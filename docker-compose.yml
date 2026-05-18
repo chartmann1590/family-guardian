@@ -1,0 +1,18 @@
+services:
+  guardian:
+    build: ./server
+    image: family-guardian/server:dev
+    container_name: family-guardian
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - guardian-data:/data
+    environment:
+      DATABASE_PATH: /data/guardian.db
+      # Generate a real secret with: openssl rand -hex 32
+      SESSION_SECRET: change-me-in-production-please
+      LOG_LEVEL: info
+
+volumes:
+  guardian-data:

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Family Guardian design-system colors -->
+    <color name="primary">#FF004AC6</color>
+    <color name="on_primary">#FFFFFFFF</color>
+    <color name="primary_container">#FF2563EB</color>
+    <color name="on_primary_container">#FFEEEFFF</color>
+    <color name="secondary">#FF006C49</color>
+    <color name="on_secondary">#FFFFFFFF</color>
+    <color name="error">#FFBA1A1A</color>
+    <color name="background">#FFF8F9FF</color>
+    <color name="on_background">#FF0B1C30</color>
+    <color name="surface">#FFF8F9FF</color>
+    <color name="surface_container">#FFE5EEFF</color>
+    <color name="surface_container_high">#FFDCE9FF</color>
+    <color name="outline">#FF737686</color>
+    <color name="outline_variant">#FFC3C6D7</color>
+</resources>

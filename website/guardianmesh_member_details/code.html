@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GuardianMesh - Member Detail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-variant": "#d3e4fe",
+                        "secondary-container": "#6cf8bb",
+                        "on-primary-container": "#7c839b",
+                        "on-primary-fixed": "#131b2e",
+                        "surface-bright": "#f8f9ff",
+                        "surface": "#f8f9ff",
+                        "background": "#f8f9ff",
+                        "on-surface": "#0b1c30",
+                        "on-secondary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "primary": "#000000",
+                        "on-tertiary-container": "#3980f4",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "tertiary": "#000000",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "error-container": "#ffdad6",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed": "#dae2fd",
+                        "outline-variant": "#c6c6cd",
+                        "secondary": "#006c49",
+                        "outline": "#76777d",
+                        "on-secondary-container": "#00714d",
+                        "primary-fixed-dim": "#bec6e0",
+                        "tertiary-fixed": "#d8e2ff",
+                        "on-secondary-fixed": "#002113",
+                        "inverse-primary": "#bec6e0",
+                        "on-surface-variant": "#45464d",
+                        "on-background": "#0b1c30",
+                        "surface-container-low": "#eff4ff",
+                        "surface-container-highest": "#d3e4fe",
+                        "inverse-surface": "#213145",
+                        "primary-container": "#131b2e",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "surface-container-high": "#dce9ff",
+                        "on-error-container": "#93000a",
+                        "surface-container": "#e5eeff",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-tertiary-fixed": "#001a42",
+                        "error": "#ba1a1a",
+                        "secondary-fixed": "#6ffbbe",
+                        "on-secondary-fixed-variant": "#005236",
+                        "surface-dim": "#cbdbf5",
+                        "secondary-fixed-dim": "#4edea3",
+                        "surface-tint": "#565e74",
+                        "tertiary-container": "#001a42"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "base": "4px",
+                        "margin-desktop": "32px",
+                        "status-pill-gap": "8px",
+                        "gutter": "16px",
+                        "sidebar-width": "320px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Inter"],
+                        "status-number": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "fontWeight": "700" }],
+                        "status-number": ["13px", { "lineHeight": "1", "fontWeight": "700" }],
+                        "label-md": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-md": ["20px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background antialiased h-screen overflow-hidden flex">
+<!-- SideNavBar (Desktop) -->
+<nav class="hidden md:flex flex-col fixed left-0 top-0 h-screen w-[320px] z-40 bg-surface dark:bg-on-primary-container shadow-sm docked left-0 h-full w-[320px]">
+<div class="p-6 border-b border-surface-container-low dark:border-on-primary-container bg-surface-container-low dark:bg-on-primary-container">
+<div class="flex items-center gap-4">
+<img alt="Family Administrator Profile" class="w-12 h-12 rounded-full object-cover border-2 border-primary" data-alt="A professional headshot of an adult woman serving as a family administrator avatar. The image has a clean, high-contrast, modern corporate aesthetic. She is wearing a dark navy blazer over a light shirt. The background is a soft, out-of-focus light gray. Lighting is bright, studio quality, emphasizing clarity and trust." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAhz98bUAsipzgEtD9u4v2t2E4jIYG4stNwL25muYLEeB_LVca9-Pew1g1WOMG4309HO6lHpwV1WtWW7VpbZm9SD6KQdpnTlCWyPsxMp3KpAGsV-Q-Vz_nGycl5RTT7_ttCmUHisOMKSPgmcpA8XV0EwnHobw8liUTNPr_ogObZ9O2ZhSFSx-zTsk6E_5UIfPtjuIWH5OdP3ZyznX8nBVUlJMkQl6da38fqCsMznMyHOfdJKuHIXXB3bpX_h_AsO9I4NgS5RiTNim56"/>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">GuardianMesh</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">Family Circle: Active</p>
+</div>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto py-4 flex flex-col gap-2">
+<a class="flex items-center gap-3 px-6 py-3 text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">map</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-3 text-primary dark:text-primary-fixed font-bold border-r-4 border-primary dark:border-primary-fixed bg-surface-container-high dark:bg-on-primary-fixed-variant scale-[0.98] transition-transform" href="#">
+<span class="material-symbols-outlined">person_pin_circle</span>
+<span class="font-label-md text-label-md">Details</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-3 text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">distance</span>
+<span class="font-label-md text-label-md">Safety Places</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-3 text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">group_add</span>
+<span class="font-label-md text-label-md">Circle Settings</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-3 text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">notifications</span>
+<span class="font-label-md text-label-md">Notifications</span>
+</a>
+</div>
+<div class="p-6 border-t border-surface-container-low dark:border-on-primary-container mt-auto">
+<button class="w-full mb-6 bg-secondary text-on-secondary font-label-md text-label-md py-3 rounded-lg flex items-center justify-center gap-2 shadow-sm hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined">emergency</span>
+                SOS Signal
+            </button>
+<div class="flex flex-col gap-2">
+<a class="flex items-center gap-3 py-2 text-on-surface-variant hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-sm">terminal</span>
+<span class="font-label-md text-label-md">Server Logs</span>
+</a>
+<a class="flex items-center gap-3 py-2 text-on-surface-variant hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-sm">logout</span>
+<span class="font-label-md text-label-md">Logout</span>
+</a>
+</div>
+</div>
+</nav>
+<!-- TopAppBar (Mobile) -->
+<header class="flex md:hidden justify-between items-center w-full px-margin-mobile h-16 fixed top-0 z-50 bg-surface/80 dark:bg-on-primary-container/80 backdrop-blur-md shadow-sm docked full-width top-0 bg-transparent">
+<h1 class="font-headline-md text-headline-md font-extrabold text-primary dark:text-primary-fixed">GuardianMesh</h1>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant dark:text-outline-variant hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined">add_alert</span>
+</button>
+<button class="text-on-surface-variant dark:text-outline-variant hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<img alt="Admin Avatar" class="w-8 h-8 rounded-full object-cover" data-alt="A professional headshot of an adult woman serving as a family administrator avatar. The image has a clean, high-contrast, modern corporate aesthetic. She is wearing a dark navy blazer over a light shirt. The background is a soft, out-of-focus light gray. Lighting is bright, studio quality, emphasizing clarity and trust." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXwW9LDRMrR-O2ItbEy-zcpG9NpnhkXfah0CrvHHHIMzPDd7zEM0y0U4sTa1E6eiTN9xgbTkYtjgMZUkCvMedC5Tcw0aGJTESmWWRiQXTnlucKgEedCKZmM6dctBuiofrOa0rt03Q3RI_ulUrMZtw03WpiggYYkv9xVU7DFCRVJB8rlJlZ8LBcvM3QLZm--QxYf-kBCuAeOUnfvpw-idxevvYRGVdOTN9Gsfx_efL1RFQA4UbAyWKnt7TQF2hJMHRSdQ0jQ5yycwc3"/>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 md:ml-[320px] pt-16 md:pt-0 h-full overflow-y-auto bg-surface-bright relative">
+<div class="p-margin-mobile md:p-margin-desktop max-w-7xl mx-auto h-full flex flex-col gap-6">
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+<div class="flex items-center gap-4">
+<div class="relative">
+<img alt="Sarah Profile" class="w-16 h-16 rounded-full object-cover border-2 border-secondary" data-alt="A clear, high-quality profile picture of a young woman named Sarah. She has a bright, approachable expression. The lighting is natural and flattering. The aesthetic is clean and modern, fitting a high-end family safety application. The background is a simple, unobtrusive gradient." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCNYOS8MTP3H6SohUST-Ow93v2Rb-Xdg_9hGuriVSBFexgPZMXWnoM8eMNoh_gT--cEzXxFOkuYZsnDjT-FwIgIYddWNvBYPd1s30ud0_pF5KPj_WR7f6qQlx2sRqKg03dDnsC5BcwXKzK2_eQ1vZsCR2zlaCTeWmP_Xizpn-qDEPpWxwgkJbEdVmb-34m8YPWAOJFE5Qfse3p-Q74QsdG8qO_l5jeTRPtQPSjyBT8iJh44qwjROGmtVTGRFHocvmvO6YTaHAcY8Zhq"/>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-secondary rounded-full border-2 border-surface"></div>
+</div>
+<div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary">Sarah</h2>
+<p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">location_on</span>
+                            Lincoln High School
+                        </p>
+</div>
+</div>
+<div class="flex gap-3 w-full md:w-auto">
+<button class="flex-1 md:flex-none flex items-center justify-center gap-2 bg-primary text-on-primary font-label-md text-label-md py-2 px-4 rounded-lg shadow-sm hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">chat_bubble</span>
+                        Message Sarah
+                    </button>
+<button class="flex-1 md:flex-none flex items-center justify-center gap-2 border border-outline-variant text-primary font-label-md text-label-md py-2 px-4 rounded-lg hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined text-[18px]">call</span>
+                        Ring Phone
+                    </button>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
+<!-- Left Column: Location & Device Health -->
+<div class="lg:col-span-1 flex flex-col gap-6">
+<!-- Map Card -->
+<div class="bg-surface-container-lowest rounded-xl shadow-[0_4px_12px_rgba(15,23,42,0.08)] overflow-hidden flex flex-col">
+<div class="p-4 border-b border-surface-container-low flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md text-primary">Current Location</h3>
+<button class="text-secondary font-label-md text-label-md hover:underline flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">route</span>
+                                View Route History
+                            </button>
+</div>
+<div class="h-48 relative bg-surface-container-low">
+<!-- Placeholder for Map -->
+<img alt="Map View" class="w-full h-full object-cover opacity-80 mix-blend-multiply" data-alt="A stylized, modern map view showing a specific city block. The map uses a clean, high-contrast palette with light grays for streets and soft blues for water, adhering to a minimalist corporate aesthetic. A prominent, precise emerald green pin marker is centrally located, indicating a current position. The overall mood is technical, clear, and reassuring." data-location="Seattle" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDhpmd4faSL8Lg9usXa8RYj0nrKPG9F6-FTmzYR8Pn2pnbFW21KC7hr3wxRwmA3om28PU-8a7Rm0AjWJUzD21ekD3vBqWLG3tGV14rjiWwFN7EdvOYY4b7Ys9E6dA0zebVdQG6G_3awiEZuDdqIluSFIGv1VZ6t8wOYbUhtbesERedQEuDwd89VBXzp52D5XeN2M9MPzU6mTp2dKU7KNmy9PlDEYEtxQrB7BflVxrriTDyCIQo90JphAcVE5P8OqwBYyn5oOPuISum"/>
+<!-- Overlay Pin -->
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+<div class="w-10 h-10 bg-secondary rounded-full flex items-center justify-center border-4 border-surface shadow-md">
+<img class="w-8 h-8 rounded-full object-cover" data-alt="A clear, high-quality profile picture of a young woman named Sarah. She has a bright, approachable expression. The lighting is natural and flattering. The aesthetic is clean and modern, fitting a high-end family safety application. The background is a simple, unobtrusive gradient." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAE1KV-mbtGVLHCQmNbR4sAMNtV-j2Vh3wLltmFTdkDCgUf74dNsHFGeI-EEDspUDt0OEvFwRmFYbBl9C6MHq0btLz2LFdvW9OIk4matsutoXukLbJLhCsJZeXNvy6BuYTAwdXZUB5QfJvi5rMZNPS3vod2genslIOAz3NvMeNdM33-tQIQ74PhMEwzlOOd0ufSNYk9jEKwn9CRTmnaDRfdOemAxvueQmED_W-c2R4CjAD19ek9OIwzoWxUBADE2TC7_YclrCp_dZph"/>
+</div>
+<div class="w-2 h-2 bg-secondary rotate-45 transform -translate-y-1"></div>
+</div>
+</div>
+<div class="p-4 bg-surface-container-lowest">
+<p class="font-body-md text-body-md text-primary font-semibold">Lincoln High School</p>
+<p class="font-label-md text-label-md text-on-surface-variant">4500 Interlake Ave N, Seattle, WA</p>
+<p class="font-label-md text-label-md text-on-surface-variant mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span> Updated 2 mins ago
+                            </p>
+</div>
+</div>
+<!-- Device Health Cards -->
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-lowest p-4 rounded-xl shadow-[0_4px_12px_rgba(15,23,42,0.08)] flex flex-col gap-2">
+<div class="flex justify-between items-center text-on-surface-variant">
+<span class="material-symbols-outlined">battery_charging_full</span>
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+</div>
+<div>
+<p class="font-status-number text-status-number text-primary text-xl">85%</p>
+<p class="font-label-md text-label-md text-on-surface-variant">Charging</p>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-4 rounded-xl shadow-[0_4px_12px_rgba(15,23,42,0.08)] flex flex-col gap-2">
+<div class="flex justify-between items-center text-on-surface-variant">
+<span class="material-symbols-outlined">signal_cellular_alt</span>
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+</div>
+<div>
+<p class="font-status-number text-status-number text-primary text-xl">Strong</p>
+<p class="font-label-md text-label-md text-on-surface-variant">Cellular</p>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-4 rounded-xl shadow-[0_4px_12px_rgba(15,23,42,0.08)] col-span-2 flex flex-row items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">wifi</span>
+</div>
+<div>
+<p class="font-body-md text-body-md font-semibold text-primary">WiFi - School_Guest</p>
+<p class="font-label-md text-label-md text-on-surface-variant">Connected • Secure</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Activity Timeline -->
+<div class="lg:col-span-2 bg-surface-container-lowest rounded-xl shadow-[0_4px_12px_rgba(15,23,42,0.08)] p-6 flex flex-col h-full">
+<h3 class="font-headline-md text-headline-md text-primary mb-6">Activity Timeline</h3>
+<div class="relative flex-1 overflow-y-auto pr-2">
+<!-- Timeline Line -->
+<div class="absolute left-4 top-2 bottom-0 w-px bg-surface-container-high"></div>
+<!-- Timeline Items -->
+<div class="flex flex-col gap-8">
+<!-- Item 1 -->
+<div class="relative flex items-start gap-6">
+<div class="absolute left-4 w-3 h-3 rounded-full bg-secondary transform -translate-x-1.5 mt-1.5 border-2 border-surface-container-lowest shadow-sm z-10"></div>
+<div class="ml-10 flex-1 bg-surface-container-low p-4 rounded-lg">
+<div class="flex justify-between items-start mb-1">
+<p class="font-body-md text-body-md font-semibold text-primary">Arrived at School</p>
+<p class="font-label-md text-label-md text-on-surface-variant">8:00 AM</p>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">school</span> Lincoln High School
+                                    </p>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="relative flex items-start gap-6">
+<div class="absolute left-4 w-3 h-3 rounded-full bg-outline-variant transform -translate-x-1.5 mt-1.5 border-2 border-surface-container-lowest shadow-sm z-10"></div>
+<div class="ml-10 flex-1 py-2">
+<div class="flex justify-between items-start mb-1">
+<p class="font-body-md text-body-md text-primary">In Transit</p>
+<p class="font-label-md text-label-md text-on-surface-variant">7:45 AM - 8:00 AM</p>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">directions_car</span> Speed: ~25 mph
+                                    </p>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="relative flex items-start gap-6">
+<div class="absolute left-4 w-3 h-3 rounded-full bg-surface-tint transform -translate-x-1.5 mt-1.5 border-2 border-surface-container-lowest shadow-sm z-10"></div>
+<div class="ml-10 flex-1 bg-surface-container-low p-4 rounded-lg">
+<div class="flex justify-between items-start mb-1">
+<p class="font-body-md text-body-md font-semibold text-primary">Left Home</p>
+<p class="font-label-md text-label-md text-on-surface-variant">7:45 AM</p>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">home</span> 123 Maple Street
+                                    </p>
+</div>
+</div>
+<!-- Item 4 (Older) -->
+<div class="relative flex items-start gap-6 opacity-70">
+<div class="absolute left-4 w-3 h-3 rounded-full bg-outline-variant transform -translate-x-1.5 mt-1.5 border-2 border-surface-container-lowest z-10"></div>
+<div class="ml-10 flex-1 py-2">
+<div class="flex justify-between items-start mb-1">
+<p class="font-body-md text-body-md text-primary">Device Charging Started</p>
+<p class="font-label-md text-label-md text-on-surface-variant">10:00 PM (Yesterday)</p>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">power</span> Battery was at 15%
+                                    </p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 py-3 bg-surface dark:bg-on-primary-container shadow-[0_-4px_12px_rgba(15,23,42,0.08)] docked full-width bottom-0 rounded-t-xl shadow-lg dark:shadow-none">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined">explore</span>
+<span class="font-label-md-mobile text-label-md-mobile mt-1">Map</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-secondary-container dark:bg-on-secondary-container text-on-secondary-container dark:text-secondary-fixed rounded-full px-4 py-1 scale-95 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-md-mobile text-label-md-mobile mt-1">Members</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined">share_location</span>
+<span class="font-label-md-mobile text-label-md-mobile mt-1">Places</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined">notifications_active</span>
+<span class="font-label-md-mobile text-label-md-mobile mt-1">Alerts</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container hover:bg-surface-container-highest transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md-mobile text-label-md-mobile mt-1">Settings</span>
+</a>
+</nav>
+</body></html>

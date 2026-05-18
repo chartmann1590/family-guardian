@@ -1,0 +1,119 @@
+package com.familyguardian.events
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.core.app.NotificationCompat
+import com.familyguardian.MainActivity
+import com.familyguardian.R
+
+/**
+ * Wraps Android notification plumbing for SOS + geofence alerts. Two channels:
+ *  - fg_alerts_high   — heads-up for SOS (IMPORTANCE_HIGH)
+ *  - fg_alerts_normal — geofence enter/exit (IMPORTANCE_DEFAULT)
+ *
+ * Each event-source carries a stable notification id so a sos_resolved cancels
+ * the earlier sos_active for the same event id.
+ */
+object Alerts {
+    const val CHANNEL_HIGH = "fg_alerts_high"
+    const val CHANNEL_NORMAL = "fg_alerts_normal"
+
+    private fun ensureChannels(context: Context) {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (nm.getNotificationChannel(CHANNEL_HIGH) == null) {
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_HIGH,
+                    context.getString(R.string.notif_channel_alerts_high),
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply {
+                    description = context.getString(R.string.notif_channel_alerts_high_desc)
+                    enableVibration(true)
+                    enableLights(true)
+                },
+            )
+        }
+        if (nm.getNotificationChannel(CHANNEL_NORMAL) == null) {
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_NORMAL,
+                    context.getString(R.string.notif_channel_alerts_normal),
+                    NotificationManager.IMPORTANCE_DEFAULT,
+                ).apply {
+                    description = context.getString(R.string.notif_channel_alerts_normal_desc)
+                },
+            )
+        }
+    }
+
+    private fun openAppIntent(context: Context, mapsUri: Uri? = null): PendingIntent {
+        val intent = mapsUri?.let { Intent(Intent.ACTION_VIEW, it) }
+            ?: Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+        return PendingIntent.getActivity(
+            context, 0, intent, PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    fun showSos(context: Context, event: GuardianEvent.SosActive) {
+        ensureChannels(context)
+        val title = "🚨 SOS from ${event.displayName ?: "a family member"}"
+        val text = if (event.lat != null && event.lng != null) {
+            "Last location: ${"%.4f".format(event.lat)}, ${"%.4f".format(event.lng)}"
+        } else "Location unavailable"
+        val mapsUri = if (event.lat != null && event.lng != null) {
+            Uri.parse("geo:${event.lat},${event.lng}?q=${event.lat},${event.lng}(SOS)")
+        } else null
+        val notif = NotificationCompat.Builder(context, CHANNEL_HIGH)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text + (event.note?.let { "\n\"$it\"" } ?: "")))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setColor(0xFFBA1A1A.toInt())
+            .setOngoing(true)
+            .setContentIntent(openAppIntent(context, mapsUri))
+            .build()
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(sosNotifId(event.id), notif)
+    }
+
+    fun cancelSos(context: Context, sosId: Long) {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.cancel(sosNotifId(sosId))
+    }
+
+    fun showGeofence(
+        context: Context,
+        userId: Long,
+        displayName: String?,
+        placeName: String,
+        entered: Boolean,
+    ) {
+        ensureChannels(context)
+        val name = displayName ?: "Someone"
+        val title = if (entered) "$name arrived at $placeName" else "$name left $placeName"
+        val notif = NotificationCompat.Builder(context, CHANNEL_NORMAL)
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentTitle(title)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setAutoCancel(true)
+            .setContentIntent(openAppIntent(context))
+            .build()
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(geofenceNotifId(userId, placeName, entered), notif)
+    }
+
+    private fun sosNotifId(eventId: Long): Int = 1_000_000 + (eventId.toInt() and 0xFFFFF)
+    private fun geofenceNotifId(userId: Long, placeName: String, entered: Boolean): Int {
+        val base = (userId.toInt() * 31 + placeName.hashCode()) and 0xFFFFF
+        return (if (entered) 2_000_000 else 3_000_000) + base
+    }
+}

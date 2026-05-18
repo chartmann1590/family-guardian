@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Family Circle Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-variant": "#d3e4fe",
+                      "secondary-container": "#6cf8bb",
+                      "on-primary-container": "#7c839b",
+                      "on-primary-fixed": "#131b2e",
+                      "surface-bright": "#f8f9ff",
+                      "surface": "#f8f9ff",
+                      "background": "#f8f9ff",
+                      "on-surface": "#0b1c30",
+                      "on-secondary": "#ffffff",
+                      "on-error": "#ffffff",
+                      "primary": "#000000",
+                      "on-tertiary-container": "#3980f4",
+                      "surface-container-lowest": "#ffffff",
+                      "on-primary": "#ffffff",
+                      "tertiary": "#000000",
+                      "on-primary-fixed-variant": "#3f465c",
+                      "error-container": "#ffdad6",
+                      "on-tertiary": "#ffffff",
+                      "primary-fixed": "#dae2fd",
+                      "outline-variant": "#c6c6cd",
+                      "secondary": "#006c49",
+                      "outline": "#76777d",
+                      "on-secondary-container": "#00714d",
+                      "primary-fixed-dim": "#bec6e0",
+                      "tertiary-fixed": "#d8e2ff",
+                      "on-secondary-fixed": "#002113",
+                      "inverse-primary": "#bec6e0",
+                      "on-surface-variant": "#45464d",
+                      "on-background": "#0b1c30",
+                      "surface-container-low": "#eff4ff",
+                      "surface-container-highest": "#d3e4fe",
+                      "inverse-surface": "#213145",
+                      "primary-container": "#131b2e",
+                      "tertiary-fixed-dim": "#adc6ff",
+                      "on-tertiary-fixed-variant": "#004395",
+                      "surface-container-high": "#dce9ff",
+                      "on-error-container": "#93000a",
+                      "surface-container": "#e5eeff",
+                      "inverse-on-surface": "#eaf1ff",
+                      "on-tertiary-fixed": "#001a42",
+                      "error": "#ba1a1a",
+                      "secondary-fixed": "#6ffbbe",
+                      "on-secondary-fixed-variant": "#005236",
+                      "surface-dim": "#cbdbf5",
+                      "secondary-fixed-dim": "#4edea3",
+                      "surface-tint": "#565e74",
+                      "tertiary-container": "#001a42"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "margin-mobile": "16px",
+                      "base": "4px",
+                      "margin-desktop": "32px",
+                      "status-pill-gap": "8px",
+                      "gutter": "16px",
+                      "sidebar-width": "320px"
+              },
+              "fontFamily": {
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "status-number": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "status-number": [
+                              "13px",
+                              {
+                                      "lineHeight": "1",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-md": [
+                              "12px",
+                              {
+                                      "lineHeight": "1",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "1.3",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col md:flex-row font-body-md">
+<!-- TopAppBar (Mobile) -->
+<header class="flex md:hidden justify-between items-center w-full px-margin-mobile h-16 fixed top-0 z-50 bg-surface/80 backdrop-blur-md text-primary font-headline-md text-headline-md font-extrabold shadow-sm bg-transparent">
+<span>GuardianMesh</span>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined hover:opacity-80 transition-opacity active:scale-95 duration-150 text-on-surface-variant cursor-pointer" data-icon="add_alert">add_alert</span>
+<span class="material-symbols-outlined hover:opacity-80 transition-opacity active:scale-95 duration-150 text-on-surface-variant cursor-pointer" data-icon="settings">settings</span>
+</div>
+</header>
+<!-- SideNavBar (Desktop) -->
+<nav class="hidden md:flex flex-col fixed left-0 top-0 h-screen w-[320px] z-40 bg-surface shadow-sm docked left-0 h-full w-[320px]">
+<div class="p-margin-desktop bg-surface-container-low border-b border-surface-container-highest">
+<div class="flex items-center gap-3 mb-2">
+<img alt="Family Administrator Profile" class="w-10 h-10 rounded-full border-2 border-secondary object-cover" data-alt="A small, circular avatar portrait of a mature male with short graying hair and glasses, wearing a casual light blue shirt. The background is a soft, out-of-focus gray. The lighting is bright and even, conveying a professional and trustworthy modern light-mode aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAq6tPbd0X71slyHDOL8C2SDp2Lq1MIGvl-1UAlqep96PktwyoZYVdNc5QIvqbvlzoeqQ2tOBlZKrgM1BC0rgsXItEIAFH5cwvDvVLNO7D-qHaY3u_DPyt7M0ztmVDK3M3owkEKJ9IbgR7InS16NhwcAx0ma1e4nFRfOWdnXP8xxfPJmB9kXs9e3k8PVUE0pu-_gzNzOfw3X1mxtJC6xGNQAddo87z392npQl4ykr3O_WLQwV4sj8mhd_w1Qv2CW0oH8HN-2AgKPXpt"/>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">GuardianMesh</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Family Circle: Active</p>
+</div>
+</div>
+</div>
+<ul class="flex-1 py-4 flex flex-col gap-1 overflow-y-auto">
+<li>
+<a class="flex items-center gap-4 px-6 py-3 font-label-md text-label-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+                    Dashboard
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-4 px-6 py-3 font-label-md text-label-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="person_pin_circle">person_pin_circle</span>
+                    Details
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-4 px-6 py-3 font-label-md text-label-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="distance">distance</span>
+                    Safety Places
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-4 px-6 py-3 font-label-md text-label-md text-primary font-bold border-r-4 border-primary bg-surface-container-high scale-[0.98] transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="group_add">group_add</span>
+                    Circle Settings
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-4 px-6 py-3 font-label-md text-label-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+                    Notifications
+                </a>
+</li>
+</ul>
+<div class="p-6">
+<button class="w-full bg-secondary text-on-secondary font-label-md text-label-md py-3 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-sm">
+<span class="material-symbols-outlined" data-icon="sos">sos</span>
+                SOS Signal
+            </button>
+</div>
+<div class="border-t border-surface-container-highest p-4 bg-surface-container-low">
+<ul class="flex flex-col gap-1">
+<li>
+<a class="flex items-center gap-4 px-2 py-2 font-label-md text-label-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+                        Server Logs
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-4 px-2 py-2 font-label-md text-label-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+                        Logout
+                    </a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 md:ml-[320px] pt-16 md:pt-0 p-margin-mobile md:p-margin-desktop bg-surface-bright min-h-screen pb-24 md:pb-margin-desktop">
+<div class="max-w-4xl mx-auto space-y-8">
+<!-- Header -->
+<div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary mb-2">Circle Settings</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Manage your family group, invitation codes, and underlying server configuration.</p>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Members List (Takes up 2 columns on large screens) -->
+<section class="lg:col-span-2 bg-surface-container-lowest rounded-xl shadow-[0_4px_12px_rgba(15,23,42,0.08)] p-6 border border-surface-container">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-md text-headline-md text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">group</span>
+                            Members
+                        </h3>
+<span class="bg-surface-container-high text-primary font-label-md text-label-md px-3 py-1 rounded-full">4 Active</span>
+</div>
+<ul class="space-y-4">
+<li class="flex items-center justify-between p-4 rounded-lg bg-surface-bright border border-surface-container hover:border-outline-variant transition-colors">
+<div class="flex items-center gap-4">
+<img alt="Admin" class="w-12 h-12 rounded-full object-cover border-2 border-secondary" data-alt="A small, circular avatar portrait of a mature male with short graying hair and glasses, wearing a casual light blue shirt. The background is a soft, out-of-focus gray. The lighting is bright and even, conveying a professional and trustworthy modern light-mode aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD5eenT1bY_XtaHsCSdMLv_VmNHLE4W0y6ktLWSN9YIjos4QDcUnoLMbyKRsnccx3eU6DzBkC2-iPH7rnJJFquErQfzGWM6IAFhMQ4mQ-VJgo253hl0SNgoBk1INq1hzxACXluOWj16O9imW_BJ0lyHto-c6v-WJQGcqmzQ9A0qBaYO6APKNik5SEolkVO-eClres6zqljgnl1Fb-JIY0nDuvvGI19-Wh3ymhF8RwDV5nKaDtfwQkapXrJMk61bqeP9gDaPgV7TisFI"/>
+<div>
+<div class="font-label-md text-label-md text-primary">James Wilson</div>
+<div class="font-body-md text-body-md text-on-surface-variant">You</div>
+</div>
+</div>
+<span class="bg-primary-container text-on-primary-fixed font-label-md text-label-md px-2 py-1 rounded">Admin</span>
+</li>
+<li class="flex items-center justify-between p-4 rounded-lg bg-surface-bright border border-surface-container hover:border-outline-variant transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center text-primary font-headline-md text-headline-md">
+                                    SW
+                                </div>
+<div>
+<div class="font-label-md text-label-md text-primary">Sarah Wilson</div>
+<div class="font-body-md text-body-md text-on-surface-variant flex items-center gap-1">
+<div class="w-2 h-2 rounded-full bg-secondary"></div> Online
+                                    </div>
+</div>
+</div>
+<span class="text-on-surface-variant font-label-md text-label-md px-2 py-1 rounded border border-outline-variant">Member</span>
+</li>
+</ul>
+</section>
+<!-- Invite Codes -->
+<section class="bg-surface-container-lowest rounded-xl shadow-[0_4px_12px_rgba(15,23,42,0.08)] p-6 border border-surface-container flex flex-col">
+<div class="mb-6">
+<h3 class="font-headline-md text-headline-md text-primary flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-on-tertiary-container">vpn_key</span>
+                            Invite Codes
+                        </h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Generate temporary codes to let new members join the circle.</p>
+</div>
+<div class="flex-1">
+<div class="bg-surface-bright border border-surface-container rounded-lg p-4 mb-4">
+<div class="flex justify-between items-center mb-2">
+<span class="font-label-md text-label-md text-primary">A7X-9B2-K4M</span>
+<span class="material-symbols-outlined text-outline-variant cursor-pointer hover:text-primary" data-icon="content_copy">content_copy</span>
+</div>
+<div class="font-body-md text-body-md text-on-surface-variant text-xs">Expires in 23 hours</div>
+</div>
+</div>
+<button class="w-full bg-primary text-on-primary font-label-md text-label-md py-2 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+                        Generate Code
+                    </button>
+</section>
+<!-- Server Settings (Full Width below) -->
+<section class="lg:col-span-3 bg-surface-container-lowest rounded-xl shadow-[0_4px_12px_rgba(15,23,42,0.08)] p-6 border border-surface-container">
+<div class="mb-6 border-b border-surface-container pb-4">
+<h3 class="font-headline-md text-headline-md text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant">dns</span>
+                            Server Settings
+                        </h3>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<!-- Hosting Details -->
+<div class="space-y-4">
+<div>
+<label class="block font-label-md text-label-md text-primary mb-1">Self-Hosting URL</label>
+<input class="w-full bg-surface-bright border border-outline-variant text-primary font-body-md text-body-md rounded-lg p-3 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all" readonly="" type="text" value="https://mesh.wilson-family.net"/>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-primary mb-1">API Key (Read Only)</label>
+<div class="relative">
+<input class="w-full bg-surface-bright border border-outline-variant text-primary font-body-md text-body-md rounded-lg p-3 pr-10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all" readonly="" type="password" value="sk_live_1234567890abcdef"/>
+<span class="material-symbols-outlined absolute right-3 top-3 text-outline-variant cursor-pointer hover:text-primary" data-icon="visibility">visibility</span>
+</div>
+</div>
+</div>
+<!-- Storage & Status -->
+<div class="bg-surface-bright rounded-lg p-6 border border-surface-container">
+<h4 class="font-label-md text-label-md text-primary mb-4">Storage Usage</h4>
+<div class="mb-2 flex justify-between font-body-md text-body-md">
+<span class="text-on-surface-variant">Location History</span>
+<span class="text-primary font-bold">1.2 GB / 5.0 GB</span>
+</div>
+<div class="w-full bg-surface-container-high rounded-full h-2 mb-6">
+<div class="bg-secondary h-2 rounded-full" style="width: 24%"></div>
+</div>
+<div class="flex items-center gap-2 text-secondary font-label-md text-label-md">
+<span class="material-symbols-outlined" data-icon="check_circle">check_circle</span>
+                                Server Status: Healthy
+                            </div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 py-3 bg-surface docked full-width bottom-0 rounded-t-xl shadow-[0_-4px_12px_rgba(15,23,42,0.08)]">
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-md text-label-md-mobile" href="#">
+<span class="material-symbols-outlined" data-icon="explore">explore</span>
+            Map
+        </a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-md text-label-md-mobile" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+            Members
+        </a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-md text-label-md-mobile" href="#">
+<span class="material-symbols-outlined" data-icon="share_location">share_location</span>
+            Places
+        </a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-md text-label-md-mobile" href="#">
+<span class="material-symbols-outlined" data-icon="notifications_active">notifications_active</span>
+            Alerts
+        </a>
+<a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full px-4 py-1 font-label-md text-label-md-mobile active:bg-surface-container-highest scale-95 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+            Settings
+        </a>
+</nav>
+</body></html>

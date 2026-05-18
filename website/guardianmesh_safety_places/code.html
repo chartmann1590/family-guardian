@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Safety Places - GuardianMesh</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-variant": "#d3e4fe",
+                        "secondary-container": "#6cf8bb",
+                        "on-primary-container": "#7c839b",
+                        "on-primary-fixed": "#131b2e",
+                        "surface-bright": "#f8f9ff",
+                        "surface": "#f8f9ff",
+                        "background": "#f8f9ff",
+                        "on-surface": "#0b1c30",
+                        "on-secondary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "primary": "#000000",
+                        "on-tertiary-container": "#3980f4",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "tertiary": "#000000",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "error-container": "#ffdad6",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed": "#dae2fd",
+                        "outline-variant": "#c6c6cd",
+                        "secondary": "#006c49",
+                        "outline": "#76777d",
+                        "on-secondary-container": "#00714d",
+                        "primary-fixed-dim": "#bec6e0",
+                        "tertiary-fixed": "#d8e2ff",
+                        "on-secondary-fixed": "#002113",
+                        "inverse-primary": "#bec6e0",
+                        "on-surface-variant": "#45464d",
+                        "on-background": "#0b1c30",
+                        "surface-container-low": "#eff4ff",
+                        "surface-container-highest": "#d3e4fe",
+                        "inverse-surface": "#213145",
+                        "primary-container": "#131b2e",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "surface-container-high": "#dce9ff",
+                        "on-error-container": "#93000a",
+                        "surface-container": "#e5eeff",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-tertiary-fixed": "#001a42",
+                        "error": "#ba1a1a",
+                        "secondary-fixed": "#6ffbbe",
+                        "on-secondary-fixed-variant": "#005236",
+                        "surface-dim": "#cbdbf5",
+                        "secondary-fixed-dim": "#4edea3",
+                        "surface-tint": "#565e74",
+                        "tertiary-container": "#001a42"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "base": "4px",
+                        "margin-desktop": "32px",
+                        "status-pill-gap": "8px",
+                        "gutter": "16px",
+                        "sidebar-width": "320px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Inter"],
+                        "status-number": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "fontWeight": "700" }],
+                        "status-number": ["13px", { "lineHeight": "1", "fontWeight": "700" }],
+                        "label-md": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-md": ["20px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background w-full h-screen overflow-hidden flex flex-col md:flex-row font-body-md text-body-md">
+<!-- TopAppBar (Mobile Only) -->
+<header class="flex md:hidden justify-between items-center w-full px-margin-mobile h-16 fixed top-0 z-50 bg-surface/80 dark:bg-on-primary-container/80 backdrop-blur-md shadow-sm bg-transparent">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-variant overflow-hidden">
+<img alt="Admin Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVwRkGGm-Xg9iKixmUCdQWIXRqzLHPz9gxzG_mG_mi1KOpvkFZOaIixhkZA96bw-EthgXY3eq97CpPBZxH84E8nSk8n6xmypRTAe_24mgRNTisFvsOEMrcM3w5dMSwRwdNh9Vj73aJdCyoJKrD5P10WqBrynhQfeVkELMdGdLFMyl_va96H5-mpQFF1o6pX003hbWON5T7bRVQUjfWzTo-efh4B_cwT63LQTjVuLJmwMha8cqQQn0b9bdJxrmT0Qa2k63EKtD-yMRC"/>
+</div>
+<h1 class="font-headline-md text-headline-md font-extrabold text-primary dark:text-primary-fixed">GuardianMesh</h1>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 text-on-surface-variant hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined">add_alert</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+</header>
+<!-- SideNavBar (Desktop Only) -->
+<nav class="hidden md:flex flex-col fixed left-0 top-0 h-screen w-[320px] z-40 bg-surface dark:bg-on-primary-container shadow-sm bg-surface-container-low dark:bg-on-primary-container">
+<div class="p-6 pb-2 border-b border-surface-variant">
+<div class="flex items-center gap-4 mb-6">
+<div class="w-12 h-12 rounded-full overflow-hidden bg-surface-variant flex-shrink-0">
+<img alt="Family Administrator Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCZFCYCxp8-k66LbA786hnqexA7jwQTeYRBswFFhCpOnGDHeBIll-tH0WKkDybYiXwymmTAL4GAXNgo-hX1yWfoSMutzkip1nrniyzVjpx3NVD8Kpg7TTXNJ8k2rjN8Ip2iGUifJB6gmyGSoxcZQX1SY2PdgKlUiVUiF7ZI6yFfUaQQ0afycjuANM8Wg4lrNAS0i8AbNHVlKIXjr63lrePCD72eKyG3i0FgPNCQL_RlicvQJEq-BkKZNgdN1926EeTTV47YT_jegIlF"/>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">GuardianMesh</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Family Circle: Active</p>
+</div>
+</div>
+<button class="w-full py-3 px-4 bg-secondary text-on-secondary rounded-lg font-label-md text-label-md hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">emergency</span>
+                SOS Signal
+            </button>
+</div>
+<div class="flex-1 overflow-y-auto py-4 flex flex-col gap-1 px-3">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">map</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">person_pin_circle</span>
+<span class="font-label-md text-label-md">Details</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-primary dark:text-primary-fixed font-bold border-r-4 border-primary dark:border-primary-fixed bg-surface-container-high dark:bg-on-primary-fixed-variant active:scale-[0.98] transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">distance</span>
+<span class="font-label-md text-label-md">Safety Places</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">group_add</span>
+<span class="font-label-md text-label-md">Circle Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">notifications</span>
+<span class="font-label-md text-label-md">Notifications</span>
+</a>
+</div>
+<div class="p-4 border-t border-surface-variant flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">terminal</span>
+<span class="font-label-md text-label-md">Server Logs</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-error hover:bg-error-container transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md">Logout</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area (Fluid Map Base) -->
+<main class="flex-1 relative w-full h-full md:ml-[320px] mt-16 md:mt-0 bg-surface-dim overflow-hidden">
+<!-- Map Background Layer -->
+<div class="absolute inset-0 bg-cover bg-center" data-alt="A clean, highly detailed digital map interface in a light mode color palette. The map shows a stylized suburban neighborhood with soft, pastel-colored blocks for houses, parks, and winding gray roads. The overall mood is precise, calm, and technological, emphasizing clear geometric alignment and professional data visualization." data-location="Suburbs" style="background-image: url('https://www.gstatic.com/labs-code/stitch/stitch-placeholder-300x300.svg'); opacity: 0.6;"></div>
+<!-- Geofence Overlays (Simulated on Map) -->
+<div class="absolute top-[30%] left-[40%] w-[300px] h-[300px] rounded-full bg-secondary-container/20 border-2 border-secondary border-dashed flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+<div class="w-4 h-4 rounded-full bg-secondary shadow-[0_0_12px_rgba(0,108,73,0.6)]"></div>
+</div>
+<!-- Floating Panel: Safety Places Management -->
+<section class="absolute top-margin-mobile md:top-margin-desktop left-margin-mobile right-margin-mobile md:right-auto md:left-margin-desktop bottom-[80px] md:bottom-margin-desktop md:w-[420px] z-20 flex flex-col pointer-events-none">
+<div class="bg-surface rounded-xl shadow-[0_12px_24px_rgba(15,23,42,0.15)] w-full h-full flex flex-col pointer-events-auto border border-surface-variant overflow-hidden">
+<!-- Panel Header -->
+<div class="p-6 border-b border-surface-variant bg-surface-bright flex flex-col gap-4 shrink-0">
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface">Safety Places</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Manage geofences and active alerts.</p>
+</div>
+<button class="w-full bg-primary text-on-primary py-3 rounded-lg font-label-md text-label-md shadow-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">add_location_alt</span>
+                        Add New Place
+                    </button>
+</div>
+<!-- Places List -->
+<div class="flex-1 overflow-y-auto bg-surface flex flex-col divide-y divide-surface-variant">
+<!-- Place Item: Home -->
+<div class="p-6 flex flex-col gap-5 hover:bg-surface-container-lowest transition-colors">
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+</div>
+<div class="flex-1">
+<h3 class="font-headline-md text-[18px] text-on-surface leading-tight">Home</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">123 Maple Street, Suburbia</p>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">edit</span>
+</button>
+</div>
+<div class="bg-surface-container-low rounded-lg p-4 flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface">Arrival Alerts</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-9 h-5 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<div class="h-px w-full bg-surface-variant"></div>
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface">Departure Alerts</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-9 h-5 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+</div>
+</div>
+<!-- Place Item: School -->
+<div class="p-6 flex flex-col gap-5 hover:bg-surface-container-lowest transition-colors">
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">school</span>
+</div>
+<div class="flex-1">
+<h3 class="font-headline-md text-[18px] text-on-surface leading-tight">School</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">456 Education Ave, Suburbia</p>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">edit</span>
+</button>
+</div>
+<div class="bg-surface-container-low rounded-lg p-4 flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface">Arrival Alerts</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-9 h-5 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<div class="h-px w-full bg-surface-variant"></div>
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface">Departure Alerts</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox" value=""/>
+<div class="w-9 h-5 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+</div>
+</div>
+<!-- Place Item: Gym -->
+<div class="p-6 flex flex-col gap-5 hover:bg-surface-container-lowest transition-colors">
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">fitness_center</span>
+</div>
+<div class="flex-1">
+<h3 class="font-headline-md text-[18px] text-on-surface leading-tight">Gym</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">789 Iron Street, Downtown</p>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">edit</span>
+</button>
+</div>
+<div class="bg-surface-container-low rounded-lg p-4 flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface">Arrival Alerts</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox" value=""/>
+<div class="w-9 h-5 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<div class="h-px w-full bg-surface-variant"></div>
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface">Departure Alerts</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox" value=""/>
+<div class="w-9 h-5 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 py-3 bg-surface dark:bg-on-primary-container shadow-[0_-4px_12px_rgba(15,23,42,0.08)] rounded-t-xl">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container active:bg-surface-container-highest transition-all duration-200 p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined">explore</span>
+<span class="font-label-md-mobile text-label-md-mobile mt-1">Map</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container active:bg-surface-container-highest transition-all duration-200 p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-md-mobile text-label-md-mobile mt-1">Members</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-secondary-container dark:bg-on-secondary-container text-on-secondary-container dark:text-secondary-fixed rounded-full px-4 py-1 active:scale-95 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">share_location</span>
+<span class="font-label-md-mobile text-label-md-mobile mt-1">Places</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container active:bg-surface-container-highest transition-all duration-200 p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined">notifications_active</span>
+<span class="font-label-md-mobile text-label-md-mobile mt-1">Alerts</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container active:bg-surface-container-highest transition-all duration-200 p-2 rounded-lg" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md-mobile text-label-md-mobile mt-1">Settings</span>
+</a>
+</nav>
+</body></html>

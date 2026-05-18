@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GuardianMesh — Circle Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+        darkMode: "class",
+        theme: {
+            extend: {
+                colors: {
+                    "primary": "#000000", "on-primary": "#ffffff",
+                    "primary-container": "#131b2e", "on-primary-container": "#7c839b",
+                    "secondary": "#006c49", "on-secondary": "#ffffff",
+                    "secondary-container": "#6cf8bb",
+                    "error": "#ba1a1a", "error-container": "#ffdad6",
+                    "background": "#f8f9ff", "on-background": "#0b1c30",
+                    "surface": "#f8f9ff", "on-surface": "#0b1c30",
+                    "surface-bright": "#f8f9ff",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-low": "#eff4ff",
+                    "surface-container": "#e5eeff",
+                    "surface-container-high": "#dce9ff",
+                    "surface-container-highest": "#d3e4fe",
+                    "on-surface-variant": "#45464d",
+                    "outline": "#76777d", "outline-variant": "#c6c6cd"
+                },
+                borderRadius: { DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px" },
+                spacing: { "gutter": "16px", "margin-mobile": "16px", "margin-desktop": "32px", "sidebar-width": "320px" },
+                fontFamily: { "headline-md": ["Inter"], "body-md": ["Inter"], "label-md": ["Inter"] },
+                fontSize: {
+                    "headline-md": ["20px", { lineHeight: "1.3", fontWeight: "600" }],
+                    "body-md": ["14px", { lineHeight: "1.5", fontWeight: "400" }],
+                    "label-md": ["12px", { lineHeight: "1", letterSpacing: "0.05em", fontWeight: "600" }]
+                }
+            }
+        }
+    };
+</script>
+<style>.material-symbols-outlined { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }</style>
+</head>
+<body class="bg-background text-on-background w-full min-h-screen flex">
+
+<header class="flex md:hidden justify-between items-center w-full px-margin-mobile h-16 fixed top-0 z-50 bg-surface/80 backdrop-blur-md text-primary font-headline-md text-headline-md font-extrabold shadow-sm">
+    <a href="/dashboard">GuardianMesh</a>
+</header>
+
+<nav class="hidden md:flex flex-col fixed left-0 top-0 h-screen w-sidebar-width z-40 bg-surface-container-low border-r border-outline-variant/20 shadow-[0_4px_12px_rgba(15,23,42,0.08)]">
+    <div class="p-gutter pb-8 border-b border-outline-variant/20">
+        <div class="flex items-center gap-4 mb-6">
+            <div class="w-12 h-12 rounded-full bg-primary-container flex items-center justify-center text-on-primary">
+                <span class="material-symbols-outlined">shield_lock</span>
+            </div>
+            <div>
+                <h1 class="font-headline-md text-headline-md font-bold text-primary">{{CIRCLE_NAME}}</h1>
+                <p class="font-label-md text-label-md text-on-surface-variant">Signed in as {{DISPLAY_NAME}}</p>
+            </div>
+        </div>
+    </div>
+    <div class="flex-1 overflow-y-auto py-4 flex flex-col gap-2 px-2">
+        <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container" href="/dashboard">
+            <span class="material-symbols-outlined">map</span><span class="font-label-md text-label-md">Dashboard</span>
+        </a>
+        <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container" href="/places">
+            <span class="material-symbols-outlined">distance</span><span class="font-label-md text-label-md">Safety Places</span>
+        </a>
+        <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-primary font-bold border-r-4 border-primary bg-surface-container-high" href="/settings">
+            <span class="material-symbols-outlined">group_add</span><span class="font-label-md text-label-md">Circle Settings</span>
+        </a>
+    </div>
+    <div class="mt-auto border-t border-outline-variant/20 p-2 flex flex-col gap-2">
+        <form method="POST" action="/api/auth/logout">
+            <button type="submit" class="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container">
+                <span class="material-symbols-outlined">logout</span><span class="font-label-md text-label-md">Logout</span>
+            </button>
+        </form>
+    </div>
+</nav>
+
+<main class="flex-1 md:ml-sidebar-width w-full p-margin-mobile md:p-margin-desktop pt-20 md:pt-margin-desktop">
+    <div class="max-w-3xl mx-auto flex flex-col gap-8">
+
+        <header class="flex flex-col gap-2">
+            <h1 class="font-headline-md text-headline-md text-primary text-2xl font-bold">Circle Settings</h1>
+            <p class="text-on-surface-variant text-sm">Manage members and invitations for <strong id="circle-name">{{CIRCLE_NAME}}</strong>.</p>
+        </header>
+
+        <!-- Members -->
+        <section class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-headline-md text-headline-md text-on-surface">Members</h2>
+                <span id="member-count" class="text-sm text-on-surface-variant"></span>
+            </div>
+            <div id="member-list" class="flex flex-col divide-y divide-outline-variant/20"></div>
+        </section>
+
+        <!-- Invites -->
+        <section id="invite-section" class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="font-headline-md text-headline-md text-on-surface">Invitations</h2>
+                    <p class="text-sm text-on-surface-variant mt-1">Share a code with a family member so they can join this circle. Codes expire after 24 hours.</p>
+                </div>
+                <button id="generate-btn" class="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-primary/90 flex items-center gap-2">
+                    <span class="material-symbols-outlined">qr_code_2</span> Generate code
+                </button>
+            </div>
+            <div id="invite-list" class="flex flex-col divide-y divide-outline-variant/20"></div>
+        </section>
+
+        <section id="non-admin-note" class="hidden bg-surface-container-low rounded-xl p-6 text-sm text-on-surface-variant">
+            Only the circle admin can manage invitations.
+        </section>
+    </div>
+</main>
+
+<div id="toast-host" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
+
+<script>window.__SETTINGS_STATE__ = {{{INITIAL_STATE_JSON}}};</script>
+<script src="/public/settings.js"></script>
+</body></html>

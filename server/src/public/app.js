@@ -1,0 +1,365 @@
+// GuardianMesh dashboard client
+// - Renders Leaflet map with one marker per circle member
+// - Opens WebSocket and applies `location_update` events live
+// - Refreshes the sidebar member list
+
+(function () {
+    const state = window.__GUARDIAN_STATE__;
+    if (!state) {
+        console.error('Initial state missing.');
+        return;
+    }
+
+    const DEFAULT_CENTER = [37.7749, -122.4194]; // SF — placeholder until first fix
+    const map = L.map('map', { zoomControl: true, attributionControl: true }).setView(DEFAULT_CENTER, 13);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+
+    const markers = new Map();     // userId -> L.Marker
+    const members = new Map();     // userId -> { displayName, lat, lng, batteryPct, recordedAt }
+    const placeLayers = new Map(); // placeId -> L.Circle
+    const places = new Map();      // placeId -> { id, name, lat, lng, radiusM }
+    const sosByUser = new Map();   // userId -> sos event (active only)
+
+    function initialsAvatar(name) {
+        const initials = (name || '?')
+            .split(/\s+/)
+            .map((w) => w[0])
+            .filter(Boolean)
+            .slice(0, 2)
+            .join('')
+            .toUpperCase();
+        return initials || '?';
+    }
+
+    function makeIcon(displayName, active, sos) {
+        if (sos) {
+            return L.divIcon({
+                html: `<div class="fg-sos-pulse">${initialsAvatar(displayName)}</div>`,
+                className: 'fg-sos-marker',
+                iconSize: [36, 36],
+                iconAnchor: [18, 18],
+            });
+        }
+        const border = active ? '#006c49' : '#76777d';
+        const html = `
+            <div style="
+                background:#f8f9ff;
+                border:2px solid ${border};
+                border-radius:9999px;
+                width:36px;height:36px;
+                display:flex;align-items:center;justify-content:center;
+                font-family:Inter,sans-serif;font-weight:700;font-size:12px;
+                color:#0b1c30;
+                box-shadow:0 4px 12px rgba(15,23,42,0.2);
+            ">${initialsAvatar(displayName)}</div>`;
+        return L.divIcon({
+            html,
+            className: 'fg-marker',
+            iconSize: [36, 36],
+            iconAnchor: [18, 18],
+        });
+    }
+
+    function isActive(recordedAt) {
+        return recordedAt && Date.now() - recordedAt < 5 * 60 * 1000;
+    }
+
+    function relativeTime(ms) {
+        if (!ms) return '—';
+        const diff = Date.now() - ms;
+        if (diff < 60_000) return 'Just now';
+        if (diff < 3_600_000) return Math.floor(diff / 60_000) + 'm ago';
+        if (diff < 86_400_000) return Math.floor(diff / 3_600_000) + 'h ago';
+        return Math.floor(diff / 86_400_000) + 'd ago';
+    }
+
+    function batteryColor(pct) {
+        if (pct == null) return { fg: '#45464d', bg: '#e5eeff' };
+        if (pct < 10) return { fg: '#ba1a1a', bg: '#ffdad6' };
+        if (pct < 20) return { fg: '#943700', bg: '#ffdbcd' };
+        return { fg: '#006c49', bg: '#e5eeff' };
+    }
+
+    function renderMemberList() {
+        const list = document.getElementById('member-list');
+        const activeCount = document.getElementById('active-count');
+        list.innerHTML = '';
+        let active = 0;
+
+        const sorted = Array.from(members.values()).sort((a, b) => {
+            if (a.userId === state.me.userId) return -1;
+            if (b.userId === state.me.userId) return 1;
+            return (a.displayName || '').localeCompare(b.displayName || '');
+        });
+
+        for (const m of sorted) {
+            const liveNow = isActive(m.recordedAt);
+            if (liveNow) active += 1;
+            const battery = batteryColor(m.batteryPct);
+            const card = document.createElement('div');
+            card.className = 'p-4 border-b border-surface-container flex items-start gap-3 hover:bg-surface-container-low cursor-pointer';
+            card.innerHTML = `
+                <div class="relative mt-1">
+                    <div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center font-bold text-on-surface">${initialsAvatar(m.displayName)}</div>
+                    <div class="absolute -bottom-1 -right-1 w-3.5 h-3.5 ${liveNow ? 'bg-secondary' : 'bg-outline-variant'} border-2 border-surface rounded-full"></div>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-headline-md text-headline-md text-on-surface text-base truncate">${escapeHtml(m.displayName || 'Member')}</span>
+                        <span class="font-label-md text-label-md text-on-surface-variant whitespace-nowrap">${relativeTime(m.recordedAt)}</span>
+                    </div>
+                    <p class="font-body-md text-body-md text-on-surface-variant text-sm mb-2">${m.lat != null ? `${m.lat.toFixed(4)}, ${m.lng.toFixed(4)}` : 'No location yet'}</p>
+                    <div class="flex gap-status-pill-gap">
+                        ${m.batteryPct != null ? `
+                            <div class="flex items-center gap-1 px-2 py-0.5 rounded-full" style="background:${battery.bg}33">
+                                <span class="material-symbols-outlined text-[14px]" style="color:${battery.fg}">battery_full</span>
+                                <span class="font-status-number text-status-number" style="color:${battery.fg}">${m.batteryPct}%</span>
+                            </div>` : ''}
+                        ${liveNow ? '' : `
+                            <div class="flex items-center gap-1 bg-surface-container px-2 py-0.5 rounded-full">
+                                <span class="material-symbols-outlined text-[14px] text-outline">wifi_off</span>
+                                <span class="font-status-number text-status-number text-outline">Idle</span>
+                            </div>`}
+                    </div>
+                </div>`;
+            card.addEventListener('click', () => {
+                if (m.lat != null) map.flyTo([m.lat, m.lng], 15);
+            });
+            list.appendChild(card);
+        }
+
+        activeCount.textContent = `${active} Active`;
+    }
+
+    function escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function upsertMarker(m) {
+        if (m.lat == null || m.lng == null) return;
+        const existing = markers.get(m.userId);
+        const sos = sosByUser.has(m.userId);
+        const icon = makeIcon(m.displayName, isActive(m.recordedAt), sos);
+        if (existing) {
+            existing.setLatLng([m.lat, m.lng]);
+            existing.setIcon(icon);
+        } else {
+            const marker = L.marker([m.lat, m.lng], { icon }).addTo(map);
+            marker.bindTooltip(m.displayName || 'Member', { direction: 'top', offset: [0, -16] });
+            markers.set(m.userId, marker);
+        }
+    }
+
+    function fitMapToMembers() {
+        const points = Array.from(members.values()).filter((m) => m.lat != null).map((m) => [m.lat, m.lng]);
+        if (points.length === 0) return;
+        if (points.length === 1) {
+            map.setView(points[0], 14);
+        } else {
+            map.fitBounds(points, { padding: [40, 40] });
+        }
+    }
+
+    function drawPlace(p) {
+        const existing = placeLayers.get(p.id);
+        if (existing) {
+            existing.setLatLng([p.lat, p.lng]);
+            existing.setRadius(p.radiusM);
+            return;
+        }
+        const layer = L.circle([p.lat, p.lng], {
+            radius: p.radiusM,
+            color: '#006c49',
+            weight: 2,
+            opacity: 0.8,
+            dashArray: '6 6',
+            fillColor: '#006c49',
+            fillOpacity: 0.08,
+            interactive: false,
+        }).addTo(map);
+        placeLayers.set(p.id, layer);
+    }
+
+    function toast(msg, kind = 'info') {
+        const host = document.getElementById('toast-host');
+        if (!host) return;
+        const el = document.createElement('div');
+        const bg = kind === 'enter' ? '#006c49' : kind === 'exit' ? '#ba1a1a' : '#0b1c30';
+        el.style.cssText = `
+            background:${bg};color:#fff;border-radius:10px;padding:10px 14px;
+            font-family:Inter,sans-serif;font-size:14px;font-weight:500;
+            box-shadow:0 12px 24px rgba(15,23,42,0.2);max-width:360px;
+        `;
+        el.textContent = msg;
+        host.appendChild(el);
+        setTimeout(() => {
+            el.style.transition = 'opacity 0.4s';
+            el.style.opacity = '0';
+            setTimeout(() => el.remove(), 500);
+        }, 4_000);
+    }
+
+    function renderSosBanner() {
+        const banner = document.getElementById('sos-banner');
+        const title = document.getElementById('sos-banner-title');
+        const meta = document.getElementById('sos-banner-meta');
+        const locateBtn = document.getElementById('sos-locate');
+        const resolveBtn = document.getElementById('sos-resolve');
+        const active = Array.from(sosByUser.values());
+        if (active.length === 0) { banner.classList.add('hidden'); return; }
+
+        const first = active[0];
+        const isMine = first.userId === state.me.userId;
+        title.textContent = `${first.displayName} triggered SOS`;
+        meta.textContent =
+            (first.lat != null ? `at ${first.lat.toFixed(4)}, ${first.lng.toFixed(4)}` : 'location unknown') +
+            ` · ${relativeTime(first.startedAt)}` +
+            (active.length > 1 ? ` · ${active.length - 1} other active SOS` : '');
+        banner.classList.remove('hidden');
+
+        locateBtn.onclick = () => {
+            if (first.lat != null) map.flyTo([first.lat, first.lng], 16);
+        };
+
+        if (isMine || state.me.role === 'admin') {
+            resolveBtn.classList.remove('hidden');
+            resolveBtn.onclick = async () => {
+                resolveBtn.disabled = true;
+                try {
+                    const res = await fetch(`/api/sos/${first.id}/resolve`, {
+                        method: 'POST', credentials: 'same-origin',
+                    });
+                    if (!res.ok) {
+                        const e = await res.json().catch(() => ({}));
+                        alert('Resolve failed: ' + (e.error || res.status));
+                    }
+                } finally { resolveBtn.disabled = false; }
+            };
+        } else {
+            resolveBtn.classList.add('hidden');
+        }
+    }
+
+    function applySosEvent(ev) {
+        if (ev.type === 'sos_active') {
+            sosByUser.set(ev.userId, ev);
+            const existingMember = members.get(ev.userId) || { userId: ev.userId };
+            if (ev.lat != null) {
+                Object.assign(existingMember, {
+                    displayName: ev.displayName || existingMember.displayName,
+                    lat: ev.lat, lng: ev.lng, recordedAt: ev.startedAt,
+                });
+                members.set(ev.userId, existingMember);
+                upsertMarker(existingMember);
+            } else if (markers.has(ev.userId)) {
+                // No coords on the event but we have a marker — re-skin as SOS pulse.
+                upsertMarker(existingMember);
+            }
+        } else if (ev.type === 'sos_resolved') {
+            sosByUser.delete(ev.userId);
+            const m = members.get(ev.userId);
+            if (m) upsertMarker(m);
+        }
+        renderSosBanner();
+        renderMemberList();
+    }
+
+    // Sidebar SOS button — trigger an SOS for the current user
+    const sosBtn = document.getElementById('sos-btn');
+    if (sosBtn) {
+        sosBtn.addEventListener('click', async () => {
+            if (!confirm('Activate SOS now? This will alert everyone in your circle.')) return;
+            sosBtn.disabled = true;
+            try {
+                const res = await fetch('/api/sos/activate', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({}),
+                });
+                if (!res.ok) {
+                    const e = await res.json().catch(() => ({}));
+                    alert('Failed to activate SOS: ' + (e.error || res.status));
+                }
+            } finally { sosBtn.disabled = false; }
+        });
+    }
+
+    // Initial state from server-side render
+    for (const m of state.members || []) {
+        members.set(m.userId, m);
+        upsertMarker(m);
+    }
+    for (const p of state.places || []) {
+        places.set(p.id, p);
+        drawPlace(p);
+    }
+    for (const ev of state.sosActive || []) {
+        sosByUser.set(ev.userId, ev);
+        // re-skin marker if we already have one
+        const m = members.get(ev.userId);
+        if (m) upsertMarker(m);
+    }
+    renderMemberList();
+    renderSosBanner();
+    fitMapToMembers();
+    map.invalidateSize();
+
+    // WebSocket — live location updates
+    let ws;
+    let reconnectDelay = 1000;
+    function connectWs() {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${proto}//${location.host}/ws`);
+        ws.addEventListener('open', () => { reconnectDelay = 1000; });
+        ws.addEventListener('message', (ev) => {
+            let msg;
+            try { msg = JSON.parse(ev.data); } catch { return; }
+            if (msg.type === 'location_update') {
+                const existing = members.get(msg.userId) || { userId: msg.userId };
+                const updated = Object.assign(existing, {
+                    displayName: msg.displayName || existing.displayName,
+                    lat: msg.lat,
+                    lng: msg.lng,
+                    batteryPct: msg.batteryPct,
+                    recordedAt: msg.recordedAt,
+                });
+                members.set(msg.userId, updated);
+                upsertMarker(updated);
+                renderMemberList();
+            } else if (msg.type === 'geofence_enter') {
+                toast(`${msg.displayName} arrived at ${msg.placeName}`, 'enter');
+            } else if (msg.type === 'geofence_exit') {
+                toast(`${msg.displayName} left ${msg.placeName}`, 'exit');
+            } else if (msg.type === 'sos_active' || msg.type === 'sos_resolved') {
+                applySosEvent(msg);
+                if (msg.type === 'sos_active') {
+                    toast(`🚨 ${msg.displayName} triggered SOS`, 'exit');
+                } else {
+                    toast(`SOS resolved for ${msg.displayName}`, 'enter');
+                }
+            }
+        });
+        ws.addEventListener('close', () => {
+            setTimeout(connectWs, reconnectDelay);
+            reconnectDelay = Math.min(reconnectDelay * 2, 30_000);
+        });
+        ws.addEventListener('error', () => { try { ws.close(); } catch {} });
+    }
+    connectWs();
+
+    // Periodic re-render so "Just now / 2m ago" stays fresh
+    setInterval(renderMemberList, 30_000);
+
+    // Map needs an invalidateSize when the sidebar layout settles
+    window.addEventListener('resize', () => map.invalidateSize());
+    setTimeout(() => map.invalidateSize(), 100);
+})();

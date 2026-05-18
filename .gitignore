@@ -1,0 +1,32 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# SQLite (dev)
+server/data/
+*.db
+*.db-wal
+*.db-shm
+
+# Build outputs
+dist/
+build/
+
+# Android
+android/.gradle/
+android/.idea/
+android/local.properties
+android/captures/
+android/app/build/
+android/build/
+android/**/build/
+android/.cxx/
+*.iml
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/

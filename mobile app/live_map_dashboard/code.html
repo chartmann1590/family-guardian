@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Family Guardian - Live Map</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#ffffff",
+                        "surface-container-low": "#eff4ff",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "on-primary-fixed": "#00174b",
+                        "inverse-primary": "#b4c5ff",
+                        "secondary": "#006c49",
+                        "secondary-fixed": "#6ffbbe",
+                        "tertiary-container": "#bc4800",
+                        "primary-fixed": "#dbe1ff",
+                        "primary": "#004ac6",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "surface-container-highest": "#d3e4fe",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "secondary-container": "#6cf8bb",
+                        "on-secondary-fixed-variant": "#005236",
+                        "surface": "#f8f9ff",
+                        "tertiary": "#943700",
+                        "surface-variant": "#d3e4fe",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-surface": "#0b1c30",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed": "#ffdbcd",
+                        "on-tertiary-fixed": "#360f00",
+                        "on-background": "#0b1c30",
+                        "on-tertiary-container": "#ffede6",
+                        "on-surface-variant": "#434655",
+                        "error": "#ba1a1a",
+                        "on-primary-container": "#eeefff",
+                        "surface-tint": "#0053db",
+                        "background": "#f8f9ff",
+                        "primary-container": "#2563eb",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#4edea3",
+                        "surface-bright": "#f8f9ff",
+                        "inverse-surface": "#213145",
+                        "outline": "#737686",
+                        "surface-container-high": "#dce9ff",
+                        "outline-variant": "#c3c6d7",
+                        "on-secondary-fixed": "#002113",
+                        "on-secondary-container": "#00714d",
+                        "surface-container": "#e5eeff",
+                        "surface-dim": "#cbdbf5",
+                        "on-error-container": "#93000a",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-gap-lg": "24px",
+                        "gutter": "16px",
+                        "stack-gap-md": "16px",
+                        "container-padding": "20px",
+                        "stack-gap-sm": "8px",
+                        "unit": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "label-bold": ["Inter"],
+                        "body-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "label-md": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "headline-lg": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "label-bold": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>.map-bg {
+    background-color: #e5e7eb;
+    /* Fallback */
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuCZybRoVQwXVDPQs_g_Vob8ld3Ww391_377feUOW2BdalBljMzX8MRVTbvNsQcTqCK8OkKYPMeVdrKd_W22wRR1yYOtxSOZv-ZTJD9Ouc2UXeLHewxD9XeEsohv9JNcjBY5kP2tKoCT7WKMmKzeFmfjty_z2ESYlBvVFoV6MIcB-7ukYip8j8w5-U9Lo_PrWvRwtd7DqccruVJKdQ8cphZrDa0xiamamWrYbbc8Cbi10wxwiP5tUTGKLjb-ABL5Q2ZfTwxsUJHZq-4);
+    background-size: cover;
+    background-position: center
+    }
+.marker-shadow {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15)
+    }
+.bottom-sheet-shadow {
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.08)
+    }
+.sos-pulse {
+    animation: pulse 2s infinite
+    }
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(186, 26, 26, 0.4);
+        } 70% {
+        box-shadow: 0 0 0 15px rgba(186, 26, 26, 0);
+        } 100% {
+        box-shadow: 0 0 0 0 rgba(186, 26, 26, 0);
+        }
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-lg antialiased h-screen w-screen overflow-hidden flex flex-col relative">
+<!-- Top App Bar (Web / Mobile) -->
+<header class="bg-surface dark:bg-surface shadow-sm docked full-width top-0 z-40 flex justify-between items-center w-full px-container-padding py-stack-gap-sm">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden shrink-0">
+<img alt="User profile avatar" class="w-full h-full object-cover" data-alt="A small, circular avatar portrait of a smiling woman with shoulder-length hair, representing a parent profile. The lighting is soft and natural, fitting a modern, friendly app interface. The image is cropped tightly to her face." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCRRYS9tydn62hTFoabiofhflP0BvV8shR83DMuJYM3AhAJjc8R1mhKp8KfWE_VFuJ2S5520SCf7ftYrVxYGLy_gs9vSoUlLq193woPwpeXm8sDYWwfk-gDJ9PgRVq-O3_C2g4Lr_gQ3gVvZnkxg1-VVHAcKBUPqFyRgefjnGDd8uM4DL8tTTB243A5QXZjeWzRUtgzsvECn_SxRm1cKx_cET5n5SzGfsuELFRt6dhy4xG4_zb2dOF5X14bI0x9SYXmOm2KN1YK5hw"/>
+</div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">Family Guardian</h1>
+</div>
+<button class="w-10 h-10 rounded-full hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors flex items-center justify-center text-primary dark:text-primary-fixed-dim shrink-0">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings</span>
+</button>
+</header>
+<!-- Map Canvas Area -->
+<main class="flex-grow relative map-bg w-full h-full" data-location="Suburban Neighborhood Map">
+<!-- Map Markers -->
+<!-- Mom Marker -->
+<div class="absolute top-[30%] left-[45%] flex flex-col items-center transform -translate-x-1/2 -translate-y-full z-10 hover:scale-105 transition-transform cursor-pointer">
+<div class="w-12 h-12 rounded-full border-4 border-white marker-shadow bg-surface overflow-hidden z-10 relative">
+<img alt="Mom Profile" class="w-full h-full object-cover" data-alt="A small circular avatar of a smiling woman, serving as a map marker. The image is bright and clear, fitting the soft-modern aesthetic of the Family Guardian app." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBPJcfWJvkXBJuABpVoEjfL8HJM3HR4g7uoBfsTMw-WfvdNIf8jHTl1yJ1EAKWuy6s4NQkkXbMOmCLUZvK5STrdw_FIZl0DPWDq4pSeFz02xBY3txSp7_l11hXLtKNH8-BAxT7txDjw0tO6HxRNSwKjVkSHfFri08c1ZNnvkUn6GlJTxrsB2VSsdPjuOHXDsW9An96uDy6Ip3j_1ljBYy5_77MRRW6iNf2umXoBdO839-TTulYAbx_NNhnCoV3LWLHBTziOgYJCj1Q"/>
+</div>
+<div class="w-4 h-4 bg-white transform rotate-45 -mt-2 marker-shadow rounded-sm z-0 relative"></div>
+<div class="mt-1 bg-surface-container-lowest px-3 py-1 rounded-full shadow-sm text-on-surface font-label-bold text-label-bold">Mom</div>
+</div>
+<!-- Dad Marker -->
+<div class="absolute top-[60%] left-[20%] flex flex-col items-center transform -translate-x-1/2 -translate-y-full z-10 hover:scale-105 transition-transform cursor-pointer">
+<div class="w-12 h-12 rounded-full border-4 border-white marker-shadow bg-surface overflow-hidden z-10 relative">
+<img alt="Dad Profile" class="w-full h-full object-cover" data-alt="A small circular avatar of a smiling man with a light beard, serving as a map marker. The image is bright and clear, fitting the soft-modern aesthetic of the Family Guardian app." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCB3ZeX8YJ-Oel7EmmsIbb5zPpFE58AT9VDIxyvfsMf_4eO5ovf9W-qU6f1lUslV1EEtU7HFDFnJzlTgGdD3iAwg7uZhgElRP-8_pbbnnWwJO4QmNZCWeHMIXWQunL88SfkgAwvB09O695bUzWRzai3oT4WcmoTe-5HKo8tscoEXUmTrusC_tG2ubCP6ilHwIpjL393hW_QR9MY_iSXhEvGjfMsMxm44OkcqUGnhsWYdONfBIvPvHVyG_DiA8g4zzbCdqY0NVlYD3g"/>
+</div>
+<div class="w-4 h-4 bg-white transform rotate-45 -mt-2 marker-shadow rounded-sm z-0 relative"></div>
+<div class="mt-1 bg-surface-container-lowest px-3 py-1 rounded-full shadow-sm text-on-surface font-label-bold text-label-bold">Dad</div>
+</div>
+<!-- Leo Marker -->
+<div class="absolute top-[45%] left-[75%] flex flex-col items-center transform -translate-x-1/2 -translate-y-full z-10 hover:scale-105 transition-transform cursor-pointer">
+<div class="w-12 h-12 rounded-full border-4 border-white marker-shadow bg-primary overflow-hidden z-10 relative">
+<img alt="Leo Profile" class="w-full h-full object-cover" data-alt="A small circular avatar of a young boy smiling, serving as a map marker. The image is bright and clear, fitting the soft-modern aesthetic of the Family Guardian app." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHbPl9yrmtX2LLZz0PWulfLeKVc3gt3xT_00T13aeWgUKlSQ5sKm68M94Ft7Zl_gDyxAKwBIzDSn4-ni1f_8WsD20uwqI5mtQnlsogzpq_i3xF07UQudshAbdf8IkausIcwLno1usnaaZ4sIQ-VC7VSLwnAy6VUfnxz6P0IKZ0Wcpn5m_fr-_sygwXb7gW78ho27HRAy42wB-FS6KrB7n-bi67eHlVLd7TZI3rmu1Kgsitn-HiYPX20B80xyDob2GUVoCuLFTpG78"/>
+</div>
+<div class="w-4 h-4 bg-white transform rotate-45 -mt-2 marker-shadow rounded-sm z-0 relative"></div>
+<div class="mt-1 bg-surface-container-lowest px-3 py-1 rounded-full shadow-sm text-on-surface font-label-bold text-label-bold">Leo</div>
+</div>
+<!-- SOS Button Floating Action -->
+<button aria-label="Emergency SOS" class="absolute top-6 right-6 w-14 h-14 bg-error text-on-error rounded-full shadow-lg flex items-center justify-center z-20 sos-pulse hover:bg-error-container hover:text-on-error-container transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 28px;">sos</span>
+</button>
+<!-- Bottom Sheet / Floating Cards Status Area -->
+<div class="absolute bottom-24 left-0 w-full px-container-padding z-20 pb-4">
+<div class="flex gap-4 overflow-x-auto pb-4 snap-x no-scrollbar">
+<!-- Status Card 1: Leo -->
+<div class="snap-center shrink-0 w-72 bg-surface-container-lowest rounded-xl p-4 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+<div class="w-12 h-12 rounded-full overflow-hidden shrink-0">
+<img alt="Leo" class="w-full h-full object-cover" data-alt="Avatar of Leo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvdxWVo6xutpqTh_kE1pI7TO8dAT_OzfguH3StJ1SyrKX7fpjbBmtrrVgwsd_mCpYyRpsn6BNvcnV_QA66KMytVK-NxUxGP97nZqprMsTqnbxXc5qRC_9rJd8rWE5l_yLUztMsr4EmKwTsBVuJsnVWbCpVSbJKLik1KErw4vJrnTInkPCUUQLa7dCN1o2S1KbnsD-OXXB6UhHrbrKFaBZbzhaFR1q9Vp94ufyqJ9JRywUZH_j202kqYKAgPzMzF0hjPgBWZG061Ks"/>
+</div>
+<div class="flex-grow">
+<h3 class="font-body-lg text-body-lg font-semibold text-on-surface">Leo</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[16px] text-secondary">check_circle</span>
+                             At School
+                         </p>
+</div>
+<div class="text-right">
+<span class="font-label-md text-label-md text-outline">Just now</span>
+</div>
+</div>
+<!-- Status Card 2: Dad -->
+<div class="snap-center shrink-0 w-72 bg-surface-container-lowest rounded-xl p-4 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+<div class="w-12 h-12 rounded-full overflow-hidden shrink-0">
+<img alt="Dad" class="w-full h-full object-cover" data-alt="Avatar of Dad" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9O5EcAWdkJhaRPPeRmiTFpPXn9I8p5H6Fu2V-aciyFr1hnx7mvN41O07C-_XCul2RXiZdvRgmnIpXpQCtdSUVxc5GTpH-ZlvYkxHkFH19yN08wvhtmkGHw-Y5lGu6r5Affs7wRo2NxZUktKqAC_PGJZLPNe076lNwm5SzE22lTrsBXBQvAQfc6Yhs38SPftYbXh-2LjDn_rGvwXyZLtx9uUtdHNPI71s3pHfXKWSsJNtFEdqpvFvWhxKQgwZqUTOyxXq-uVPKzRY"/>
+</div>
+<div class="flex-grow">
+<h3 class="font-body-lg text-body-lg font-semibold text-on-surface">Dad</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[16px] text-primary">directions_car</span>
+                             Moving
+                         </p>
+</div>
+<div class="text-right">
+<span class="font-label-md text-label-md text-outline">3 min ago</span>
+</div>
+</div>
+<!-- Status Card 3: Mom -->
+<div class="snap-center shrink-0 w-72 bg-surface-container-lowest rounded-xl p-4 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+<div class="w-12 h-12 rounded-full overflow-hidden shrink-0">
+<img alt="Mom" class="w-full h-full object-cover" data-alt="Avatar of Mom" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuFn_SVGUmQMg8LAOkVd7yJ9gbA5CUCglS044H7Z838X5-EOk1qQUgnKKVSr1sgKkPpuT2tCU6cQeFQkAXL7R4v0vo4zEU9qZ8pVy_w5HGMkKAha2PXyS_UDbjMZVOrYxbiIF2otPyJOqtWT_1T5UBzqq3HPwQJ3rpMq0SiVLP7gAqWTku7mctBHZV3CUfqmrdIYDwow14okUnYMOecRKfo1lTFMAI3GvddiprSSja11pJlxtlepsqZ43_N43Sq23k27us15yjXXc"/>
+</div>
+<div class="flex-grow">
+<h3 class="font-body-lg text-body-lg font-semibold text-on-surface">Mom</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[16px] text-secondary">home</span>
+                             At Home
+                         </p>
+</div>
+<div class="text-right">
+<span class="font-label-md text-label-md text-outline">10 min ago</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Bar (Mobile primarily) -->
+<nav class="md:hidden bg-surface dark:bg-surface shadow-lg docked full-width bottom-0 rounded-t-xl fixed w-full z-50 flex justify-around items-center px-4 pb-4 pt-2 border-t-0">
+<!-- Active Tab: Map -->
+<button class="hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-all flex flex-col items-center justify-center bg-primary-container dark:bg-primary text-on-primary-container dark:text-on-primary rounded-full px-5 py-2 scale-90 duration-200">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">map</span>
+<span class="font-label-md text-label-md mt-1">Map</span>
+</button>
+<!-- Inactive Tab: Chat -->
+<button class="hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-all flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant p-2">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">chat</span>
+<span class="font-label-md text-label-md mt-1">Chat</span>
+</button>
+<!-- Inactive Tab: History -->
+<button class="hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-all flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant p-2">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">history</span>
+<span class="font-label-md text-label-md mt-1">History</span>
+</button>
+<!-- Inactive Tab: Safety -->
+<button class="hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-all flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant p-2">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">security</span>
+<span class="font-label-md text-label-md mt-1">Safety</span>
+</button>
+</nav>
+<!-- Desktop Side Nav (Hidden on Mobile, Visible on md+) - Simplified for this layout as Bottom Nav is requested, but providing structural completeness for responsive mapping -->
+<nav class="hidden md:flex flex-col bg-surface shadow-lg fixed left-0 top-[72px] h-[calc(100vh-72px)] w-20 items-center py-6 gap-8 z-30">
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl w-14 h-14 p-2 transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">map</span>
+<span class="font-label-md text-label-md text-[10px] mt-1">Map</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant rounded-xl w-14 h-14 p-2 hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">chat</span>
+<span class="font-label-md text-label-md text-[10px] mt-1">Chat</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant rounded-xl w-14 h-14 p-2 hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">history</span>
+<span class="font-label-md text-label-md text-[10px] mt-1">History</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant rounded-xl w-14 h-14 p-2 hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">security</span>
+<span class="font-label-md text-label-md text-[10px] mt-1">Safety</span>
+</button>
+</nav>
+<style>
+        /* Hide scrollbar for horizontal scrolling cards */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+    </style>
+</body></html>

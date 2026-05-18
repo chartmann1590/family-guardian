@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Family Guardian</string>
+    <string name="notif_channel_location">Location sharing</string>
+    <string name="notif_channel_location_desc">Sustained foreground notification while sharing your location with your circle.</string>
+    <string name="notif_sharing_title">Family Guardian is sharing your location</string>
+    <string name="notif_sharing_text">Tap to open the app. Your location is reported only to your self-hosted server.</string>
+
+    <string name="notif_channel_alerts_high">Critical alerts</string>
+    <string name="notif_channel_alerts_high_desc">SOS broadcasts from your family circle.</string>
+    <string name="notif_channel_alerts_normal">Family activity</string>
+    <string name="notif_channel_alerts_normal_desc">Geofence arrivals and departures.</string>
+</resources>

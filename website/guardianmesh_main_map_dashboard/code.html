@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GuardianMesh - Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-variant": "#d3e4fe",
+                      "secondary-container": "#6cf8bb",
+                      "on-primary-container": "#7c839b",
+                      "on-primary-fixed": "#131b2e",
+                      "surface-bright": "#f8f9ff",
+                      "surface": "#f8f9ff",
+                      "background": "#f8f9ff",
+                      "on-surface": "#0b1c30",
+                      "on-secondary": "#ffffff",
+                      "on-error": "#ffffff",
+                      "primary": "#000000",
+                      "on-tertiary-container": "#3980f4",
+                      "surface-container-lowest": "#ffffff",
+                      "on-primary": "#ffffff",
+                      "tertiary": "#000000",
+                      "on-primary-fixed-variant": "#3f465c",
+                      "error-container": "#ffdad6",
+                      "on-tertiary": "#ffffff",
+                      "primary-fixed": "#dae2fd",
+                      "outline-variant": "#c6c6cd",
+                      "secondary": "#006c49",
+                      "outline": "#76777d",
+                      "on-secondary-container": "#00714d",
+                      "primary-fixed-dim": "#bec6e0",
+                      "tertiary-fixed": "#d8e2ff",
+                      "on-secondary-fixed": "#002113",
+                      "inverse-primary": "#bec6e0",
+                      "on-surface-variant": "#45464d",
+                      "on-background": "#0b1c30",
+                      "surface-container-low": "#eff4ff",
+                      "surface-container-highest": "#d3e4fe",
+                      "inverse-surface": "#213145",
+                      "primary-container": "#131b2e",
+                      "tertiary-fixed-dim": "#adc6ff",
+                      "on-tertiary-fixed-variant": "#004395",
+                      "surface-container-high": "#dce9ff",
+                      "on-error-container": "#93000a",
+                      "surface-container": "#e5eeff",
+                      "inverse-on-surface": "#eaf1ff",
+                      "on-tertiary-fixed": "#001a42",
+                      "error": "#ba1a1a",
+                      "secondary-fixed": "#6ffbbe",
+                      "on-secondary-fixed-variant": "#005236",
+                      "surface-dim": "#cbdbf5",
+                      "secondary-fixed-dim": "#4edea3",
+                      "surface-tint": "#565e74",
+                      "tertiary-container": "#001a42"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "margin-mobile": "16px",
+                      "base": "4px",
+                      "margin-desktop": "32px",
+                      "status-pill-gap": "8px",
+                      "gutter": "16px",
+                      "sidebar-width": "320px"
+              },
+              "fontFamily": {
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "status-number": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "status-number": [
+                              "13px",
+                              {
+                                      "lineHeight": "1",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-md": [
+                              "12px",
+                              {
+                                      "lineHeight": "1",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "1.3",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+</head>
+<body class="bg-background text-on-background font-body-md text-body-md overflow-hidden w-full h-screen relative flex">
+<!-- TopAppBar for Mobile -->
+<header class="flex md:hidden justify-between items-center w-full px-margin-mobile h-16 fixed top-0 z-50 bg-surface/80 dark:bg-on-primary-container/80 backdrop-blur-md text-primary dark:text-primary-fixed font-headline-md text-headline-md font-extrabold text-primary dark:text-primary-fixed bg-transparent shadow-sm">
+<div class="flex items-center gap-2">
+<span>GuardianMesh</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="hover:opacity-80 transition-opacity text-on-surface-variant dark:text-outline-variant">
+<span class="material-symbols-outlined" data-icon="add_alert">add_alert</span>
+</button>
+<button class="hover:opacity-80 transition-opacity text-on-surface-variant dark:text-outline-variant">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<img alt="Admin Avatar" class="w-8 h-8 rounded-full border border-outline-variant" data-alt="A small circular avatar image showing a professional headshot of an administrator, suitable for a profile icon in a modern corporate web application. The lighting is bright and clear." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyKM_zuZOLsLm1gBEgMzHqVv1d9L-dOchLC9ivkrCCBOJHNg7h5jc8EadnZoK910DWtSLfy5i0449QaX2Gry6XPDlzJTkaxWuUzYIaEsHMFTboJzHHbMi7g6EpQgXbR7nzBof0wCUHyJsG3-arwRh1xGlvt8Uy3RtYZ2T1ayimT7Fz2a5RMA0rBsaDha0sGjtGXJUbd3lp8A4AB99NCrsny3Uu1wIs3NbFV1RPT4qV6Y7EWMLfrfRJ3yFUkOi48LfIoy5tqu-UJI21"/>
+</div>
+</header>
+<!-- SideNavBar for Desktop -->
+<nav class="hidden md:flex flex-col fixed left-0 top-0 h-screen w-[320px] z-40 bg-surface dark:bg-on-primary-container text-primary dark:text-primary-fixed bg-surface-container-low dark:bg-on-primary-container shadow-sm shadow-[0_4px_12px_rgba(15,23,42,0.08)] border-r border-outline-variant/20">
+<div class="p-gutter pb-8 border-b border-outline-variant/20">
+<div class="flex items-center gap-4 mb-6">
+<img alt="Family Administrator Profile" class="w-12 h-12 rounded-full border-2 border-primary-fixed" data-alt="A circular profile picture of a family administrator, showing a friendly yet professional demeanor. The background is subtle and unobtrusive, fitting seamlessly into a high-trust, modern UI environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDEfr4ary4xRyT3X5HH4hA5YZApvgvS1YyECZLtN9FNdgPeKsowOzd3rKBByB8e86QvcC5n5TOQ4NNFleCPm8KLgHAwnFBs6Jitp9HYoDp5gOM3VCUdIPl8ArW0Hapii6jpIrzhrSR1I2t9aPpFHPgyYvivUEVBjhmPzF37nSRDr6UXjkPQWr-4-eWoHBHxAZglBecH6-2ErlaE3MCHDVLMNsr9ymbApqgddFMPeFN8heFRGNCa9oHFPrJUSWgnD44yayLP5jtVr537"/>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">GuardianMesh</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">Family Circle: Active</p>
+</div>
+</div>
+<button class="w-full bg-secondary text-on-secondary font-label-md text-label-md py-3 rounded-full flex items-center justify-center gap-2 hover:bg-secondary-fixed-dim transition-colors shadow-sm">
+<span class="material-symbols-outlined" data-icon="sos" data-weight="fill">sos</span>
+                SOS Signal
+            </button>
+</div>
+<div class="flex-1 overflow-y-auto py-4 flex flex-col gap-2 px-2">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-primary dark:text-primary-fixed font-bold border-r-4 border-primary dark:border-primary-fixed bg-surface-container-high dark:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="person_pin_circle">person_pin_circle</span>
+<span class="font-label-md text-label-md">Details</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="distance">distance</span>
+<span class="font-label-md text-label-md">Safety Places</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="group_add">group_add</span>
+<span class="font-label-md text-label-md">Circle Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="font-label-md text-label-md">Notifications</span>
+</a>
+</div>
+<div class="mt-auto border-t border-outline-variant/20 p-2 flex flex-col gap-2">
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span class="font-label-md text-label-md">Server Logs</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-label-md text-label-md">Logout</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 relative md:ml-[320px] w-full h-full bg-surface-container-low">
+<!-- Full Bleed Map Background Placeholder -->
+<div class="absolute inset-0 w-full h-full bg-surface-dim overflow-hidden z-0 flex items-center justify-center">
+<!-- Simulated map texture/image for generation -->
+<div class="absolute inset-0 bg-cover bg-center opacity-80" data-alt="A clean, highly detailed digital map interface viewed from a top-down perspective, similar to modern navigation apps. The map uses a bright, high-contrast color scheme typical of light mode, with clear roads, green parks, and subtle terrain features. The lighting is even and flat, optimizing legibility for an administrative dashboard aesthetic." data-location="San Francisco" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAERYqtGfdLomCGel3kCec8-BXHcXpXeiL0NNsQMqNVMflmq2wbA4vYzdtBw3dRw8vOJAk9q_0p7E7p4tXzBDhh1WTDd_NpsPIJ8oC2FSMZbQed8gJLb9h5BCOusUbkVxOHkDB2kE_J_eyhQ3TAAM7pXdJT4E6PEk2wtel3bo5elrlu0P8LX_IPYTNq8DI90Lwxvepfwr7GxF0E6ez68PDQwK36SMNZjNqW7WLJcdUGZh_lX6aLmypm5o4KVqU6dSLTghFwludEZuDt')"></div>
+<!-- Map Markers (Floating on map) -->
+<!-- Marker 1: Sarah (Active) -->
+<div class="absolute top-[30%] left-[40%] transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group cursor-pointer z-10">
+<div class="bg-surface rounded-full p-1 border-2 border-secondary shadow-sm mb-1">
+<img alt="Sarah Profile" class="w-8 h-8 rounded-full" data-alt="A close-up portrait of a young woman with a friendly expression, serving as an avatar pin on a map interface. The image is bright and professional." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrOG4i_ZF2sG1uGeRL82YCncDV3S1Ucbhc8h-fvIjDVLesOYjg4sGTXu6qU_SweSzx0Lu0vo3LAQnIXqEK1tiBd2vupihF6bpoFEsB4HTcbnrxDH_DEaFYrmbXy1VY0gSYjtfy8jfAd8Dm4K2rA6wccit5BGApta6TlyTqVWeVAOvGetv0DTXoQ3QqpImWrnvkX01IWcL4E8Er4gT7EL1FpfztrH3_Hf3IyuZinAyH7p_HZogPo7qKVaKbYqNhFvYI1BsvhEfl5quE"/>
+</div>
+<div class="bg-surface px-3 py-1.5 rounded-full shadow-[0_4px_12px_rgba(15,23,42,0.08)] flex items-center gap-2 opacity-90 group-hover:opacity-100 transition-opacity">
+<span class="font-label-md text-label-md text-on-surface whitespace-nowrap">Sarah - At School</span>
+</div>
+</div>
+<!-- Marker 2: Dad (Moving) -->
+<div class="absolute top-[60%] left-[65%] transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group cursor-pointer z-10">
+<div class="bg-surface rounded-full p-1 border-2 border-secondary shadow-sm mb-1">
+<img alt="Dad Profile" class="w-8 h-8 rounded-full" data-alt="A professional headshot of a middle-aged man used as a digital map marker. The lighting is balanced and clear, fitting a trustworthy family safety application." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYDCv8lyua6XexRIaAYWAowM2kklX1fePKEnurbU8NSb-MkuR6IpXcWBx9FrqZCAcKdSksvfz6NEjJrFYNjthcb0nTgE5nWvUpN_KzQMSrfc8uopuXNiXhhhh3lg7lTk5MijkWv3CnVf-Nc7kuWwI5ZSSSE17r00FBiL4W6PpU_khStNxXYBo_JfgQ6EQHNSTass5ZMAPwanff-yXSz_D4zH1rhwK0js5goozyb_JSUH6e7hqUYm1hGq4b45Q6F572Pm4BbfThdAKI"/>
+</div>
+<div class="bg-surface px-3 py-1.5 rounded-full shadow-[0_4px_12px_rgba(15,23,42,0.08)] flex items-center gap-2 opacity-90 group-hover:opacity-100 transition-opacity">
+<span class="font-label-md text-label-md text-on-surface whitespace-nowrap">Dad - Driving 35mph</span>
+</div>
+</div>
+<!-- Marker 3: Mom (Inactive) -->
+<div class="absolute top-[20%] left-[70%] transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group cursor-pointer z-10">
+<div class="bg-surface rounded-full p-1 border-2 border-outline-variant shadow-sm mb-1 opacity-70">
+<img alt="Mom Profile" class="w-8 h-8 rounded-full grayscale" data-alt="A portrait of a woman used as an inactive map marker, styled with a subtle grayscale effect to indicate a stationary or offline status within a sleek, modern UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBjlWQ7kWELvdqLdvJx2VGx51uyTPx26JXYinBXbN4_Hh7Q_V6dfNiwm4XMWNoSxl5V-bpuaQXaTvxoxXIIkJQ8tvlR7tTShx2uJ0tmpw788pSokT4slWdIoOGxebO_Viah3ZBiX3xi8K7CnAGmdX7roUCr6pTZ2ibdFct65Q_ePUxYtowuvCa7vDwUEilUx8XVP875O2_gAYbEh9gmDO3_vCjSvnuvjdWnIE3s78dpZEYmr46l3rpssl-oMGuZ4JhApatXMy3BRVj2"/>
+</div>
+<div class="bg-surface px-3 py-1.5 rounded-full shadow-[0_4px_12px_rgba(15,23,42,0.08)] flex items-center gap-2 opacity-70 group-hover:opacity-100 transition-opacity">
+<span class="font-label-md text-label-md text-outline whitespace-nowrap">Mom - Home</span>
+</div>
+</div>
+</div>
+<!-- Floating Live Circle Panel -->
+<div class="absolute top-20 md:top-gutter right-gutter md:right-margin-desktop w-[340px] max-w-[calc(100vw-32px)] bg-surface/95 backdrop-blur-md rounded-xl shadow-[0_12px_24px_rgba(15,23,42,0.15)] border border-outline-variant/30 flex flex-col z-20 overflow-hidden">
+<div class="p-4 border-b border-outline-variant/20 flex justify-between items-center bg-surface-bright">
+<h2 class="font-headline-md text-headline-md text-primary font-bold flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary" data-icon="group">group</span>
+                    Live Circle
+                </h2>
+<span class="font-status-number text-status-number text-on-surface-variant bg-surface-container-low px-2 py-1 rounded-full">3 Active</span>
+</div>
+<div class="flex flex-col max-h-[614px] overflow-y-auto">
+<!-- Member Card: Sarah -->
+<div class="p-4 border-b border-surface-container flex items-start gap-3 hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="relative mt-1">
+<img alt="Sarah" class="w-10 h-10 rounded-full object-cover" data-alt="Small thumbnail portrait of a young woman for a list view item. Clear lighting and neutral background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCq58v0_I8BKhpy9XFbZBTRMALlqECQOBniQ4R1foG-6vw7dN967rw7615woiN0l92Ktpiq_2Qp40siWET8NFNZmIGQp6Ku0tsk9sgfO_jpp0QON5Jg5gKYCtfFncQBOZG4POb2GYWiAIdAPGJlgepOx2TqVpeoe-FRRA1KtuX2oqgev_GV5ARsLFclJ0ck75fugLiAyTj1sk5R4-Ju7grS7E1dzmk8BZD2LFnOZ4Gm0bKIDE2TuX4hFHA8tKkcwTCV1XuMVLMrfagh"/>
+<div class="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-secondary border-2 border-surface rounded-full"></div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-center mb-1">
+<span class="font-headline-md text-headline-md text-on-surface text-base">Sarah</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Just now</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm mb-2">Lincoln High School</p>
+<div class="flex gap-status-pill-gap">
+<div class="flex items-center gap-1 bg-surface-container px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined text-[14px] text-secondary" data-icon="battery_full">battery_full</span>
+<span class="font-status-number text-status-number text-on-surface">85%</span>
+</div>
+<div class="flex items-center gap-1 bg-surface-container px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined text-[14px] text-outline" data-icon="directions_walk">directions_walk</span>
+<span class="font-status-number text-status-number text-on-surface">Stationary</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Member Card: Dad -->
+<div class="p-4 border-b border-surface-container flex items-start gap-3 hover:bg-surface-container-low transition-colors cursor-pointer">
+<div class="relative mt-1">
+<img alt="Dad" class="w-10 h-10 rounded-full object-cover" data-alt="Small thumbnail portrait of a man for a list view item. Professional and approachable appearance." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDjmqOJJ9JUCfisWD1P34uUjN3s1GjBJ2bqKj7O1W4iGjgJcza_gEYcIxlb7KJIJwLDHEAtgGoiEQi5k6agxTUzaTDOXt3-cuiTExXHsdBzdV39RcWpIucbyIDCFitSPbe3jmoqZU6z33B1mbVDN5QKXdFaQNlFJucEVECX47YYeiL3HbSAMgwVfDa2wYeW2IbqwPYvP2YIiBtTnKr_Z87tsPZieqYbHDRprj9V0X1vToFpiWMjwImwkNaQl7vzu0RzK6rgv2mGqoYY"/>
+<div class="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-secondary border-2 border-surface rounded-full"></div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-center mb-1">
+<span class="font-headline-md text-headline-md text-on-surface text-base">Dad</span>
+<span class="font-label-md text-label-md text-on-surface-variant">2m ago</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm mb-2">I-95 Northbound</p>
+<div class="flex gap-status-pill-gap">
+<div class="flex items-center gap-1 bg-error-container/30 px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined text-[14px] text-error" data-icon="battery_1_bar">battery_1_bar</span>
+<span class="font-status-number text-status-number text-error">12%</span>
+</div>
+<div class="flex items-center gap-1 bg-surface-container px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant" data-icon="directions_car">directions_car</span>
+<span class="font-status-number text-status-number text-on-surface">35 mph</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Member Card: Mom -->
+<div class="p-4 flex items-start gap-3 hover:bg-surface-container-low transition-colors cursor-pointer opacity-80">
+<div class="relative mt-1">
+<img alt="Mom" class="w-10 h-10 rounded-full object-cover grayscale" data-alt="Small grayscale thumbnail portrait of a woman for a list view item, denoting offline status." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAenF4o3zdOqq4N123CUlzmSX0QVegNaTtPiDSyzk8BpFK7RDOQHB1gZ9mCtLi4kpSmoj6JOIhRQ4RhrpzGPlQ5qKQZ8mfhSkER2QSt8TNKXWKAZwzQ_tHYyjyJIjqLEqaHnwE-nP2pR9Sxcun2iLBY4TDeNCv30EMmMiGMWJciHUAosHJMSMwxyYqndtdI-dNA4IatpFwFv0NPf3eeMa6Q8Ga0wRopy8SIPyk87tdi5pwE86RHOS7QB1Cl6SnkUHUp8U1nFb02a5wg"/>
+<div class="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-outline-variant border-2 border-surface rounded-full"></div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-center mb-1">
+<span class="font-headline-md text-headline-md text-on-surface text-base">Mom</span>
+<span class="font-label-md text-label-md text-outline">1hr ago</span>
+</div>
+<p class="font-body-md text-body-md text-outline text-sm mb-2">Home</p>
+<div class="flex gap-status-pill-gap">
+<div class="flex items-center gap-1 bg-surface-container px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined text-[14px] text-outline" data-icon="wifi_off">wifi_off</span>
+<span class="font-status-number text-status-number text-outline">Offline</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar for Mobile -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 py-3 bg-surface dark:bg-on-primary-container shadow-lg dark:shadow-none shadow-[0_-4px_12px_rgba(15,23,42,0.08)] docked full-width bottom-0 rounded-t-xl">
+<a class="flex flex-col items-center justify-center bg-secondary-container dark:bg-on-secondary-container text-on-secondary-container dark:text-secondary-fixed rounded-full px-4 py-1 active:bg-surface-container-highest" href="#">
+<span class="material-symbols-outlined" data-icon="explore">explore</span>
+<span class="font-label-md text-label-md mt-1">Map</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container active:bg-surface-container-highest" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-label-md text-label-md mt-1">Members</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container active:bg-surface-container-highest" href="#">
+<span class="material-symbols-outlined" data-icon="share_location">share_location</span>
+<span class="font-label-md text-label-md mt-1">Places</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container active:bg-surface-container-highest" href="#">
+<span class="material-symbols-outlined" data-icon="notifications_active">notifications_active</span>
+<span class="font-label-md text-label-md mt-1">Alerts</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container active:bg-surface-container-highest" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md mt-1">Settings</span>
+</a>
+</nav>
+</body></html>

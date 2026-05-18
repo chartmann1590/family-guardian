@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Onboarding Step 2: Circle Selection - GuardianMesh</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary": "#ffffff",
+                        "surface-container": "#e5eeff",
+                        "error": "#ba1a1a",
+                        "tertiary": "#000000",
+                        "inverse-primary": "#bec6e0",
+                        "secondary-container": "#6cf8bb",
+                        "primary": "#000000",
+                        "on-surface": "#0b1c30",
+                        "secondary": "#006c49",
+                        "on-secondary-fixed-variant": "#005236",
+                        "on-tertiary-fixed": "#001a42",
+                        "outline-variant": "#c6c6cd",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#dce9ff",
+                        "surface-variant": "#d3e4fe",
+                        "primary-fixed": "#dae2fd",
+                        "on-primary-container": "#7c839b",
+                        "on-secondary-fixed": "#002113",
+                        "tertiary-fixed": "#d8e2ff",
+                        "outline": "#76777d",
+                        "on-primary": "#ffffff",
+                        "on-surface-variant": "#45464d",
+                        "surface": "#f8f9ff",
+                        "primary-fixed-dim": "#bec6e0",
+                        "on-error-container": "#93000a",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "on-secondary-container": "#00714d",
+                        "secondary-fixed-dim": "#4edea3",
+                        "on-tertiary-container": "#3980f4",
+                        "surface-dim": "#cbdbf5",
+                        "on-primary-fixed": "#131b2e",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "surface-bright": "#f8f9ff",
+                        "surface-container-low": "#eff4ff",
+                        "primary-container": "#131b2e",
+                        "surface-tint": "#565e74",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-error": "#ffffff",
+                        "tertiary-container": "#001a42",
+                        "on-background": "#0b1c30",
+                        "secondary-fixed": "#6ffbbe",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "inverse-surface": "#213145",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#f8f9ff",
+                        "surface-container-highest": "#d3e4fe"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "sidebar-width": "320px",
+                        "gutter": "16px",
+                        "margin-desktop": "32px",
+                        "status-pill-gap": "8px",
+                        "base": "4px"
+                    },
+                    "fontFamily": {
+                        "status-number": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "status-number": ["13px", {"lineHeight": "1", "fontWeight": "700"}],
+                        "label-md": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-md": ["20px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col items-center justify-center p-gutter md:p-margin-desktop">
+<div class="w-full max-w-4xl flex flex-col items-center text-center">
+<!-- Progress Indicator -->
+<div class="flex items-center gap-2 mb-8 md:mb-12">
+<div class="w-12 h-2 rounded-full bg-primary-fixed"></div>
+<div class="w-12 h-2 rounded-full bg-primary"></div>
+<div class="w-12 h-2 rounded-full bg-surface-container-high"></div>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg mb-2">Set up your Family Circle</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-xl mx-auto mb-10 md:mb-16">
+            A Circle is your private group where members can share locations and safety alerts. Are you starting a new one, or joining an existing group?
+        </p>
+<!-- Selection Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl">
+<!-- Create Circle Card -->
+<button class="group flex flex-col items-start p-8 rounded-xl bg-surface-container-lowest border border-outline-variant hover:border-primary hover:shadow-[0_12px_24px_rgba(15,23,42,0.15)] transition-all duration-300 text-left focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background relative overflow-hidden">
+<div class="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+<div class="w-16 h-16 rounded-full bg-primary-fixed flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl text-primary" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+</div>
+<h2 class="font-headline-md text-headline-md mb-3 text-on-surface">Create a New Circle</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                    I am the Family Administrator. Set up a new secure perimeter and invite family members to join my network.
+                </p>
+<div class="mt-8 flex items-center text-primary font-label-md text-label-md uppercase tracking-wider">
+                    Start Setup <span class="material-symbols-outlined ml-2 text-sm">arrow_forward</span>
+</div>
+</button>
+<!-- Join Circle Card -->
+<button class="group flex flex-col items-start p-8 rounded-xl bg-surface-container-lowest border border-outline-variant hover:border-primary hover:shadow-[0_12px_24px_rgba(15,23,42,0.15)] transition-all duration-300 text-left focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background relative overflow-hidden">
+<div class="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+<div class="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl text-primary" style="font-variation-settings: 'FILL' 1;">group</span>
+</div>
+<h2 class="font-headline-md text-headline-md mb-3 text-on-surface">Join an Existing Circle</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                    I have an invite code. Connect to an existing family network managed by another administrator.
+                </p>
+<div class="mt-8 w-full">
+<label class="sr-only" for="invite-code">Invite Code</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-on-surface-variant pointer-events-none">vpn_key</span>
+<input class="w-full pl-10 pr-4 py-3 rounded-lg border border-outline-variant bg-surface focus:bg-surface-container-lowest focus:border-primary focus:ring-0 font-body-md text-body-md transition-colors" id="invite-code" onclick="event.stopPropagation();" placeholder="Enter Invite Code" type="text"/>
+</div></div></button><button class="absolute right-2 bg-primary text-on-primary font-label-md text-label-md px-4 py-1.5 rounded-md hover:bg-on-surface transition-colors" onclick="event.stopPropagation();">Join</button>
+</div>
+</div>
+<!-- Back Action -->
+<button class="mt-12 flex items-center text-on-surface-variant hover:text-primary font-label-md text-label-md transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background rounded-md px-2 py-1">
+<span class="material-symbols-outlined mr-2 text-sm">arrow_back</span>
+            Back to Profile
+        </button>
+</body></html>

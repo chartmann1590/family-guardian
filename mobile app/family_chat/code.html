@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Family Chat - Family Guardian</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#ffffff",
+                        "surface-container-low": "#eff4ff",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "on-primary-fixed": "#00174b",
+                        "inverse-primary": "#b4c5ff",
+                        "secondary": "#006c49",
+                        "secondary-fixed": "#6ffbbe",
+                        "tertiary-container": "#bc4800",
+                        "primary-fixed": "#dbe1ff",
+                        "primary": "#004ac6",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "surface-container-highest": "#d3e4fe",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "secondary-container": "#6cf8bb",
+                        "on-secondary-fixed-variant": "#005236",
+                        "surface": "#f8f9ff",
+                        "tertiary": "#943700",
+                        "surface-variant": "#d3e4fe",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-surface": "#0b1c30",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed": "#ffdbcd",
+                        "on-tertiary-fixed": "#360f00",
+                        "on-background": "#0b1c30",
+                        "on-tertiary-container": "#ffede6",
+                        "on-surface-variant": "#434655",
+                        "error": "#ba1a1a",
+                        "on-primary-container": "#eeefff",
+                        "surface-tint": "#0053db",
+                        "background": "#f8f9ff",
+                        "primary-container": "#2563eb",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#4edea3",
+                        "surface-bright": "#f8f9ff",
+                        "inverse-surface": "#213145",
+                        "outline": "#737686",
+                        "surface-container-high": "#dce9ff",
+                        "outline-variant": "#c3c6d7",
+                        "on-secondary-fixed": "#002113",
+                        "on-secondary-container": "#00714d",
+                        "surface-container": "#e5eeff",
+                        "surface-dim": "#cbdbf5",
+                        "on-error-container": "#93000a",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-gap-lg": "24px",
+                        "gutter": "16px",
+                        "stack-gap-md": "16px",
+                        "container-padding": "20px",
+                        "stack-gap-sm": "8px",
+                        "unit": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "label-bold": ["Inter"],
+                        "body-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "label-md": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "headline-lg": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "label-bold": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col relative overflow-hidden">
+<!-- TopAppBar -->
+<header class="bg-surface shadow-sm docked full-width top-0 z-50 flex justify-between items-center w-full px-container-padding py-stack-gap-sm fixed">
+<div class="flex items-center gap-3">
+<img alt="User profile avatar" class="w-10 h-10 rounded-full object-cover border-2 border-surface-container-high" data-alt="A close-up, warm portrait of a smiling parent in natural daylight, representing the user profile avatar. The photo is well-lit, approachable, and friendly, reflecting the Soft-Modern aesthetic. The color palette focuses on soft, inviting tones that harmonize with a digital safety net UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCL5Uh9sJNvk7G46-tlPTAawe2NJPWBE27_y-MMwR11huk3MQiKLX3khcCGZIKT61xDSFcb1kw-qFYcs7SGR-NCk0M1RMEFHR6aSYgea-Dt3Sap_sMI07vU5lnzfBvJm0EC_75BQcTm-gdEROgDjWDuA35Db-hQy5-WyAuSdZHKLflS7mK2KKDOsdHCiRgvvTTAejCX-SiGIpj3xEl--_XJzQ_-Fo3_xcuJhxjhnJhnI5UOMOo7QWisSXL5U4EIrxnzoPmAmyInArE"/>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Family Guardian</h1>
+</div>
+<button class="text-on-surface-variant hover:bg-surface-container-high transition-colors p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</header>
+<!-- Main Chat Canvas -->
+<main class="flex-1 overflow-y-auto mt-[64px] mb-[80px] px-container-padding py-stack-gap-md flex flex-col gap-4">
+<!-- Chat Date Separator -->
+<div class="flex justify-center w-full">
+<span class="font-label-md text-label-md text-on-surface-variant bg-surface-container-high px-3 py-1 rounded-full">Today</span>
+</div>
+<!-- Received Message (Mom) -->
+<div class="flex items-end gap-2 w-full max-w-[85%]">
+<img alt="Mom Avatar" class="w-8 h-8 rounded-full object-cover" data-alt="A portrait of an adult woman with a warm, reassuring smile. Soft, natural lighting highlights her friendly expression. The image feels approachable and safe, matching the Soft-Modern digital safety net vibe." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAPMpsY92rCASskeE4sGTf92snb-BFlsbWe7dTYST_M7QVKCGydYEKI_N-pGKDbU5-io2E8EZsdJQg1ZVZHtL_G-69YSQjZ2Ren1me9puOoH2NvEJKsj1HkX-WBvxTIdsKrf05yF7jFmyLwM2wW7Dvj_wQJRb_8W-QQORNi1Lro9iRKjuwk6QC3Gq1fpzSaQHquA4v40mhrEDs5LCoHlPve78g2zF-cIYnpJS3ZquyN6KqRlQUeKhiJj9Gs_DFCR4gd9qhGhuGQk9M"/>
+<div class="flex flex-col gap-1">
+<span class="font-label-md text-label-md text-on-surface-variant ml-1">Mom • 2:30 PM</span>
+<div class="bg-surface-container-high text-on-surface p-3 rounded-2xl rounded-bl-sm font-body-sm text-body-sm shadow-sm">
+                    Hey everyone, I just picked up Sam from soccer practice. We are heading home now!
+                </div>
+</div>
+</div>
+<!-- Received Message (Dad - Location Snippet) -->
+<div class="flex items-end gap-2 w-full max-w-[85%] mt-2">
+<img alt="Dad Avatar" class="w-8 h-8 rounded-full object-cover" data-alt="A portrait of an adult man looking confident and relaxed. The lighting is soft and natural, emphasizing a trustworthy and reliable presence. It aligns perfectly with the protective, family-oriented design system." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAJYN5TIySwgPeTKU7fihtGLyNAf2kiq6HMIJJPKOyHKfSOP9VIofuqMp68xxGpbgS6NRvtPMhtT1D1PnwHM9UvctmdjqtXtq7UKYZ1IdwXxqkJ9mXUFqY8l-uSwUR9LaPfBcAP1vuzRfRrON-DNUrhARjbuHafjXy381CactddI0PKqHkvS4vhw9dfcLr-BV6r5XFWg661PZG0X8EcKA09M_HgqYJoOvsvJR07DDy7nLitniyUy3SE2g3Mb6_RJasDsXr9PxJ85Io"/>
+<div class="flex flex-col gap-1">
+<span class="font-label-md text-label-md text-on-surface-variant ml-1">Dad • 2:35 PM</span>
+<div class="bg-surface-container-high text-on-surface p-3 rounded-2xl rounded-bl-sm font-body-sm text-body-sm shadow-sm flex flex-col gap-2">
+<p>Sounds good! I'm leaving the office.</p>
+<!-- Location Snippet Card -->
+<div class="bg-surface rounded-lg p-2 flex items-center gap-3 border border-surface-variant">
+<div class="bg-primary-container text-on-primary-container p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]" data-icon="location_on" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-bold text-label-bold text-on-surface">Shared Location</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Downtown Office</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Sent Message (User/Sam) -->
+<div class="flex items-end justify-end gap-2 w-full mt-4">
+<div class="flex flex-col items-end gap-1 max-w-[85%]">
+<span class="font-label-md text-label-md text-on-surface-variant mr-1">3:00 PM</span>
+<div class="bg-primary text-on-primary p-3 rounded-2xl rounded-br-sm font-body-sm text-body-sm shadow-sm">
+                    Can't wait for dinner! See you both soon. 🍕
+                </div>
+</div>
+</div>
+</main>
+<!-- Chat Input Area (Fixed above BottomNav) -->
+<div class="fixed bottom-[80px] w-full bg-surface px-container-padding py-2 border-t border-surface-variant z-40">
+<div class="flex items-center gap-2 bg-surface-container-low rounded-full px-4 py-2 border border-surface-variant focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+<button class="text-primary p-1 rounded-full hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="add_photo_alternate">add_photo_alternate</span>
+</button>
+<input class="flex-1 bg-transparent border-none focus:ring-0 font-body-sm text-body-sm text-on-surface placeholder-on-surface-variant px-2 h-10" placeholder="Type a message..." type="text"/>
+<button class="text-primary p-1 rounded-full hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="mic">mic</span>
+</button>
+<button class="bg-primary text-on-primary p-2 rounded-full hover:bg-primary-fixed-variant transition-colors ml-1 shadow-sm flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]" data-icon="send">send</span>
+</button>
+</div>
+</div>
+<!-- BottomNavBar -->
+<nav class="bg-surface shadow-lg docked full-width bottom-0 rounded-t-xl fixed bottom-0 w-full z-50 flex justify-around items-center px-4 pb-4 pt-2 md:hidden">
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-surface-container-low transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="font-label-md text-label-md mt-1">Map</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-5 py-2 scale-90 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="chat" style="font-variation-settings: 'FILL' 1;">chat</span>
+<span class="font-label-md text-label-md mt-1">Chat</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-surface-container-low transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-label-md text-label-md mt-1">History</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-surface-container-low transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="security">security</span>
+<span class="font-label-md text-label-md mt-1">Safety</span>
+</a>
+</nav>
+</body></html>

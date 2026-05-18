@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Family Guardian - Member Detail &amp; History</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-error": "#ffffff",
+                        "surface-container-low": "#eff4ff",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "on-primary-fixed": "#00174b",
+                        "inverse-primary": "#b4c5ff",
+                        "secondary": "#006c49",
+                        "secondary-fixed": "#6ffbbe",
+                        "tertiary-container": "#bc4800",
+                        "primary-fixed": "#dbe1ff",
+                        "primary": "#004ac6",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "surface-container-highest": "#d3e4fe",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "secondary-container": "#6cf8bb",
+                        "on-secondary-fixed-variant": "#005236",
+                        "surface": "#f8f9ff",
+                        "tertiary": "#943700",
+                        "surface-variant": "#d3e4fe",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-surface": "#0b1c30",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed": "#ffdbcd",
+                        "on-tertiary-fixed": "#360f00",
+                        "on-background": "#0b1c30",
+                        "on-tertiary-container": "#ffede6",
+                        "on-surface-variant": "#434655",
+                        "error": "#ba1a1a",
+                        "on-primary-container": "#eeefff",
+                        "surface-tint": "#0053db",
+                        "background": "#f8f9ff",
+                        "primary-container": "#2563eb",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#4edea3",
+                        "surface-bright": "#f8f9ff",
+                        "inverse-surface": "#213145",
+                        "outline": "#737686",
+                        "surface-container-high": "#dce9ff",
+                        "outline-variant": "#c3c6d7",
+                        "on-secondary-fixed": "#002113",
+                        "on-secondary-container": "#00714d",
+                        "surface-container": "#e5eeff",
+                        "surface-dim": "#cbdbf5",
+                        "on-error-container": "#93000a",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary": "#ffffff"
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.25rem",
+                        lg: "0.5rem",
+                        xl: "0.75rem",
+                        full: "9999px"
+                    },
+                    spacing: {
+                        "stack-gap-lg": "24px",
+                        "gutter": "16px",
+                        "stack-gap-md": "16px",
+                        "container-padding": "20px",
+                        "stack-gap-sm": "8px",
+                        "unit": "4px"
+                    },
+                    fontFamily: {
+                        "headline-lg-mobile": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "label-bold": ["Inter"],
+                        "body-sm": ["Inter"]
+                    },
+                    fontSize: {
+                        "headline-lg-mobile": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "700" }],
+                        "label-md": ["12px", { lineHeight: "16px", fontWeight: "500" }],
+                        "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+                        "headline-md": ["20px", { lineHeight: "28px", fontWeight: "600" }],
+                        "headline-lg": ["30px", { lineHeight: "38px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "label-bold": ["12px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600" }],
+                        "body-sm": ["14px", { lineHeight: "20px", fontWeight: "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-sm antialiased pb-24 selection:bg-primary selection:text-on-primary min-h-screen">
+<!-- TopAppBar -->
+<header class="bg-surface shadow-sm sticky top-0 z-40 w-full flex justify-between items-center px-container-padding py-stack-gap-sm">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden border border-outline-variant bg-surface-container-highest">
+<img alt="Parent profile avatar" class="w-full h-full object-cover" data-alt="A close-up portrait of a caring, professional parent smiling gently. Soft, warm natural lighting emphasizing a trustworthy and reliable demeanor. The setting is a bright, modern interior with neutral tones, fitting a clean, soft-modern app aesthetic. High-key lighting, soft shadows, evoking a sense of safety and family." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCFMI9ma2AjOngiZ0war8be3Ka1tcTN1pkD4wNsm3LQaXJKjwjfMf8iL-VylMZdITWJ7P9CZH6LtjARFf0s__f-7ss70Gojdnm70On72UYqqMvUszuwc6qgbffx01-WTa90TYEuQsfpp69m_io9EJkKvv7i3R7MyMkIbevIl0IgFTzzBq3PYzuCZGPXMXdP3L5HKFtstf3aS9zxxc8tNUg-35yTqDPM9TkV-wgsthXLiy4qTWxgRzOzzkOqwRJPrFWOUj1Fl_nHh3E"/>
+</div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Family Guardian</h1>
+</div>
+<button class="w-11 h-11 flex items-center justify-center rounded-full text-primary hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="px-container-padding py-stack-gap-lg flex flex-col gap-stack-gap-md max-w-2xl mx-auto">
+<!-- Bento Grid Header: Profile & Status -->
+<section class="grid grid-cols-2 gap-stack-gap-sm">
+<!-- Main Profile Card -->
+<div class="col-span-2 bg-surface-container-lowest rounded-xl p-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.06)] flex items-center gap-4 relative overflow-hidden">
+<!-- Abstract decorative element -->
+<div class="absolute -right-10 -top-10 w-32 h-32 bg-primary-container opacity-20 rounded-full blur-2xl"></div>
+<div class="w-16 h-16 rounded-full overflow-hidden shrink-0 border-2 border-surface bg-surface-container-high shadow-sm z-10">
+<img alt="Leo's Profile" class="w-full h-full object-cover" data-alt="A portrait of a cheerful teenage boy, Leo, with a bright, energetic expression. He is outdoors in a sunlit park, representing activity and youth. The lighting is natural and vibrant, reinforcing a friendly, non-intrusive safety net vibe. Soft focus background, high-contrast crisp subject." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDZPpreUNSjlcOEhW-QRN3rBgoC62grpJQAkz7VJRNCvWfTc4KtboKXXWePff7b0HCop3cl187qr_xhIhAMbSe9Edav4WDl-KT9apLgfZdoKIphIdsuVFA7lbRX2savO8rNZWWvXkLStVgCiCKxnoeq9YxscHcrlUTZ_h2Y8nFm-PUpTmCaWD9QTiub-5-tIKHjD3R73tSCfG5jFns4DivSpuRpt37-FmB76hO8zUSgjDC8nW5mjg8IdFgvroG2HsRztrHrdL09j7g"/>
+</div>
+<div class="z-10 flex flex-col justify-center">
+<h2 class="font-headline-md text-headline-md text-on-surface">Leo</h2>
+<p class="font-label-md text-label-md text-on-surface-variant mb-2">Son</p>
+<div class="inline-flex items-center gap-1 bg-secondary-container text-on-secondary-container font-label-bold text-label-bold px-3 py-1 rounded-full w-fit">
+<span class="material-symbols-outlined text-[14px]" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                        At School
+                    </div>
+</div>
+</div>
+<!-- Battery Card -->
+<div class="col-span-1 bg-surface-container-lowest rounded-xl p-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.06)] flex flex-col gap-2 justify-center items-center text-center">
+<span class="material-symbols-outlined text-secondary text-3xl" data-weight="fill" style="font-variation-settings: 'FILL' 1;">battery_6_bar</span>
+<div>
+<p class="font-headline-md text-headline-md text-on-surface">85%</p>
+<p class="font-label-md text-label-md text-on-surface-variant">Charging</p>
+</div>
+</div>
+<!-- Signal Card -->
+<div class="col-span-1 bg-surface-container-lowest rounded-xl p-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.06)] flex flex-col gap-2 justify-center items-center text-center">
+<span class="material-symbols-outlined text-primary text-3xl" data-weight="fill" style="font-variation-settings: 'FILL' 1;">wifi</span>
+<div>
+<p class="font-headline-md text-headline-md text-on-surface">Strong</p>
+<p class="font-label-md text-label-md text-on-surface-variant">Connected</p>
+</div>
+</div>
+</section>
+<!-- Historical Map Card -->
+<section class="bg-surface-container-lowest rounded-xl p-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.06)] flex flex-col gap-3">
+<div class="flex justify-between items-center">
+<h3 class="font-body-lg text-body-lg font-semibold text-on-surface">Today's Path</h3>
+<button class="font-label-bold text-label-bold text-primary hover:text-on-primary-fixed-variant transition-colors">Expand</button>
+</div>
+<div class="w-full h-48 rounded-lg overflow-hidden relative bg-surface-container-high border border-outline-variant">
+<img alt="Map view" class="w-full h-full object-cover opacity-80 mix-blend-multiply" data-alt="A clean, minimalist digital map interface showing a suburban neighborhood layout. The map uses a very light, soft color palette consistent with a light-mode UI, featuring soft whites, pale blues for water, and subtle grays for roads. There are no harsh lines, maintaining a modern, safe aesthetic." data-location="Suburban Neighborhood Map" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBGI_KDkRG8RNCX4SKHujDb0-i-c0-D4cb1shfOALrLodiA9xrDpEU3CaUQsYa6juSYBFEAvcd6ChTs_QK9qvpOizR_Bj-SgfMxvm-QDeMqFZgM9tWJUdsk6cPuUislGq0RhfYgjlVqPiTmYq-f0K_cImImjdnyD5HgCKki48XJKsa4Km4Gp4xjTTMQeR0j2yzaUbwVBNfu-mBn0HAC66sydPuipRv3Xstkmbk2FjW1GtANHrQWAVCCYhMY9IEZY0zjYqiWSj9LPjI"/>
+<!-- Simulated Path / Overlay -->
+<div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+<svg class="w-full h-full opacity-60 drop-shadow-md" preserveaspectratio="none" viewbox="0 0 100 100">
+<path d="M 20 80 Q 40 50 60 40 T 80 20" fill="transparent" stroke="#004ac6" stroke-dasharray="5,5" stroke-width="3"></path>
+</svg>
+</div>
+<!-- Map Marker -->
+<div class="absolute top-[20%] left-[80%] -translate-x-1/2 -translate-y-full drop-shadow-lg flex flex-col items-center">
+<div class="w-10 h-10 bg-primary rounded-full border-2 border-surface shadow-md flex items-center justify-center p-0.5 overflow-hidden">
+<img alt="Leo tiny avatar" class="w-full h-full rounded-full object-cover" data-alt="A very small circular portrait of Leo, matching the main profile picture but cropped tightly to his face. Bright lighting, clear features, intended for use as a map marker icon in a clean UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBOMGfLEmF3Xu1DbMz-h6j102m8WudeL3Tsn1q8uujwr-JFIrgApujCSqjO9LOQEdXpuia00UNi-00HA0LqFdGu-uAszwm5xZe8NFFd1jBb0TZx5upnP6HYeiS4FSdWPB4wTMYwQUmeMChoEQ0OdH1_XamFPzDWuacBjnvOsENVa9oymLFm9gYcsLatq3QXl5Mjn3ou49kQ0CWtYZ3bdd30R6fQVYx1pVm7KlOiU7sr9eLcvfX1LIXNCmvYNKQ15xSiNWu7H69BTgE"/>
+</div>
+<div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-primary -mt-1"></div>
+</div>
+<!-- Floating Glassmorphism Status -->
+<div class="absolute bottom-3 left-3 right-3 bg-surface/80 backdrop-blur-md rounded-lg p-3 border border-surface-variant flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-secondary-container text-[18px]">school</span>
+</div>
+<div>
+<p class="font-label-bold text-label-bold text-on-surface">Lincoln High School</p>
+<p class="font-label-md text-label-md text-on-surface-variant">Arrived 4 hours ago</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Activity Timeline -->
+<section class="bg-surface-container-lowest rounded-xl p-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.06)]">
+<h3 class="font-body-lg text-body-lg font-semibold text-on-surface mb-4">Activity Log</h3>
+<div class="relative border-l-2 border-surface-container-high ml-4 space-y-6 pb-2">
+<!-- Timeline Item 1 -->
+<div class="relative pl-6">
+<span class="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-secondary ring-4 ring-surface"></span>
+<div class="flex flex-col gap-1">
+<p class="font-body-sm text-body-sm text-on-surface">Arrived at School</p>
+<p class="font-label-md text-label-md text-on-surface-variant">8:00 AM • Lincoln High</p>
+</div>
+</div>
+<!-- Timeline Item 2 -->
+<div class="relative pl-6">
+<span class="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-surface-variant ring-4 ring-surface border-2 border-outline-variant"></span>
+<div class="flex flex-col gap-1">
+<p class="font-body-sm text-body-sm text-on-surface">Moving via Vehicle</p>
+<p class="font-label-md text-label-md text-on-surface-variant">7:42 AM - 7:58 AM • Elm Street</p>
+</div>
+</div>
+<!-- Timeline Item 3 -->
+<div class="relative pl-6">
+<span class="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-primary ring-4 ring-surface"></span>
+<div class="flex flex-col gap-1">
+<p class="font-body-sm text-body-sm text-on-surface">Left Home</p>
+<p class="font-label-md text-label-md text-on-surface-variant">7:40 AM • 123 Maple Drive</p>
+</div>
+</div>
+<!-- Timeline Item 4 (Faded for older history) -->
+<div class="relative pl-6 opacity-60">
+<span class="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-surface-variant ring-4 ring-surface"></span>
+<div class="flex flex-col gap-1">
+<p class="font-body-sm text-body-sm text-on-surface">Phone Charged</p>
+<p class="font-label-md text-label-md text-on-surface-variant">Yesterday, 10:00 PM</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<!-- Active Navigation Logic: The screen intent is "Member Detail & History". The closest semantic match in label_texts ["Map", "Chat", "History", "Safety"] is "History". Therefore, the 3rd item gets style_active_navigation. -->
+<nav class="bg-surface shadow-lg fixed bottom-0 w-full z-50 flex justify-around items-center px-4 pb-4 pt-2 rounded-t-xl md:hidden">
+<!-- Inactive: Map -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-surface-container-low transition-all w-16 group" href="#">
+<div class="flex items-center justify-center h-8 w-16 rounded-full group-hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+</div>
+<span class="font-label-md text-label-md mt-1">Map</span>
+</a>
+<!-- Inactive: Chat -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-surface-container-low transition-all w-16 group" href="#">
+<div class="flex items-center justify-center h-8 w-16 rounded-full group-hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="chat">chat</span>
+</div>
+<span class="font-label-md text-label-md mt-1">Chat</span>
+</a>
+<!-- Active: History -->
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-5 py-2 scale-90 duration-200 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="history" data-weight="fill" style="font-variation-settings: 'FILL' 1;">history</span>
+<span class="font-label-md text-label-md mt-1 font-semibold">History</span>
+</a>
+<!-- Inactive: Safety -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-surface-container-low transition-all w-16 group" href="#">
+<div class="flex items-center justify-center h-8 w-16 rounded-full group-hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined" data-icon="security">security</span>
+</div>
+<span class="font-label-md text-label-md mt-1">Safety</span>
+</a>
+</nav>
+<!-- Web Navigation Drawer Placeholder (Hidden on mobile, visible on desktop to satisfy layout constraints conceptually, though the prompt implies mobile focus given BottomNav). Let's keep it clean and just use BottomNav as instructed. -->
+</body></html>

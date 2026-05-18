@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GuardianMesh - Chat</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary": "#ffffff",
+                    "tertiary-fixed-dim": "#adc6ff",
+                    "background": "#f8f9ff",
+                    "secondary-fixed": "#6ffbbe",
+                    "on-secondary-fixed": "#002113",
+                    "surface-variant": "#d3e4fe",
+                    "surface-container-highest": "#d3e4fe",
+                    "surface-container": "#e5eeff",
+                    "primary-fixed": "#dae2fd",
+                    "on-primary-fixed": "#131b2e",
+                    "secondary": "#006c49",
+                    "surface-dim": "#cbdbf5",
+                    "on-tertiary-container": "#3980f4",
+                    "inverse-on-surface": "#eaf1ff",
+                    "on-background": "#0b1c30",
+                    "surface-bright": "#f8f9ff",
+                    "primary": "#000000",
+                    "inverse-primary": "#bec6e0",
+                    "tertiary-fixed": "#d8e2ff",
+                    "surface": "#f8f9ff",
+                    "primary-container": "#131b2e",
+                    "on-tertiary-fixed": "#001a42",
+                    "error": "#ba1a1a",
+                    "secondary-fixed-dim": "#4edea3",
+                    "on-surface-variant": "#45464d",
+                    "tertiary": "#000000",
+                    "on-secondary": "#ffffff",
+                    "outline": "#76777d",
+                    "error-container": "#ffdad6",
+                    "on-primary-fixed-variant": "#3f465c",
+                    "on-tertiary-fixed-variant": "#004395",
+                    "on-error-container": "#93000a",
+                    "surface-container-high": "#dce9ff",
+                    "on-secondary-fixed-variant": "#005236",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-tint": "#565e74",
+                    "on-error": "#ffffff",
+                    "tertiary-container": "#001a42",
+                    "on-secondary-container": "#00714d",
+                    "on-primary-container": "#7c839b",
+                    "on-primary": "#ffffff",
+                    "outline-variant": "#c6c6cd",
+                    "inverse-surface": "#213145",
+                    "secondary-container": "#6cf8bb",
+                    "surface-container-low": "#eff4ff",
+                    "primary-fixed-dim": "#bec6e0",
+                    "on-surface": "#0b1c30"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "margin-mobile": "16px",
+                    "sidebar-width": "320px",
+                    "gutter": "16px",
+                    "status-pill-gap": "8px",
+                    "base": "4px",
+                    "margin-desktop": "32px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "body-md": ["Inter"],
+                    "status-number": ["Inter"],
+                    "headline-lg-mobile": ["Inter"],
+                    "headline-md": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-md": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "status-number": ["13px", {"lineHeight": "1", "fontWeight": "700"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                    "headline-md": ["20px", {"lineHeight": "1.3", "fontWeight": "600"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background h-screen flex flex-col md:flex-row overflow-hidden font-body-md text-body-md">
+<!-- TopAppBar (Mobile Only) -->
+<header class="flex md:hidden justify-between items-center w-full px-margin-mobile h-16 fixed top-0 z-50 bg-surface/80 dark:bg-on-primary-container/80 backdrop-blur-md shadow-sm">
+<div class="flex items-center gap-3">
+<img alt="Admin Avatar" class="w-8 h-8 rounded-full border-2 border-primary-container" data-alt="A small circular avatar of a professional administrator. Close-up portrait of a young man with a slight smile. The avatar is framed with a dark navy border. The lighting is bright and even, set against a neutral light background, suitable for a professional safety app dashboard." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB12JmMDNtlm2BO6fQSiftzW4rWnT-QKszWKUHxgHyMmFdYZEd8s3qQJRO96psbVpEmQx103DJZEr8agwThH3H1fdy-q2HGrZ50irShLfqDntkjfCBLq9hhKDL2eptVNdEvvA7bUcTJLszpxRhWJPI2BACh73EekzinMmBQKgM9x57wljv2gPSQdl8cUQ7hLxEDKT_oR40_yxD4uqquEjbVvi0NEPb2H8gw9rHGWRXm68Gq8RUFVuNjxSmXP4kaVHBttWmzZ8viTnhr"/>
+<span class="font-headline-md text-headline-md font-extrabold text-primary dark:text-primary-fixed">GuardianMesh</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:opacity-80 transition-opacity active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="add_alert">add_alert</span>
+</button>
+<button class="text-on-surface-variant hover:opacity-80 transition-opacity active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+</header>
+<!-- SideNavBar (Desktop Only) -->
+<nav class="hidden md:flex flex-col fixed left-0 top-0 h-screen w-[320px] z-40 bg-surface dark:bg-on-primary-container shadow-sm border-r border-outline-variant">
+<!-- Header -->
+<div class="p-6 border-b border-surface-container-high dark:border-on-primary-fixed-variant">
+<div class="flex items-center gap-3 mb-4">
+<img alt="Family Administrator Profile" class="w-12 h-12 rounded-full border-2 border-primary-container" data-alt="A circular avatar of a professional administrator. Close-up portrait of a young man with a slight smile. The avatar is framed with a dark navy border. The lighting is bright and even, set against a neutral light background, suitable for a professional safety app dashboard." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVjnz2YOBLJOU3xQ3VnPJbiZCrYxxwcbXTKMkj87MUy3Dh3iMl0Ep-udXc5XsiFJSMyelxl1BSvk0MtkHe5EZURuTJtIhTpBHZJ4-q5wOTsDUqfHwM5xxg3xY9aYYYGaKwRgFilgNGZl4eetka0dqS-6L1PweXILqdPIlPcp9opPjJSu0E47Asw9yH8BIFwKsdHrQDBijZ3boPWfbb2tIYU0nkkL7bu3pBpgBQF0FLRCih5UH6mQrdtX9H7qjtPYkZH0qw8RVdGbSa"/>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">GuardianMesh</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">Family Circle: Active</p>
+</div>
+</div>
+<button class="w-full bg-secondary text-on-secondary py-3 px-4 rounded-lg font-label-md text-label-md shadow-sm hover:bg-secondary-fixed hover:text-on-secondary-fixed transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="warning" style="font-variation-settings: 'FILL' 1;">warning</span>
+                SOS Signal
+            </button>
+</div>
+<!-- Main Navigation (Contextualized for Chat/Members) -->
+<div class="flex-1 overflow-y-auto py-4">
+<!-- Tabs -->
+<ul class="space-y-1 mb-6 px-3">
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-primary dark:text-primary-fixed font-bold border-r-4 border-primary dark:border-primary-fixed bg-surface-container-high dark:bg-on-primary-fixed-variant" href="#">
+<span class="material-symbols-outlined" data-icon="forum">forum</span>
+<span class="font-label-md text-label-md">Messages</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-on-primary-container hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container dark:hover:bg-on-primary-fixed-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="distance">distance</span>
+<span class="font-label-md text-label-md">Safety Places</span>
+</a>
+</li>
+</ul>
+<!-- Chat Contacts -->
+<div class="px-4 mb-2">
+<h2 class="font-label-md text-label-md text-outline uppercase tracking-wider mb-2">Conversations</h2>
+</div>
+<ul class="space-y-1 px-3">
+<!-- Group Chat -->
+<li>
+<a class="flex items-center justify-between px-3 py-3 rounded-lg bg-surface-container-high border-l-4 border-primary" href="#">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-bold">
+                                FC
+                            </div>
+<div>
+<p class="font-label-md text-label-md text-primary">Family Circle</p>
+<p class="font-body-md text-xs text-on-surface-variant truncate w-32">Mom arrived at Home</p>
+</div>
+</div>
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+</a>
+</li>
+<!-- Individual Chats -->
+<li>
+<a class="flex items-center justify-between px-3 py-3 rounded-lg hover:bg-surface-container transition-colors" href="#">
+<div class="flex items-center gap-3">
+<img alt="Sarah" class="w-10 h-10 rounded-full border border-secondary" data-alt="A portrait of a young woman smiling. She is outdoors with a blurred green background. Soft natural light illuminates her face. The image is cropped to a circle with a thin emerald green border indicating active status." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCIUPYPY8pE5Gs6dCIEydvVdEkCdkGs7YQ36SWK-n2tJkFv7Qi7sXruCAXjnuiIc-Le9oq8qeSLSMda7Z_LNdGu_OvmDCCaVJQUcyjraW66mueZ1KikjMaC1dKhC1PTwNmgGqvjUX0Gea3kHv8SOT4xuaiyNGM7UcIKvXUcL_x6-fW31hKcqzlKotu1_lVUltNSqjEQG1vfPRgQ5NFlLlMryPL527eG8RN4K-EkR-aVKIrK3SbjFQOVP6jI9D7tL__JnoB4EhFtlebg"/>
+<div>
+<p class="font-label-md text-label-md text-on-background">Sarah</p>
+<p class="font-body-md text-xs text-secondary font-semibold">At School</p>
+</div>
+</div>
+</a>
+</li>
+<li>
+<a class="flex items-center justify-between px-3 py-3 rounded-lg hover:bg-surface-container transition-colors" href="#">
+<div class="flex items-center gap-3">
+<img alt="Dad" class="w-10 h-10 rounded-full border border-outline-variant" data-alt="A portrait of an older man looking directly at the camera. He is wearing a casual shirt. The background is a soft, neutral grey. The image is cropped to a circle with a grey border indicating inactive status." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVMaXUFhtQRPUx8HMSYGsrbbK4ve-RdUw5iOpEUMvgUSRpnuwReB_oJf3X91QW5jUAWsddZsOnIkiDprv3K2764wtDbfJBn47z_bzH_f-SuRIx0RfA6N0NmkR6-sB0Td6lVeVgnTD1ssoqJ7IIUfjqtVxPfbtRKe16YraMiRyKfhKdJe4d9Ioa0OdaLk5eX6oaG_jdKNpeKZZKZdwkLfW05Z2Ub-wOAUBVLbBWsRhF2jANQfhEzEerOs6xqwQueLcI3Hj7VsGyoW3v"/>
+<div>
+<p class="font-label-md text-label-md text-on-background">Dad</p>
+<p class="font-body-md text-xs text-on-surface-variant truncate w-32">I'll pick up groceries.</p>
+</div>
+</div>
+</a>
+</li>
+</ul>
+</div>
+<!-- Footer -->
+<div class="p-4 border-t border-surface-container-high dark:border-on-primary-fixed-variant">
+<ul class="space-y-1">
+<li>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="terminal">terminal</span>
+<span class="font-label-md text-label-md">Server Logs</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-error hover:bg-error-container transition-colors" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="logout">logout</span>
+<span class="font-label-md text-label-md">Logout</span>
+</a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col md:ml-[320px] mt-16 md:mt-0 h-[calc(100vh-64px)] md:h-screen bg-background relative">
+<!-- Chat Header -->
+<div class="flex items-center justify-between p-4 md:p-6 bg-surface border-b border-surface-container-high shadow-[0_4px_12px_rgba(15,23,42,0.02)] z-10">
+<div>
+<h2 class="font-headline-md text-headline-md font-bold text-primary-container">Family Circle</h2>
+<p class="font-body-md text-sm text-secondary font-semibold flex items-center gap-1 mt-1">
+<span class="w-2 h-2 rounded-full bg-secondary inline-block"></span>
+                    4 Members Active
+                </p>
+</div>
+<div class="flex gap-2">
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Message Thread -->
+<div class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 bg-surface-bright">
+<!-- Date Divider -->
+<div class="flex justify-center my-4">
+<span class="bg-surface-container px-3 py-1 rounded-full font-label-md text-[10px] text-outline uppercase tracking-widest">Today</span>
+</div>
+<!-- Safety Card: Arrival -->
+<div class="flex justify-center">
+<div class="bg-surface border border-outline-variant/30 rounded-xl p-3 flex items-center gap-3 shadow-sm max-w-sm w-full">
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined text-sm" data-icon="home">home</span>
+</div>
+<div>
+<p class="font-body-md text-sm text-on-background"><strong>Mom</strong> arrived at <strong>Home</strong></p>
+<p class="font-label-md text-[10px] text-outline mt-0.5">08:42 AM</p>
+</div>
+</div>
+</div>
+<!-- Text Message: Other -->
+<div class="flex items-start gap-3 max-w-2xl">
+<img alt="Dad" class="w-8 h-8 rounded-full flex-shrink-0 border border-outline-variant" data-alt="A small circular portrait of an older man looking directly at the camera. He is wearing a casual shirt. The background is a soft, neutral grey. The image is framed with a thin grey border." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAuujkyPAGTCvtQM1jRh9w5UKpfFl-SnV6rCvwv9thHYoK8j5tOfYXqSOtnwYeWJs4kv8Jt2Yc8sjLjRMWhH91KC3G8GcJdi1mUqbOSRZM341C2xz82s0pTVSycCNXHz3J79TveG6dkqjFHAqvBKNGHk6oNSqxcSE2XuS05LJf4o3jLng4zEe7OH7BlYbnJeBWadaVD0mPXbPqmpjuevt25TihFYhDQGnUCCVgKaR3rxZAl3_YXkftw1mJTLRJMTGOJR5WJSccw7RAZ"/>
+<div>
+<div class="flex items-baseline gap-2 mb-1">
+<span class="font-label-md text-xs text-primary-container">Dad</span>
+<span class="font-label-md text-[10px] text-outline">08:45 AM</span>
+</div>
+<div class="bg-surface-container-high text-on-background px-4 py-3 rounded-2xl rounded-tl-none font-body-md shadow-[0_2px_4px_rgba(15,23,42,0.04)]">
+                        I'll be picking up groceries after work. Anyone need anything specific?
+                    </div>
+</div>
+</div>
+<!-- Text Message: Other (Child) -->
+<div class="flex items-start gap-3 max-w-2xl">
+<img alt="Sarah" class="w-8 h-8 rounded-full flex-shrink-0 border border-secondary" data-alt="A small circular portrait of a young woman smiling. She is outdoors with a blurred green background. The image is framed with a thin emerald green border indicating active status." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBFrgB-5HpYmavsZq2R-G9cBH5TC8keOJznZVVX8AQ_PLK8_SePj0JubUovclizdQZgm4vkYxuyl0SQHAyg9hDZaACmsMpz3dpX6uxhMPHs8mTPMKj-yC2Z0xR7RWhpWWvffmMrhGtnmFDRrusj34azsitaR9dJoiNojfK6KhFT9l1D3V7JIaWFX-3Kv3ux-truWQG102hjHZwcIf1TsQcPykzE9KO_JnS85SyTNTdj2fG5ch9vez4dVe7S0NUIIfzZ61Ln5suQWqy"/>
+<div>
+<div class="flex items-baseline gap-2 mb-1">
+<span class="font-label-md text-xs text-primary-container">Sarah</span>
+<span class="font-label-md text-[10px] text-outline">08:47 AM</span>
+</div>
+<div class="bg-surface-container-high text-on-background px-4 py-3 rounded-2xl rounded-tl-none font-body-md shadow-[0_2px_4px_rgba(15,23,42,0.04)]">
+                        Can you get some more of those granola bars?
+                    </div>
+</div>
+</div>
+<!-- Safety Card: Location Share -->
+<div class="flex items-start gap-3 max-w-2xl">
+<img alt="Dad" class="w-8 h-8 rounded-full flex-shrink-0 border border-outline-variant" data-alt="A small circular portrait of an older man looking directly at the camera. He is wearing a casual shirt. The background is a soft, neutral grey. The image is framed with a thin grey border." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQFAykZhFf9wqSaAxkKZ1CCqZhrBH0XThlttbSHbsYx7KiMQUSEQxKsZgH61W9BjUESSDkOhZIB0KNMAOBEi5qDjtPrXg96L33R_nrIv9i0_jgbl5-XLEickndUhnbZQcvWa3KMmxlFpZSOV7Ud6Z4kCKgUmEtV1m5Ht0EzSBFuSDJcTx_bckki8O20UFpg-Crko3Bfy6jo9uI_-IBLzh-PRb9TwJ0GHSatGo-awc0ugGAUhwuvYXgj6b4RxBBQTqTGH-ixsWbW3P1"/>
+<div class="w-full max-w-sm">
+<div class="flex items-baseline gap-2 mb-1">
+<span class="font-label-md text-xs text-primary-container">Dad</span>
+<span class="font-label-md text-[10px] text-outline">09:15 AM</span>
+</div>
+<div class="bg-surface border border-outline-variant/30 rounded-2xl rounded-tl-none overflow-hidden shadow-sm">
+<div class="h-24 bg-surface-container-high relative flex items-center justify-center">
+<!-- Placeholder for a mini map -->
+<div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&amp;fit=crop&amp;w=600&amp;q=80')] bg-cover bg-center opacity-50" data-alt="A muted, stylized map background showing city streets and blocks. The map is rendered in light tones with soft grey lines, suitable as a background texture for a location sharing card. A location pin icon is centered over the map." data-location="City Streets" style=""></div>
+<span class="material-symbols-outlined text-secondary z-10" data-icon="location_on" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+<div class="p-3 bg-surface flex items-center justify-between">
+<div>
+<p class="font-label-md text-sm text-primary-container">Dad shared location</p>
+<p class="font-body-md text-xs text-on-surface-variant">Downtown Office Park</p>
+</div>
+<button class="text-secondary font-label-md text-xs uppercase hover:underline">View</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Text Message: Self -->
+<div class="flex items-start gap-3 max-w-2xl ml-auto flex-row-reverse">
+<img alt="Me" class="w-8 h-8 rounded-full flex-shrink-0 border border-primary-container" data-alt="A small circular avatar of a professional administrator. Close-up portrait of a young man with a slight smile. The avatar is framed with a dark navy border. The lighting is bright and even, set against a neutral light background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyaC8_euRk_EtRnotbobvmya8PLruO54lefdTZySEK1oSt1VefdOQ9Uyl5P8jgoe2KAStIgKGJT8fnJOqW2W6CrZ5TTleCeE0qRAW1hcHDPSxpxJK-JWDKUkOI-g_iWopLvtUWMamvCRIGJXXKDOk98tyRxgztXozmItPwDOehQyuDFWPfxwxoTK05O7TGB0G2Ce7HHmHeToQr8da50KBomS_X23plxRVyrIRlVKdIuQJ0u8rM061sSRwOwY4NHtc9lP9FLlMbuBhR"/>
+<div class="text-right">
+<div class="flex items-baseline gap-2 mb-1 justify-end">
+<span class="font-label-md text-[10px] text-outline">Just now</span>
+</div>
+<div class="bg-primary-container text-on-primary px-4 py-3 rounded-2xl rounded-tr-none font-body-md shadow-[0_4px_12px_rgba(15,23,42,0.1)] inline-block text-left">
+                        Got it. I'll add it to the list. Everyone stay safe today!
+                    </div>
+</div>
+</div>
+</div>
+<!-- Input Area -->
+<div class="p-4 bg-surface border-t border-surface-container-high shadow-[0_-4px_12px_rgba(15,23,42,0.02)] z-10 pb-20 md:pb-4">
+<div class="max-w-4xl mx-auto flex items-end gap-2 bg-surface-container-low border border-outline-variant/50 rounded-2xl p-2 focus-within:border-primary-container focus-within:ring-1 focus-within:ring-primary-container transition-all">
+<div class="flex gap-1 pb-1">
+<button class="p-2 text-on-surface-variant hover:text-primary-container rounded-full hover:bg-surface-container transition-colors" title="Share Location">
+<span class="material-symbols-outlined text-[20px]" data-icon="location_on">location_on</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-primary-container rounded-full hover:bg-surface-container transition-colors" title="Attach Photo">
+<span class="material-symbols-outlined text-[20px]" data-icon="image">image</span>
+</button>
+</div>
+<textarea class="flex-1 bg-transparent border-none focus:ring-0 resize-none max-h-32 py-2.5 font-body-md text-on-background placeholder:text-outline" placeholder="Type a message..." rows="1" style="min-height: 44px;"></textarea>
+<button class="bg-primary-container text-on-primary p-2.5 rounded-xl hover:bg-primary transition-colors flex items-center justify-center shadow-sm shrink-0 mb-0.5">
+<span class="material-symbols-outlined text-[20px]" data-icon="send">send</span>
+</button>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 py-3 bg-surface dark:bg-on-primary-container shadow-[0_-4px_12px_rgba(15,23,42,0.08)] rounded-t-xl">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container active:bg-surface-container-highest" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="explore">explore</span>
+<span class="font-label-md text-[10px]">Map</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-secondary-container dark:bg-on-secondary-container text-on-secondary-container dark:text-secondary-fixed rounded-full px-4 py-1 active:scale-95 transition-all duration-200" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="forum" style="font-variation-settings: 'FILL' 1;">forum</span>
+<span class="font-label-md text-[10px]">Messages</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container active:bg-surface-container-highest" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="share_location">share_location</span>
+<span class="font-label-md text-[10px]">Places</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container active:bg-surface-container-highest" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="notifications_active">notifications_active</span>
+<span class="font-label-md text-[10px]">Alerts</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-primary-container active:bg-surface-container-highest" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="settings">settings</span>
+<span class="font-label-md text-[10px]">Settings</span>
+</a>
+</nav>
+</body></html>

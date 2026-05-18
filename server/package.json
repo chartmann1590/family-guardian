@@ -1,0 +1,25 @@
+{
+  "name": "guardianmesh-server",
+  "version": "0.1.0",
+  "description": "Self-hosted Family Guardian / GuardianMesh server",
+  "type": "module",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^9.3.1",
+    "@fastify/formbody": "^7.4.0",
+    "@fastify/static": "^7.0.4",
+    "@fastify/websocket": "^10.0.1",
+    "argon2": "^0.40.3",
+    "better-sqlite3": "^11.3.0",
+    "fastify": "^4.28.1",
+    "zod": "^3.23.8"
+  }
+}
