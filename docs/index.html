@@ -1,0 +1,395 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Family Guardian - Self-Hosted Family Safety Platform</title>
+<meta name="description" content="Self-hosted family safety platform. Track loved ones in real-time with complete data privacy. Docker-deployed server + Android app."/>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        navy: '#0F172A',
+        'navy-light': '#1E293B',
+        emerald: '#10B981',
+        'emerald-dark': '#059669',
+        sky: '#3B82F6',
+        surface: '#f8f9ff',
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+    },
+  },
+}
+</script>
+<style>
+html { scroll-behavior: smooth; }
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.hero-gradient { background: linear-gradient(135deg, #0F172A 0%, #1E293B 40%, #0F172A 100%); }
+.grid-bg {
+  background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.05) 1px, transparent 0);
+  background-size: 32px 32px;
+}
+.glow-emerald { box-shadow: 0 0 40px rgba(16,185,129,0.15); }
+.float-animation { animation: float 6s ease-in-out infinite; }
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease-out; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body class="bg-surface text-navy antialiased">
+
+<!-- Nav -->
+<nav class="fixed top-0 left-0 right-0 z-50 bg-navy/95 backdrop-blur-sm border-b border-white/10">
+  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="#" class="flex items-center gap-2 text-white font-bold text-lg">
+      <span class="material-symbols-outlined text-emerald">shield</span>
+      Family Guardian
+    </a>
+    <div class="hidden md:flex items-center gap-8 text-sm text-white/70">
+      <a href="#features" class="hover:text-white transition">Features</a>
+      <a href="#how-it-works" class="hover:text-white transition">How It Works</a>
+      <a href="#self-hosted" class="hover:text-white transition">Self-Hosted</a>
+      <a href="privacy.html" class="hover:text-white transition">Privacy</a>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="https://github.com/chartmann1590/family-guardian" target="_blank" class="text-white/70 hover:text-white transition flex items-center gap-1.5 text-sm">
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero-gradient grid-bg min-h-screen flex items-center pt-16">
+  <div class="max-w-6xl mx-auto px-6 py-24 grid md:grid-cols-2 gap-16 items-center">
+    <div>
+      <div class="inline-flex items-center gap-2 bg-emerald/10 text-emerald border border-emerald/20 rounded-full px-4 py-1.5 text-sm font-medium mb-6">
+        <span class="material-symbols-outlined text-base">lock</span>
+        100% Self-Hosted
+      </div>
+      <h1 class="text-4xl md:text-5xl font-extrabold text-white leading-tight mb-6">
+        Family safety,<br/>
+        <span class="text-emerald">your infrastructure.</span>
+      </h1>
+      <p class="text-lg text-white/60 leading-relaxed mb-8 max-w-lg">
+        Track your family's location in real-time with a platform that runs entirely on hardware you control. No cloud subscriptions. No third-party data sharing. Ever.
+      </p>
+      <div class="flex flex-wrap gap-4">
+        <a href="https://github.com/chartmann1590/family-guardian" target="_blank" class="inline-flex items-center gap-2 bg-emerald hover:bg-emerald-dark text-white font-semibold px-6 py-3 rounded-lg transition">
+          <span class="material-symbols-outlined text-xl">code</span>
+          View on GitHub
+        </a>
+        <a href="#how-it-works" class="inline-flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white font-semibold px-6 py-3 rounded-lg border border-white/10 transition">
+          Learn More
+          <span class="material-symbols-outlined text-xl">arrow_downward</span>
+        </a>
+      </div>
+    </div>
+    <div class="relative hidden md:block">
+      <div class="bg-navy-light rounded-2xl border border-white/10 p-6 glow-emerald float-animation">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-white/50 text-sm font-medium">Live Dashboard</span>
+          <span class="flex items-center gap-1.5 text-emerald text-xs font-semibold">
+            <span class="w-2 h-2 bg-emerald rounded-full animate-pulse"></span>
+            3 members online
+          </span>
+        </div>
+        <div class="bg-navy rounded-xl h-56 flex items-center justify-center relative overflow-hidden">
+          <div class="absolute inset-0 opacity-20" style="background: radial-gradient(circle at 60% 40%, #10B981 0%, transparent 50%), radial-gradient(circle at 30% 70%, #3B82F6 0%, transparent 40%);"></div>
+          <div class="relative text-center">
+            <span class="material-symbols-outlined text-emerald text-5xl mb-2">map</span>
+            <p class="text-white/40 text-xs">Real-time map view</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3 mt-4">
+          <div class="bg-navy rounded-lg p-3 text-center">
+            <div class="text-emerald font-bold text-sm">Sarah</div>
+            <div class="text-white/40 text-xs mt-0.5">Home</div>
+          </div>
+          <div class="bg-navy rounded-lg p-3 text-center">
+            <div class="text-emerald font-bold text-sm">Jake</div>
+            <div class="text-white/40 text-xs mt-0.5">School</div>
+          </div>
+          <div class="bg-navy rounded-lg p-3 text-center">
+            <div class="text-sky font-bold text-sm">Mom</div>
+            <div class="text-white/40 text-xs mt-0.5">Driving</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features" class="py-24 bg-white">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="text-center mb-16 fade-in">
+      <h2 class="text-3xl font-bold mb-4">Everything you need,<br/>nothing you don't</h2>
+      <p class="text-navy/50 max-w-lg mx-auto">Built as a walking skeleton that works end-to-end. More features are being ported from the design prototypes every week.</p>
+    </div>
+    <div class="grid md:grid-cols-3 gap-8">
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-emerald/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-emerald">location_on</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Live GPS Tracking</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">Background location reporting from the Android app with real-time marker updates on the web dashboard via WebSocket.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-sky/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-sky">sensors</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Geofence Alerts</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">Define safety places per circle. Get notified instantly when family members arrive or leave designated areas.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-red-500">emergency</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">SOS Panic Button</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">One-tap emergency activation from the Android app. Pulsing red alert on the dashboard with last-known location fallback.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-amber-500/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-amber-600">group</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Family Circles</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">Organize members into circles with invite codes. The first user bootstraps as admin and manages membership.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-purple-500">notifications_active</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Push Notifications</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">Android event stream with exponential-backoff reconnection. High-priority heads-up for SOS, standard for geofence events.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-emerald/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-emerald">phone_android</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Native Android App</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">Kotlin + Jetpack Compose with foreground service for reliable background GPS. Uses osmdroid for mapping.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section id="how-it-works" class="py-24 bg-surface">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="text-center mb-16 fade-in">
+      <h2 class="text-3xl font-bold mb-4">Get started in minutes</h2>
+      <p class="text-navy/50 max-w-lg mx-auto">Deploy with Docker, sign up on the web, install the Android app. That's it.</p>
+    </div>
+    <div class="grid md:grid-cols-3 gap-8">
+      <div class="text-center fade-in">
+        <div class="w-16 h-16 bg-navy text-white rounded-2xl flex items-center justify-center mx-auto mb-5 text-2xl font-bold">1</div>
+        <h3 class="font-bold text-lg mb-2">Deploy the server</h3>
+        <div class="bg-navy text-white rounded-lg p-4 text-sm font-mono mb-4 text-left">
+          <span class="text-emerald">$</span> docker compose up --build
+        </div>
+        <p class="text-navy/50 text-sm">One command. Fastify + SQLite in a Docker container. Open port 8080.</p>
+      </div>
+      <div class="text-center fade-in">
+        <div class="w-16 h-16 bg-navy text-white rounded-2xl flex items-center justify-center mx-auto mb-5 text-2xl font-bold">2</div>
+        <h3 class="font-bold text-lg mb-2">Create your account</h3>
+        <div class="bg-white rounded-lg p-4 text-sm mb-4 text-left border border-navy/5">
+          <div class="text-navy/50 text-xs mb-1">First visit auto-opens signup</div>
+          <div class="font-medium">Bootstrap as circle admin</div>
+        </div>
+        <p class="text-navy/50 text-sm">The first user becomes the admin and creates the family circle automatically.</p>
+      </div>
+      <div class="text-center fade-in">
+        <div class="w-16 h-16 bg-navy text-white rounded-2xl flex items-center justify-center mx-auto mb-5 text-2xl font-bold">3</div>
+        <h3 class="font-bold text-lg mb-2">Install the app</h3>
+        <div class="bg-white rounded-lg p-4 text-sm mb-4 text-left border border-navy/5">
+          <div class="text-navy/50 text-xs mb-1">Android (Kotlin)</div>
+          <div class="font-medium">Enter server URL + credentials</div>
+        </div>
+        <p class="text-navy/50 text-sm">Grant location permissions. The foreground service starts reporting GPS immediately.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Self-hosted / Privacy -->
+<section id="self-hosted" class="py-24 bg-white">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="grid md:grid-cols-2 gap-16 items-center">
+      <div class="fade-in">
+        <div class="inline-flex items-center gap-2 bg-emerald/10 text-emerald rounded-full px-4 py-1.5 text-sm font-medium mb-6">
+          <span class="material-symbols-outlined text-base">verified_user</span>
+          Privacy by Architecture
+        </div>
+        <h2 class="text-3xl font-bold mb-6">Your data never<br/>leaves your server</h2>
+        <p class="text-navy/50 leading-relaxed mb-8">
+          Family Guardian is designed around a simple principle: location data is sensitive, and you should be the only one who holds it. There is no cloud backend, no analytics, no telemetry, and no third-party services involved in the core platform.
+        </p>
+        <ul class="space-y-4">
+          <li class="flex items-start gap-3">
+            <span class="material-symbols-outlined text-emerald mt-0.5">check_circle</span>
+            <div>
+              <div class="font-semibold">SQLite on your disk</div>
+              <div class="text-sm text-navy/50">All data stored in a single file inside your Docker volume. You own the backup.</div>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="material-symbols-outlined text-emerald mt-0.5">check_circle</span>
+            <div>
+              <div class="font-semibold">Argon2id password hashing</div>
+              <div class="text-sm text-navy/50">Industry-standard password security. Session tokens are opaque and server-managed.</div>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="material-symbols-outlined text-emerald mt-0.5">check_circle</span>
+            <div>
+              <div class="font-semibold">No external dependencies</div>
+              <div class="text-sm text-navy/50">The entire stack runs in one container. No external databases, CDNs, or analytics.</div>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="material-symbols-outlined text-emerald mt-0.5">check_circle</span>
+            <div>
+              <div class="font-semibold">Open source</div>
+              <div class="text-sm text-navy/50">Full source code available for audit. Trust through transparency.</div>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div class="fade-in">
+        <div class="bg-surface rounded-2xl border border-navy/5 p-8">
+          <h3 class="font-bold text-lg mb-6 flex items-center gap-2">
+            <span class="material-symbols-outlined text-navy/40">architecture</span>
+            Architecture
+          </h3>
+          <div class="space-y-4 text-sm">
+            <div class="flex items-center gap-4">
+              <div class="w-28 bg-navy text-white rounded-lg px-3 py-2 text-center font-medium text-xs">Android</div>
+              <div class="text-navy/30 flex-1 border-t border-dashed"></div>
+              <div class="w-28 bg-navy text-white rounded-lg px-3 py-2 text-center font-medium text-xs">Docker</div>
+            </div>
+            <div class="text-center text-navy/30 text-xs">HTTPS + WebSocket</div>
+            <div class="flex items-center gap-4">
+              <div class="w-28 bg-navy/10 rounded-lg px-3 py-2 text-center font-medium text-xs">GPS</div>
+              <div class="text-navy/30 flex-1 border-t border-dashed"></div>
+              <div class="w-28 bg-navy/10 rounded-lg px-3 py-2 text-center font-medium text-xs">SQLite</div>
+            </div>
+            <div class="mt-6 pt-6 border-t border-navy/5">
+              <div class="flex items-center gap-4">
+                <div class="w-28 bg-navy text-white rounded-lg px-3 py-2 text-center font-medium text-xs">Browser</div>
+                <div class="text-navy/30 flex-1 border-t border-dashed"></div>
+                <div class="w-28 bg-navy text-white rounded-lg px-3 py-2 text-center font-medium text-xs">Docker</div>
+              </div>
+              <div class="text-center text-navy/30 text-xs mt-1">HTTPS + WebSocket</div>
+            </div>
+            <div class="mt-4 bg-emerald/5 border border-emerald/10 rounded-lg p-3 text-center text-xs text-emerald-dark font-medium">
+              Location data stays inside your network
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tech Stack -->
+<section class="py-24 bg-surface">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="text-center mb-16 fade-in">
+      <h2 class="text-3xl font-bold mb-4">Built with familiar tools</h2>
+      <p class="text-navy/50 max-w-lg mx-auto">Standard, well-understood technologies. Easy to extend and contribute to.</p>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 fade-in">
+      <div class="bg-white rounded-xl p-6 text-center border border-navy/5">
+        <div class="font-bold text-sm mb-1">Server</div>
+        <div class="text-navy/50 text-xs">Fastify + SQLite</div>
+      </div>
+      <div class="bg-white rounded-xl p-6 text-center border border-navy/5">
+        <div class="font-bold text-sm mb-1">Android</div>
+        <div class="text-navy/50 text-xs">Kotlin + Compose</div>
+      </div>
+      <div class="bg-white rounded-xl p-6 text-center border border-navy/5">
+        <div class="font-bold text-sm mb-1">Web Map</div>
+        <div class="text-navy/50 text-xs">Leaflet + osmdroid</div>
+      </div>
+      <div class="bg-white rounded-xl p-6 text-center border border-navy/5">
+        <div class="font-bold text-sm mb-1">Real-time</div>
+        <div class="text-navy/50 text-xs">WebSocket pub/sub</div>
+      </div>
+      <div class="bg-white rounded-xl p-6 text-center border border-navy/5">
+        <div class="font-bold text-sm mb-1">Auth</div>
+        <div class="text-navy/50 text-xs">Argon2id + sessions</div>
+      </div>
+      <div class="bg-white rounded-xl p-6 text-center border border-navy/5">
+        <div class="font-bold text-sm mb-1">Deploy</div>
+        <div class="text-navy/50 text-xs">Docker Compose</div>
+      </div>
+      <div class="bg-white rounded-xl p-6 text-center border border-navy/5">
+        <div class="font-bold text-sm mb-1">API</div>
+        <div class="text-navy/50 text-xs">Retrofit + serialization</div>
+      </div>
+      <div class="bg-white rounded-xl p-6 text-center border border-navy/5">
+        <div class="font-bold text-sm mb-1">License</div>
+        <div class="text-navy/50 text-xs">MIT</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="py-24 hero-gradient grid-bg">
+  <div class="max-w-3xl mx-auto px-6 text-center">
+    <h2 class="text-3xl font-bold text-white mb-6">Ready to take control<br/>of your family's safety?</h2>
+    <p class="text-white/50 mb-8 max-w-md mx-auto">Deploy in minutes. No subscriptions. No data sharing. Just open-source software running on your hardware.</p>
+    <div class="flex flex-wrap justify-center gap-4">
+      <a href="https://github.com/chartmann1590/family-guardian" target="_blank" class="inline-flex items-center gap-2 bg-emerald hover:bg-emerald-dark text-white font-semibold px-8 py-3.5 rounded-lg transition">
+        <span class="material-symbols-outlined">code</span>
+        Get Started on GitHub
+      </a>
+      <a href="privacy.html" class="inline-flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white font-semibold px-8 py-3.5 rounded-lg border border-white/10 transition">
+        <span class="material-symbols-outlined">policy</span>
+        Privacy Policy
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="bg-navy py-12">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+      <div class="flex items-center gap-2 text-white font-bold">
+        <span class="material-symbols-outlined text-emerald">shield</span>
+        Family Guardian
+      </div>
+      <div class="flex items-center gap-6 text-sm text-white/40">
+        <a href="privacy.html" class="hover:text-white/70 transition">Privacy Policy</a>
+        <a href="https://github.com/chartmann1590/family-guardian" target="_blank" class="hover:text-white/70 transition">GitHub</a>
+        <span>&copy; 2026</span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1 });
+document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

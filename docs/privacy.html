@@ -1,0 +1,178 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Privacy Policy - Family Guardian</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        navy: '#0F172A',
+        'navy-light': '#1E293B',
+        emerald: '#10B981',
+        surface: '#f8f9ff',
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+    },
+  },
+}
+</script>
+</head>
+<body class="bg-surface text-navy antialiased">
+
+<!-- Nav -->
+<nav class="bg-navy border-b border-white/10">
+  <div class="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="index.html" class="flex items-center gap-2 text-white font-bold text-lg">
+      <span class="material-symbols-outlined text-emerald">shield</span>
+      Family Guardian
+    </a>
+    <a href="index.html" class="text-white/60 hover:text-white text-sm transition flex items-center gap-1">
+      <span class="material-symbols-outlined text-base">arrow_back</span>
+      Home
+    </a>
+  </div>
+</nav>
+
+<main class="max-w-4xl mx-auto px-6 py-16">
+  <h1 class="text-4xl font-bold mb-2">Privacy Policy</h1>
+  <p class="text-navy/40 text-sm mb-12">Last updated: May 18, 2026</p>
+
+  <div class="space-y-10 text-navy/70 leading-relaxed">
+
+    <section>
+      <h2 class="text-xl font-bold text-navy mb-3">1. Overview</h2>
+      <p>Family Guardian ("the Platform") is a self-hosted, open-source family safety application. It consists of a server component (Fastify + SQLite) that you deploy on your own infrastructure, and an optional Android companion app. Because the Platform is fully self-hosted, <strong>no data is transmitted to the developers, any cloud service, or any third party</strong> as part of normal operation.</p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-bold text-navy mb-3">2. Data Controller</h2>
+      <p>When you deploy Family Guardian on your own server, <strong>you are the data controller</strong>. The developers of Family Guardian do not operate any hosted service, do not have access to your server, and do not collect, process, or store any personal data from your deployment.</p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-bold text-navy mb-3">3. What Data Is Collected</h2>
+      <p>The following data is stored locally on your server's SQLite database:</p>
+      <ul class="list-disc pl-6 mt-3 space-y-2">
+        <li><strong>Account credentials:</strong> Email address and an argon2id-hashed password. Passwords are never stored in plaintext.</li>
+        <li><strong>Session tokens:</strong> Opaque random tokens used for authentication, stored in the sessions table.</li>
+        <li><strong>Location data:</strong> GPS coordinates (latitude, longitude), accuracy, speed, bearing, and timestamp, reported by the Android app for each circle member.</li>
+        <li><strong>Circle and membership data:</strong> Circle names, member roles, and invite codes with expiration times.</li>
+        <li><strong>Safety places (geofences):</strong> User-defined geographic areas with names and radii.</li>
+        <li><strong>SOS events:</strong> Activation and resolution timestamps for emergency alerts.</li>
+      </ul>
+      <p class="mt-3">All data resides in a single SQLite file on your server's filesystem (typically at <code class="bg-navy/5 px-1.5 py-0.5 rounded text-sm">/data/guardian.db</code> inside the Docker container).</p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-bold text-navy mb-3">4. How Data Is Used</h2>
+      <p>Data is used exclusively to provide the Platform's core functionality:</p>
+      <ul class="list-disc pl-6 mt-3 space-y-2">
+        <li><strong>Authentication:</strong> Verifying identity and managing sessions.</li>
+        <li><strong>Real-time location sharing:</strong> Displaying family member positions on the dashboard map.</li>
+        <li><strong>Geofence monitoring:</strong> Detecting arrivals and departures from safety places.</li>
+        <li><strong>Emergency alerts:</strong> Activating and resolving SOS events.</li>
+        <li><strong>Circle management:</strong> Organizing family members and controlling access via invite codes.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-bold text-navy mb-3">5. Data Sharing and Third Parties</h2>
+      <p>Family Guardian does <strong>not</strong> share any data with third parties. The Platform operates entirely within your infrastructure. There are:</p>
+      <ul class="list-disc pl-6 mt-3 space-y-2">
+        <li>No analytics services (Google Analytics, Mixpanel, etc.)</li>
+        <li>No crash reporting services (Sentry, Crashlytics, etc.)</li>
+        <li>No advertising or tracking SDKs</li>
+        <li>No cloud backup or synchronization services</li>
+        <li>No external API calls to third-party servers</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-bold text-navy mb-3">6. Data Transmission</h2>
+      <p>Data is transmitted only between three endpoints that <strong>you control</strong>:</p>
+      <ul class="list-disc pl-6 mt-3 space-y-2">
+        <li><strong>Android app to your server:</strong> GPS data, authentication requests, and SOS activations are sent over HTTP/HTTPS to your server.</li>
+        <li><strong>Web browser to your server:</strong> Dashboard access, authentication, and configuration are served from your server.</li>
+        <li><strong>WebSocket connections:</strong> Real-time location updates are broadcast via WebSocket between authenticated clients connected to your server.</li>
+      </ul>
+      <p class="mt-3"><strong>Important:</strong> The current walking skeleton supports HTTP connections. Before deploying outside your local network, you should configure TLS termination (via a reverse proxy such as Caddy, nginx, or Traefik) to encrypt data in transit.</p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-bold text-navy mb-3">7. Data Retention and Deletion</h2>
+      <p>Since you operate the server, you have full control over data retention:</p>
+      <ul class="list-disc pl-6 mt-3 space-y-2">
+        <li>The SQLite database can be inspected, backed up, or deleted at any time.</li>
+        <li>Invite codes automatically expire after 24 hours.</li>
+        <li>Session tokens are invalidated on logout.</li>
+        <li>To delete all data, remove the Docker volume or delete the database file.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-bold text-navy mb-3">8. Security Measures</h2>
+      <p>The Platform implements the following security measures:</p>
+      <ul class="list-disc pl-6 mt-3 space-y-2">
+        <li><strong>Password hashing:</strong> Argon2id, the winner of the Password Hashing Competition (2015).</li>
+        <li><strong>Session management:</strong> Opaque random tokens stored server-side, served as HttpOnly cookies (web) or Bearer tokens (API).</li>
+        <li><strong>Authentication:</strong> All location, circle, and SOS endpoints require valid authentication.</li>
+        <li><strong>Invite-only access:</strong> After the initial admin bootstrap, new members can only join via time-limited invite codes.</li>
+        <li><strong>SQLite hardening:</strong> WAL mode with foreign key enforcement enabled by default.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-bold text-navy mb-3">9. Android App Permissions</h2>
+      <p>The Android companion app requests the following permissions:</p>
+      <ul class="list-disc pl-6 mt-3 space-y-2">
+        <li><strong>Location (foreground and background):</strong> Required to report GPS coordinates to your server. Location data is only sent to the server URL you configure.</li>
+        <li><strong>Notifications:</strong> Required to display geofence and SOS alerts as Android notifications.</li>
+        <li><strong>Foreground service:</strong> Required to maintain reliable background location reporting.</li>
+      </ul>
+      <p class="mt-3">The Android app does not include any third-party analytics, advertising, or tracking SDKs. It communicates exclusively with the server URL you provide.</p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-bold text-navy mb-3">10. Children's Privacy</h1>
+      <p>Family Guardian is designed for families and may be used by minors under parental supervision. Location data of minors is stored on the parent-controlled server. The Platform does not contact or interact with any child directly. All data remains under the control of the family administrator who deployed the server.</p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-bold text-navy mb-3">11. Open Source</h2>
+      <p>Family Guardian is open-source software. The complete source code is available for independent security audit and verification at <a href="https://github.com/chartmann1590/family-guardian" class="text-emerald hover:underline">github.com/chartmann1590/family-guardian</a>.</p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-bold text-navy mb-3">12. Changes to This Policy</h2>
+      <p>This privacy policy may be updated as the Platform evolves. Changes will be reflected in the "Last updated" date above. Since the Platform is self-hosted, you can always inspect the source code to verify data handling practices.</p>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-bold text-navy mb-3">13. Contact</h2>
+      <p>For questions about this privacy policy or the Platform's data practices, please open an issue on the <a href="https://github.com/chartmann1590/family-guardian/issues" class="text-emerald hover:underline">GitHub repository</a>.</p>
+    </section>
+
+  </div>
+
+  <div class="mt-16 pt-8 border-t border-navy/10 text-center">
+    <a href="index.html" class="text-emerald hover:underline font-medium">&larr; Back to Home</a>
+  </div>
+</main>
+
+<!-- Footer -->
+<footer class="bg-navy py-8">
+  <div class="max-w-4xl mx-auto px-6 text-center text-white/30 text-sm">
+    &copy; 2026 Family Guardian &middot; <a href="https://github.com/chartmann1590/family-guardian" class="hover:text-white/50 transition">GitHub</a>
+  </div>
+</footer>
+
+</body>
+</html>
