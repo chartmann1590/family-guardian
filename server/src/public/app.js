@@ -143,7 +143,7 @@
                         ${m.batteryPct != null ? `
                             <div class="flex items-center gap-1 px-2 py-0.5 rounded-full" style="background:${battery.bg}33">
                                 <span class="material-symbols-outlined text-[14px]" style="color:${battery.fg}">battery_full</span>
-                                <span class="font-status-number text-status-number" style="color:${battery.fg}">${m.batteryPct}%</span>
+                                <span class="font-status-number text-status-number" style="color:${battery.fg}">${escapeHtml(m.batteryPct)}%</span>
                             </div>` : ''}
                         ${(() => {
                             const icon = window.FgUnits && window.FgUnits.activityIcon(m.activity);
