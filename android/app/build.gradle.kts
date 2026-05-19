@@ -17,9 +17,37 @@ android {
         versionName = "0.1.0"
     }
 
+    // Reads keystore details from ~/.gradle/gradle.properties so the keystore
+    // itself never lands in the repo. Set FG_RELEASE_KEYSTORE et al locally.
+    // If unset, ./gradlew assembleDebug still works; assembleRelease will need
+    // -PFG_RELEASE_KEYSTORE=... or the props on disk.
+    signingConfigs {
+        create("release") {
+            val keystorePath = providers.gradleProperty("FG_RELEASE_KEYSTORE").orNull
+            if (keystorePath != null) {
+                storeFile = file(keystorePath)
+                storePassword = providers.gradleProperty("FG_RELEASE_STORE_PASSWORD").orNull
+                keyAlias = providers.gradleProperty("FG_RELEASE_KEY_ALIAS").orNull
+                keyPassword = providers.gradleProperty("FG_RELEASE_KEY_PASSWORD").orNull
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            // Only apply the release config if a keystore is actually configured;
+            // otherwise leave unsigned so devs get a clear error rather than a
+            // silently-debug-signed APK.
+            val releaseSigning = signingConfigs.getByName("release")
+            if (releaseSigning.storeFile != null) {
+                signingConfig = releaseSigning
+            }
         }
     }
 
@@ -63,6 +91,11 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     implementation("org.osmdroid:osmdroid-android:6.1.20")
+
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
+    implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
+    implementation("com.google.firebase:firebase-messaging")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

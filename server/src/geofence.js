@@ -1,5 +1,6 @@
 // Geofence enter/exit detection. Called from POST /api/locations.
 import { publish } from './hub.js';
+import { fanOut } from './fcm.js';
 
 const EARTH_RADIUS_M = 6_371_000;
 
@@ -43,40 +44,46 @@ export function reconcileGeofences(db, { userId, circleId, displayName, lat, lng
 
     const events = [];
 
-    for (const p of places) {
-        const dist = haversineMeters(lat, lng, p.lat, p.lng);
-        const inside = dist <= p.radius_m;
-        const wasInside = insidePresence.has(p.id);
+    // All presence-table writes for a single fix must be atomic; otherwise a
+    // crash mid-loop leaves presence inconsistent with the location row.
+    const reconcile = db.transaction(() => {
+        for (const p of places) {
+            const dist = haversineMeters(lat, lng, p.lat, p.lng);
+            const inside = dist <= p.radius_m;
+            const wasInside = insidePresence.has(p.id);
 
-        if (inside && !wasInside) {
-            insertPresence.run(userId, p.id, recordedAt);
-            if (p.alerts_on_enter) {
-                events.push({
-                    type: 'geofence_enter',
-                    userId,
-                    displayName,
-                    placeId: p.id,
-                    placeName: p.name,
-                    distanceM: dist,
-                    recordedAt,
-                });
-            }
-        } else if (!inside && wasInside) {
-            deletePresence.run(userId, p.id);
-            if (p.alerts_on_exit) {
-                events.push({
-                    type: 'geofence_exit',
-                    userId,
-                    displayName,
-                    placeId: p.id,
-                    placeName: p.name,
-                    distanceM: dist,
-                    recordedAt,
-                });
+            if (inside && !wasInside) {
+                insertPresence.run(userId, p.id, recordedAt);
+                if (p.alerts_on_enter) {
+                    events.push({
+                        type: 'geofence_enter',
+                        userId,
+                        displayName,
+                        placeId: p.id,
+                        placeName: p.name,
+                        distanceM: dist,
+                        recordedAt,
+                    });
+                }
+            } else if (!inside && wasInside) {
+                deletePresence.run(userId, p.id);
+                if (p.alerts_on_exit) {
+                    events.push({
+                        type: 'geofence_exit',
+                        userId,
+                        displayName,
+                        placeId: p.id,
+                        placeName: p.name,
+                        distanceM: dist,
+                        recordedAt,
+                    });
+                }
             }
         }
-    }
+    });
+    reconcile();
 
     for (const ev of events) publish(circleId, ev);
+    for (const ev of events) fanOut(circleId, ev, db, userId);
     return events;
 }

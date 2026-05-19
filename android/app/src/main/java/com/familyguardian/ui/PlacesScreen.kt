@@ -307,12 +307,15 @@ private fun PlaceFormDialog(initial: Place?, onCancel: () -> Unit, onSave: (Plac
         title = { Text(if (initial == null) "New safety place" else "Edit place") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(address, { address = it }, label = { Text("Address (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                // Clear any prior validation error on the next keystroke so it
+                // disappears when the user starts fixing the offending field.
+                val clearErr: (String) -> String = { v -> validationError = null; v }
+                OutlinedTextField(name, { name = clearErr(it) }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(address, { address = clearErr(it) }, label = { Text("Address (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = lat,
-                        onValueChange = { lat = it },
+                        onValueChange = { lat = clearErr(it) },
                         label = { Text("Latitude") },
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth(0.5f),
@@ -320,7 +323,7 @@ private fun PlaceFormDialog(initial: Place?, onCancel: () -> Unit, onSave: (Plac
                     )
                     OutlinedTextField(
                         value = lng,
-                        onValueChange = { lng = it },
+                        onValueChange = { lng = clearErr(it) },
                         label = { Text("Longitude") },
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth(),
@@ -329,7 +332,7 @@ private fun PlaceFormDialog(initial: Place?, onCancel: () -> Unit, onSave: (Plac
                 }
                 OutlinedTextField(
                     value = radius,
-                    onValueChange = { radius = it },
+                    onValueChange = { radius = clearErr(it) },
                     label = { Text("Radius (m)") },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,

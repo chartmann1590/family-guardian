@@ -19,20 +19,30 @@ export default async function locationRoutes(fastify, { db }) {
             return reply.code(400).send({ error: 'invalid_body', details: parsed.error.flatten() });
         }
         const { lat, lng, accuracyM, speedMps, batteryPct } = parsed.data;
-        const recordedAt = parsed.data.recordedAt ?? Date.now();
+        // Clamp client-supplied recordedAt to "now" so a misconfigured clock
+        // can't poison the history with future timestamps.
+        const recordedAt = Math.min(parsed.data.recordedAt ?? Date.now(), Date.now());
         const userId = req.auth.userId;
 
-        db.prepare(
-            `INSERT INTO locations (user_id, lat, lng, accuracy_m, speed_mps, battery_pct, recorded_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(user_id) DO UPDATE SET
-                lat = excluded.lat,
-                lng = excluded.lng,
-                accuracy_m = excluded.accuracy_m,
-                speed_mps = excluded.speed_mps,
-                battery_pct = excluded.battery_pct,
-                recorded_at = excluded.recorded_at`
-        ).run(userId, lat, lng, accuracyM ?? null, speedMps ?? null, batteryPct ?? null, recordedAt);
+        const writeLocation = db.transaction(() => {
+            db.prepare(
+                `INSERT INTO locations (user_id, lat, lng, accuracy_m, speed_mps, battery_pct, recorded_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)
+                 ON CONFLICT(user_id) DO UPDATE SET
+                    lat = excluded.lat,
+                    lng = excluded.lng,
+                    accuracy_m = excluded.accuracy_m,
+                    speed_mps = excluded.speed_mps,
+                    battery_pct = excluded.battery_pct,
+                    recorded_at = excluded.recorded_at`
+            ).run(userId, lat, lng, accuracyM ?? null, speedMps ?? null, batteryPct ?? null, recordedAt);
+
+            db.prepare(
+                `INSERT INTO locations_history (user_id, lat, lng, accuracy_m, speed_mps, battery_pct, recorded_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`
+            ).run(userId, lat, lng, accuracyM ?? null, speedMps ?? null, batteryPct ?? null, recordedAt);
+        });
+        writeLocation();
 
         const circleId = getUserCircleId(db, userId);
         if (circleId) {
@@ -70,6 +80,7 @@ export default async function locationRoutes(fastify, { db }) {
         const rows = db
             .prepare(
                 `SELECT u.id AS userId, u.display_name AS displayName, u.email,
+                        u.photo_path AS photoPath,
                         cm.role AS role,
                         l.lat AS lat, l.lng AS lng,
                         l.accuracy_m AS accuracyM,
@@ -82,7 +93,44 @@ export default async function locationRoutes(fastify, { db }) {
                  WHERE cm.circle_id = ?
                  ORDER BY cm.role DESC, u.display_name COLLATE NOCASE ASC`
             )
-            .all(circleId);
+            .all(circleId)
+            .map(({ photoPath, ...m }) => ({
+                ...m,
+                photoUrl: photoPath ? `/api/users/${m.userId}/photo` : null,
+            }));
         return { members: rows };
+    });
+
+    fastify.get('/api/circles/:circleId/members/:userId/history', { preHandler: requireAuth(db) }, async (req, reply) => {
+        const circleId = Number(req.params.circleId);
+        const targetUserId = Number(req.params.userId);
+        if (!Number.isInteger(circleId) || !Number.isInteger(targetUserId)) {
+            return reply.code(400).send({ error: 'invalid_params' });
+        }
+
+        const membership = db
+            .prepare('SELECT 1 FROM circle_members WHERE circle_id = ? AND user_id = ?')
+            .get(circleId, req.auth.userId);
+        if (!membership) return reply.code(403).send({ error: 'not_a_member' });
+
+        const targetMembership = db
+            .prepare('SELECT 1 FROM circle_members WHERE circle_id = ? AND user_id = ?')
+            .get(circleId, targetUserId);
+        if (!targetMembership) return reply.code(404).send({ error: 'user_not_in_circle' });
+
+        const from = Number(req.query.from) || 0;
+        const to = Number(req.query.to) || Date.now() + 1;
+        const limit = Math.min(Number(req.query.limit) || 500, 5000);
+
+        const rows = db.prepare(
+            `SELECT id, lat, lng, accuracy_m AS accuracyM, speed_mps AS speedMps,
+                    battery_pct AS batteryPct, recorded_at AS recordedAt
+             FROM locations_history
+             WHERE user_id = ? AND recorded_at >= ? AND recorded_at <= ?
+             ORDER BY recorded_at ASC
+             LIMIT ?`
+        ).all(targetUserId, from, to, limit);
+
+        return { points: rows };
     });
 }

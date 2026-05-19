@@ -41,5 +41,12 @@
             android:name=".location.LocationService"
             android:exported="false"
             android:foregroundServiceType="location" />
+        <service
+            android:name=".events.FcmService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

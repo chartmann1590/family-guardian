@@ -22,6 +22,7 @@
     const placeLayers = new Map(); // placeId -> L.Circle
     const places = new Map();      // placeId -> { id, name, lat, lng, radiusM }
     const sosByUser = new Map();   // userId -> sos event (active only)
+    const checkins = new Map();    // userId -> { status, createdAt }
 
     function initialsAvatar(name) {
         const initials = (name || '?')
@@ -34,10 +35,20 @@
         return initials || '?';
     }
 
-    function makeIcon(displayName, active, sos) {
+    // Avatar inner HTML — initials always render; an <img> overlays them when
+    // photoUrl is set, and onerror removes itself so the initials show through
+    // if the upload was deleted server-side.
+    function avatarInner(m) {
+        const text = `<span style="position:relative;z-index:0">${escapeHtml(initialsAvatar(m.displayName))}</span>`;
+        if (!m.photoUrl) return text;
+        return `${text}<img src="${escapeHtml(m.photoUrl)}" alt="" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:9999px;object-fit:cover;z-index:1;background:transparent">`;
+    }
+
+    function makeIcon(member, active, sos) {
+        const displayName = member.displayName;
         if (sos) {
             return L.divIcon({
-                html: `<div class="fg-sos-pulse">${initialsAvatar(displayName)}</div>`,
+                html: `<div class="fg-sos-pulse" style="position:relative;overflow:hidden">${avatarInner(member)}</div>`,
                 className: 'fg-sos-marker',
                 iconSize: [36, 36],
                 iconAnchor: [18, 18],
@@ -46,6 +57,7 @@
         const border = active ? '#006c49' : '#76777d';
         const html = `
             <div style="
+                position:relative;overflow:hidden;
                 background:#f8f9ff;
                 border:2px solid ${border};
                 border-radius:9999px;
@@ -54,7 +66,7 @@
                 font-family:Inter,sans-serif;font-weight:700;font-size:12px;
                 color:#0b1c30;
                 box-shadow:0 4px 12px rgba(15,23,42,0.2);
-            ">${initialsAvatar(displayName)}</div>`;
+            ">${avatarInner(member)}</div>`;
         return L.divIcon({
             html,
             className: 'fg-marker',
@@ -83,6 +95,13 @@
         return { fg: '#006c49', bg: '#e5eeff' };
     }
 
+    function checkinLabel(status) {
+        if (status === 'safe_home') return { text: 'Safe at home', icon: 'home', fg: '#006c49', bg: '#6cf8bb' };
+        if (status === 'out_safe') return { text: 'Out & safe', icon: 'thumb_up', fg: '#006c49', bg: '#6cf8bb' };
+        if (status === 'heading_home') return { text: 'Heading home', icon: 'directions_walk', fg: '#943700', bg: '#ffdbcd' };
+        return null;
+    }
+
     function renderMemberList() {
         const list = document.getElementById('member-list');
         const activeCount = document.getElementById('active-count');
@@ -103,8 +122,8 @@
             card.className = 'p-4 border-b border-surface-container flex items-start gap-3 hover:bg-surface-container-low cursor-pointer';
             card.innerHTML = `
                 <div class="relative mt-1">
-                    <div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center font-bold text-on-surface">${initialsAvatar(m.displayName)}</div>
-                    <div class="absolute -bottom-1 -right-1 w-3.5 h-3.5 ${liveNow ? 'bg-secondary' : 'bg-outline-variant'} border-2 border-surface rounded-full"></div>
+                    <div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center font-bold text-on-surface" style="position:relative;overflow:hidden">${avatarInner(m)}</div>
+                    <div class="absolute -bottom-1 -right-1 w-3.5 h-3.5 ${liveNow ? 'bg-secondary' : 'bg-outline-variant'} border-2 border-surface rounded-full" style="z-index:2"></div>
                 </div>
                 <div class="flex-1 min-w-0">
                     <div class="flex justify-between items-center mb-1">
@@ -112,7 +131,16 @@
                         <span class="font-label-md text-label-md text-on-surface-variant whitespace-nowrap">${relativeTime(m.recordedAt)}</span>
                     </div>
                     <p class="font-body-md text-body-md text-on-surface-variant text-sm mb-2">${m.lat != null ? `${m.lat.toFixed(4)}, ${m.lng.toFixed(4)}` : 'No location yet'}</p>
-                    <div class="flex gap-status-pill-gap">
+                    <div class="flex gap-status-pill-gap flex-wrap">
+                        ${(() => {
+                            const ci = checkins.get(m.userId);
+                            const ciLabel = ci ? checkinLabel(ci.status) : null;
+                            return ciLabel ? `
+                            <div class="flex items-center gap-1 px-2 py-0.5 rounded-full" style="background:${ciLabel.bg}33">
+                                <span class="material-symbols-outlined text-[14px]" style="color:${ciLabel.fg}">${ciLabel.icon}</span>
+                                <span class="font-status-number text-status-number" style="color:${ciLabel.fg}">${ciLabel.text}</span>
+                            </div>` : '';
+                        })()}
                         ${m.batteryPct != null ? `
                             <div class="flex items-center gap-1 px-2 py-0.5 rounded-full" style="background:${battery.bg}33">
                                 <span class="material-symbols-outlined text-[14px]" style="color:${battery.fg}">battery_full</span>
@@ -126,7 +154,7 @@
                     </div>
                 </div>`;
             card.addEventListener('click', () => {
-                if (m.lat != null) map.flyTo([m.lat, m.lng], 15);
+                window.location.href = '/member/' + m.userId;
             });
             list.appendChild(card);
         }
@@ -147,7 +175,7 @@
         if (m.lat == null || m.lng == null) return;
         const existing = markers.get(m.userId);
         const sos = sosByUser.has(m.userId);
-        const icon = makeIcon(m.displayName, isActive(m.recordedAt), sos);
+        const icon = makeIcon(m, isActive(m.recordedAt), sos);
         if (existing) {
             existing.setLatLng([m.lat, m.lng]);
             existing.setIcon(icon);
@@ -293,6 +321,34 @@
         });
     }
 
+    // Check-in button — toggle the status picker dialog
+    const checkinBtn = document.getElementById('checkin-btn');
+    const checkinDialog = document.getElementById('checkin-dialog');
+    if (checkinBtn && checkinDialog) {
+        checkinBtn.addEventListener('click', () => {
+            checkinDialog.classList.toggle('hidden');
+        });
+        for (const opt of checkinDialog.querySelectorAll('.checkin-opt')) {
+            opt.addEventListener('click', async () => {
+                const status = opt.dataset.status;
+                try {
+                    const res = await fetch('/api/checkins', {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/json' },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ status }),
+                    });
+                    if (!res.ok) {
+                        const e = await res.json().catch(() => ({}));
+                        alert('Check-in failed: ' + (e.error || res.status));
+                    }
+                } finally {
+                    checkinDialog.classList.add('hidden');
+                }
+            });
+        }
+    }
+
     // Initial state from server-side render
     for (const m of state.members || []) {
         members.set(m.userId, m);
@@ -307,6 +363,9 @@
         // re-skin marker if we already have one
         const m = members.get(ev.userId);
         if (m) upsertMarker(m);
+    }
+    for (const ci of state.latestCheckins || []) {
+        checkins.set(ci.userId, { status: ci.status, createdAt: ci.createdAt });
     }
     renderMemberList();
     renderSosBanner();
@@ -346,6 +405,11 @@
                 } else {
                     toast(`SOS resolved for ${msg.displayName}`, 'enter');
                 }
+            } else if (msg.type === 'check_in') {
+                checkins.set(msg.userId, { status: msg.status, createdAt: msg.createdAt });
+                renderMemberList();
+                const ciLabel = checkinLabel(msg.status);
+                if (ciLabel) toast(`${msg.displayName}: ${ciLabel.text}`, 'enter');
             }
         });
         ws.addEventListener('close', () => {

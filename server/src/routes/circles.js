@@ -18,7 +18,10 @@ function assertAdmin(db, circleId, userId, reply) {
 }
 
 export default async function circleRoutes(fastify, { db }) {
-    fastify.post('/api/circles/:id/invite', { preHandler: requireAuth(db) }, async (req, reply) => {
+    fastify.post('/api/circles/:id/invite', {
+        preHandler: requireAuth(db),
+        config: { rateLimit: { max: 20, timeWindow: '1 hour' } },
+    }, async (req, reply) => {
         const circleId = Number(req.params.id);
         if (!Number.isInteger(circleId)) return reply.code(400).send({ error: 'invalid_circle' });
         if (!assertAdmin(db, circleId, req.auth.userId, reply)) return;

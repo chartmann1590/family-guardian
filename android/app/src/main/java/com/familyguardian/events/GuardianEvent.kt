@@ -71,6 +71,29 @@ sealed interface GuardianEvent {
     ) : GuardianEvent
 
     @Serializable
+    @SerialName("chat_message")
+    data class ChatMessage(
+        val id: Long,
+        val userId: Long,
+        val displayName: String? = null,
+        val body: String,
+        val createdAt: Long,
+    ) : GuardianEvent
+
+    @Serializable
+    @SerialName("check_in")
+    data class CheckIn(
+        val id: Long,
+        val userId: Long,
+        val displayName: String? = null,
+        val status: String,
+        val lat: Double? = null,
+        val lng: Double? = null,
+        val note: String? = null,
+        val createdAt: Long,
+    ) : GuardianEvent
+
+    @Serializable
     @SerialName("error")
     data class Error(val error: String) : GuardianEvent
 }

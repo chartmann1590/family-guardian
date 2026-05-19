@@ -6,6 +6,9 @@ class AuthRepo(private val prefs: Prefs) {
         val url = ApiClient.endpoint(serverUrl, "/api/auth/login")
         val resp = ApiClient.api.login(url, LoginRequest(email = email, password = password))
         persist(serverUrl, email, resp)
+        // Returning users skip the onboarding wizard — they already have a
+        // display name set, and the server keeps any prior photo.
+        prefs.setOnboarded(true)
         return resp
     }
 
@@ -25,6 +28,9 @@ class AuthRepo(private val prefs: Prefs) {
         )
         val resp = ApiClient.api.signup(url, body)
         persist(serverUrl, email, resp)
+        // Fresh account → run the onboarding wizard so we can grab a photo
+        // and confirm the display name before landing on the map.
+        prefs.setOnboarded(false)
         return resp
     }
 

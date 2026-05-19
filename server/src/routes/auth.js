@@ -25,13 +25,16 @@ const COOKIE_OPTS = {
     path: '/',
     httpOnly: true,
     sameSite: 'lax',
-    // Skeleton ships behind a reverse proxy for TLS; cookie is not Secure-only
-    // so first-run on plain http://localhost still works.
-    secure: false,
+    // In production, require HTTPS for the session cookie. Local dev /
+    // first-run on plain http://localhost still works because NODE_ENV
+    // is unset there.
+    secure: process.env.NODE_ENV === 'production',
 };
 
 export default async function authRoutes(fastify, { db }) {
-    fastify.post('/api/auth/signup', async (req, reply) => {
+    fastify.post('/api/auth/signup', {
+        config: { rateLimit: { max: 5, timeWindow: '1 hour' } },
+    }, async (req, reply) => {
         const parsed = SignupBody.safeParse(req.body);
         if (!parsed.success) {
             return reply.code(400).send({ error: 'invalid_body', details: parsed.error.flatten() });
@@ -94,7 +97,9 @@ export default async function authRoutes(fastify, { db }) {
         return { token, userId, circleId, role, displayName };
     });
 
-    fastify.post('/api/auth/login', async (req, reply) => {
+    fastify.post('/api/auth/login', {
+        config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    }, async (req, reply) => {
         const parsed = LoginBody.safeParse(req.body);
         if (!parsed.success) {
             return reply.code(400).send({ error: 'invalid_body' });
@@ -102,6 +107,7 @@ export default async function authRoutes(fastify, { db }) {
         const { email, password } = parsed.data;
         const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
         if (!user || !(await verifyPassword(user.password_hash, password))) {
+            req.log.warn({ ip: req.ip, email }, 'login_failed');
             return reply.code(401).send({ error: 'invalid_credentials' });
         }
         const { token } = createSession(db, user.id);

@@ -79,9 +79,9 @@ class EventStreamClient(
             }
             val wsUrl = server.trim().trimEnd('/')
                 .replaceFirst("http://", "ws://")
-                .replaceFirst("https://", "wss://") + "/ws?token=$token"
+                .replaceFirst("https://", "wss://") + "/ws"
             Log.i("EventStream", "Connecting $wsUrl")
-            val opened = connectOnce(wsUrl)
+            val opened = connectOnce(wsUrl, token)
             if (opened) backoffMs = 1_000L
             // After the socket closes, wait before reconnecting.
             delay(backoffMs)
@@ -90,8 +90,12 @@ class EventStreamClient(
     }
 
     /** Returns after the socket is closed. Returns true if the connection was opened at all. */
-    private suspend fun connectOnce(url: String): Boolean {
-        val request = Request.Builder().url(url).build()
+    private suspend fun connectOnce(url: String, token: String): Boolean {
+        // Authorization header survives proxies/logs better than ?token=…
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("Authorization", "Bearer $token")
+            .build()
         val gate = kotlinx.coroutines.CompletableDeferred<Boolean>()
         var openedFlag = false
         val ws = client.newWebSocket(request, object : WebSocketListener() {

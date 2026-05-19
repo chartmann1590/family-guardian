@@ -38,6 +38,26 @@ data class OkResponse(val ok: Boolean = true)
 data class ApiError(val error: String)
 
 @Serializable
+data class CircleMember(
+    val userId: Long,
+    val displayName: String,
+    val email: String? = null,
+    val role: String? = null,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    val accuracyM: Double? = null,
+    val speedMps: Double? = null,
+    val batteryPct: Int? = null,
+    val recordedAt: Long? = null,
+    // Relative path like "/api/users/42/photo" or null if no photo set.
+    // Resolve against the server URL when fetching with Coil.
+    val photoUrl: String? = null,
+)
+
+@Serializable
+data class MembersResponse(val members: List<CircleMember>)
+
+@Serializable
 data class Place(
     val id: Long,
     val circleId: Long,
@@ -86,4 +106,55 @@ data class SosEvent(
     val accuracyM: Double? = null,
     val note: String? = null,
     val status: String,
+)
+
+@Serializable
+data class ChatMessage(
+    val id: Long,
+    val circleId: Long,
+    val userId: Long,
+    val displayName: String? = null,
+    val body: String,
+    val createdAt: Long,
+)
+
+@Serializable
+data class MessagesResponse(val messages: List<ChatMessage>)
+
+@Serializable
+data class SendMessageBody(val body: String)
+
+@Serializable
+data class LocationPoint(
+    val id: Long,
+    val lat: Double,
+    val lng: Double,
+    val accuracyM: Double? = null,
+    val speedMps: Double? = null,
+    val batteryPct: Int? = null,
+    val recordedAt: Long,
+)
+
+@Serializable
+data class HistoryResponse(val points: List<LocationPoint>)
+
+@Serializable
+data class CheckinBody(
+    val status: String,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    val note: String? = null,
+)
+
+@Serializable
+data class CheckinResponse(
+    val id: Long,
+    val userId: Long,
+    val circleId: Long,
+    val displayName: String? = null,
+    val status: String,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    val note: String? = null,
+    val createdAt: Long,
 )

@@ -11,17 +11,11 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
-import retrofit2.http.HTTP
 import retrofit2.http.POST
 import retrofit2.http.PATCH
 import retrofit2.http.Url
 import java.util.concurrent.TimeUnit
 
-/**
- * Retrofit-style API surface. We intentionally pass full URLs at call time so
- * a single Retrofit instance can talk to whichever server URL the user has
- * configured in [Prefs] — no rebuild required when the URL changes.
- */
 interface GuardianApi {
     @POST
     suspend fun login(@Url url: String, @Body body: LoginRequest): LoginResponse
@@ -41,6 +35,12 @@ interface GuardianApi {
         @Url url: String,
         @Header("Authorization") auth: String,
     ): Map<String, kotlinx.serialization.json.JsonElement>
+
+    @GET
+    suspend fun listMembers(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): MembersResponse
 
     @GET
     suspend fun listPlaces(
@@ -74,6 +74,32 @@ interface GuardianApi {
         @Header("Authorization") auth: String,
         @Body body: SosActivateBody,
     ): SosEvent
+
+    @GET
+    suspend fun listMessages(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): MessagesResponse
+
+    @POST
+    suspend fun sendMessage(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: SendMessageBody,
+    ): ChatMessage
+
+    @GET
+    suspend fun getHistory(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): HistoryResponse
+
+    @POST
+    suspend fun sendCheckin(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: CheckinBody,
+    ): CheckinResponse
 }
 
 object ApiClient {
@@ -82,7 +108,7 @@ object ApiClient {
         explicitNulls = false
     }
 
-    private val okHttp = OkHttpClient.Builder()
+    val okHttp = OkHttpClient.Builder()
         .callTimeout(20, TimeUnit.SECONDS)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
@@ -98,8 +124,6 @@ object ApiClient {
 
     val api: GuardianApi by lazy {
         Retrofit.Builder()
-            // baseUrl is ignored at call sites (they pass @Url) but Retrofit
-            // requires one. Any valid URL works.
             .baseUrl("http://localhost/")
             .client(okHttp)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))

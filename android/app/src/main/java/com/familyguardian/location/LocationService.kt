@@ -19,6 +19,7 @@ import com.familyguardian.MainActivity
 import com.familyguardian.R
 import com.familyguardian.data.Prefs
 import com.familyguardian.events.Alerts
+import com.familyguardian.events.EventBus
 import com.familyguardian.events.EventStreamClient
 import com.familyguardian.events.GuardianEvent
 import com.google.android.gms.location.LocationCallback
@@ -115,6 +116,9 @@ class LocationService : Service() {
      */
     private suspend fun observeEvents(prefs: Prefs, stream: EventStreamClient) {
         stream.events.collectLatest { ev ->
+            // Republish so foreground UIs (chat, map) can react in real time.
+            EventBus.emit(ev)
+
             val selfId = prefs.snapshot().userId
             when (ev) {
                 is GuardianEvent.SosActive -> {
@@ -142,6 +146,26 @@ class LocationService : Service() {
                             displayName = ev.displayName,
                             placeName = ev.placeName,
                             entered = false,
+                        )
+                    }
+                }
+                is GuardianEvent.ChatMessage -> {
+                    if (ev.userId != selfId) {
+                        Alerts.showChatMessage(
+                            context = applicationContext,
+                            userId = ev.userId,
+                            displayName = ev.displayName,
+                            body = ev.body,
+                        )
+                    }
+                }
+                is GuardianEvent.CheckIn -> {
+                    if (ev.userId != selfId) {
+                        Alerts.showCheckIn(
+                            context = applicationContext,
+                            userId = ev.userId,
+                            displayName = ev.displayName,
+                            status = ev.status,
                         )
                     }
                 }

@@ -67,6 +67,9 @@
         <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container" href="/places">
             <span class="material-symbols-outlined">distance</span><span class="font-label-md text-label-md">Safety Places</span>
         </a>
+        <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container" href="/chat">
+            <span class="material-symbols-outlined">forum</span><span class="font-label-md text-label-md">Family Chat</span>
+        </a>
         <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-primary font-bold border-r-4 border-primary bg-surface-container-high" href="/settings">
             <span class="material-symbols-outlined">group_add</span><span class="font-label-md text-label-md">Circle Settings</span>
         </a>
@@ -87,6 +90,23 @@
             <h1 class="font-headline-md text-headline-md text-primary text-2xl font-bold">Circle Settings</h1>
             <p class="text-on-surface-variant text-sm">Manage members and invitations for <strong id="circle-name">{{CIRCLE_NAME}}</strong>.</p>
         </header>
+
+        <!-- Your photo -->
+        <section class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">
+            <h2 class="font-headline-md text-headline-md text-on-surface mb-4">Your photo</h2>
+            <div class="flex items-center gap-4">
+                <div id="my-avatar" class="w-20 h-20 rounded-full bg-surface-container-high flex items-center justify-center font-bold text-on-surface text-2xl border-2 border-secondary" style="position:relative;overflow:hidden">?</div>
+                <div class="flex flex-col gap-2 flex-1">
+                    <label class="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-primary/90 flex items-center gap-2 cursor-pointer self-start">
+                        <span class="material-symbols-outlined">photo_camera</span>
+                        <span>Upload photo</span>
+                        <input id="photo-input" type="file" accept="image/jpeg,image/png,image/webp" class="hidden">
+                    </label>
+                    <button id="remove-photo" class="text-error text-sm self-start hover:underline hidden">Remove photo</button>
+                    <p class="text-xs text-on-surface-variant">JPG, PNG, or WebP. Max 2 MB.</p>
+                </div>
+            </div>
+        </section>
 
         <!-- Members -->
         <section class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">

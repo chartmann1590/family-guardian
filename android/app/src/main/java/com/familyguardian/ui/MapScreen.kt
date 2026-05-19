@@ -1,13 +1,15 @@
 package com.familyguardian.ui
 
 import android.Manifest
-import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,22 +19,25 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Sos
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,27 +52,88 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.familyguardian.data.ApiClient
 import com.familyguardian.data.AuthRepo
+import com.familyguardian.data.CheckinRepo
+import com.familyguardian.data.CircleMember
 import com.familyguardian.data.Prefs
 import com.familyguardian.data.SosRepo
+import com.familyguardian.events.EventBus
+import com.familyguardian.events.GuardianEvent
 import com.familyguardian.location.LocationService
 import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.coroutines.resume
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import kotlin.coroutines.resume
+
+private fun initials(name: String?): String {
+    return (name ?: "?")
+        .trim()
+        .split(Regex("\\s+"))
+        .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+        .take(2)
+        .joinToString("")
+        .ifEmpty { "?" }
+}
+
+private fun memberActive(recordedAt: Long?): Boolean {
+    return recordedAt != null && (System.currentTimeMillis() - recordedAt) < 5 * 60_000L
+}
+
+private class InitialsMarker(
+    context: Context,
+    private val label: String,
+    active: Boolean,
+) : Marker(context) {
+    private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        style = Paint.Style.FILL
+    }
+    private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (active) Color.parseColor("#006c49") else Color.parseColor("#76777d")
+        style = Paint.Style.STROKE
+        strokeWidth = 6f
+    }
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#0b1c30")
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        textSize = 32f
+        textAlign = Paint.Align.CENTER
+    }
+
+    init { setAnchor(ANCHOR_CENTER, ANCHOR_CENTER) }
+
+    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+        val point = mapView.projection.toPixels(position, null)
+        val cx = point.x.toFloat()
+        val cy = point.y.toFloat()
+        val radius = 24f
+        canvas.drawCircle(cx, cy, radius, bgPaint)
+        canvas.drawCircle(cx, cy, radius, borderPaint)
+        val textY = cy - (textPaint.descent() + textPaint.ascent()) / 2f
+        canvas.drawText(label, cx, textY, textPaint)
+    }
+}
 
 @Composable
-fun MapScreen(onLoggedOut: () -> Unit, onOpenPlaces: () -> Unit) {
+fun MapScreen(
+    onLoggedOut: () -> Unit,
+    onOpenPlaces: () -> Unit,
+    onOpenChat: () -> Unit,
+    onOpenMember: (Long, String) -> Unit,
+) {
     val context = LocalContext.current
     val appCtx = context.applicationContext
     val prefs = remember { Prefs(appCtx) }
     val repo = remember { AuthRepo(prefs) }
     val sosRepo = remember { SosRepo(prefs) }
+    val checkinRepo = remember { CheckinRepo(prefs) }
     val scope = rememberCoroutineScope()
 
     val displayName by prefs.displayName.collectAsStateWithLifecycle(initialValue = null)
@@ -76,6 +142,17 @@ fun MapScreen(onLoggedOut: () -> Unit, onOpenPlaces: () -> Unit) {
     var sosConfirming by remember { mutableStateOf(false) }
     var sosInFlight by remember { mutableStateOf(false) }
     var sosMessage by remember { mutableStateOf<String?>(null) }
+    var checkinDialogOpen by remember { mutableStateOf(false) }
+    var checkinInFlight by remember { mutableStateOf(false) }
+    var checkinMessage by remember { mutableStateOf<String?>(null) }
+    var showMembers by remember { mutableStateOf(false) }
+    var members by remember { mutableStateOf<List<CircleMember>>(emptyList()) }
+    var membersLoading by remember { mutableStateOf(false) }
+    var membersError by remember { mutableStateOf<String?>(null) }
+
+    val mapViewState = remember { mutableStateOf<MapView?>(null) }
+
+    var bgLocRequested by remember { mutableStateOf(false) }
 
     val fineLocPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -86,14 +163,27 @@ fun MapScreen(onLoggedOut: () -> Unit, onOpenPlaces: () -> Unit) {
             permissionDenied = false
             LocationService.start(appCtx)
             serviceStarted = true
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !bgLocRequested) {
+                val hasBg = ContextCompat.checkSelfPermission(
+                    appCtx, Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+                ) == PackageManager.PERMISSION_GRANTED
+                if (!hasBg) {
+                    bgLocRequested = true
+                    bgLocPermission.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                }
+            }
         } else {
             permissionDenied = true
         }
     }
 
+    val bgLocPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
+
     val notifPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { /* outcome doesn't gate the flow; service uses a low-importance channel */ }
+    ) { }
 
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -119,6 +209,151 @@ fun MapScreen(onLoggedOut: () -> Unit, onOpenPlaces: () -> Unit) {
                 ),
             )
         }
+    }
+
+    suspend fun fetchMembers() {
+        val snap = prefs.snapshot()
+        val cid = snap.circleId ?: return
+        val token = snap.token ?: return
+        val server = snap.serverUrl ?: return
+        try {
+            val url = ApiClient.endpoint(server, "/api/circles/$cid/members")
+            val resp = ApiClient.api.listMembers(url, "Bearer $token")
+            members = resp.members
+            membersError = null
+        } catch (t: Throwable) {
+            membersError = t.message ?: "Couldn't reach your server."
+        }
+    }
+
+    fun syncMarkers(membersList: List<CircleMember>) {
+        val mv = mapViewState.value ?: return
+        val toRemove = mv.overlays.filterIsInstance<InitialsMarker>().toMutableList()
+        for (m in membersList) {
+            if (m.lat == null || m.lng == null) continue
+            val point = GeoPoint(m.lat, m.lng)
+            val existing = toRemove.find { it.id == m.userId.toString() }
+            if (existing != null) {
+                existing.position = point
+                toRemove.remove(existing)
+            } else {
+                val marker = InitialsMarker(
+                    mv.context,
+                    initials(m.displayName),
+                    memberActive(m.recordedAt),
+                )
+                marker.id = m.userId.toString()
+                marker.position = point
+                marker.title = m.displayName
+                marker.setOnMarkerClickListener { _, _ ->
+                    onOpenMember(m.userId, m.displayName)
+                    true
+                }
+                mv.overlays.add(marker)
+            }
+        }
+        for (old in toRemove) mv.overlays.remove(old)
+        mv.invalidate()
+    }
+
+    fun centerOnMembers(membersList: List<CircleMember>) {
+        val mv = mapViewState.value ?: return
+        val points = membersList.mapNotNull { m ->
+            if (m.lat != null && m.lng != null) GeoPoint(m.lat, m.lng) else null
+        }
+        if (points.isEmpty()) return
+        if (points.size == 1) {
+            mv.controller.setCenter(points[0])
+            mv.controller.setZoom(14.0)
+        } else {
+            val minLat = points.minOf { it.latitude }
+            val maxLat = points.maxOf { it.latitude }
+            val minLon = points.minOf { it.longitude }
+            val maxLon = points.maxOf { it.longitude }
+            val center = GeoPoint((minLat + maxLat) / 2, (minLon + maxLon) / 2)
+            val latSpan = maxLat - minLat
+            val lonSpan = maxLon - minLon
+            val maxSpan = maxOf(latSpan, lonSpan, 0.005)
+            val zoom = (16.0 - (maxSpan / 0.005)).coerceIn(5.0, 16.0)
+            mv.controller.setCenter(center)
+            mv.controller.setZoom(zoom)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        membersLoading = true
+        fetchMembers()
+        membersLoading = false
+    }
+
+    LaunchedEffect(members) {
+        syncMarkers(members)
+        if (members.any { it.lat != null }) {
+            centerOnMembers(members)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val job = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            EventBus.events.collect { event ->
+                if (event is GuardianEvent.LocationUpdate) {
+                    members = members.map { m ->
+                        if (m.userId == event.userId) {
+                            m.copy(
+                                lat = event.lat,
+                                lng = event.lng,
+                                batteryPct = event.batteryPct,
+                                speedMps = event.speedMps,
+                                recordedAt = event.recordedAt,
+                                displayName = event.displayName ?: m.displayName,
+                            )
+                        } else m
+                    }
+                }
+            }
+        }
+        onDispose { job.cancel() }
+    }
+
+    if (checkinDialogOpen) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { checkinDialogOpen = false },
+            title = { Text("Check in", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for ((status, label, _) in listOf(
+                        Triple("safe_home", "I'm safe at home", "home"),
+                        Triple("out_safe", "Out & safe", "thumb_up"),
+                        Triple("heading_home", "Heading home", "directions_walk"),
+                    )) {
+                        Button(
+                            onClick = {
+                                checkinDialogOpen = false
+                                checkinInFlight = true
+                                checkinMessage = null
+                                scope.launch {
+                                    try {
+                                        val fix = oneShotFix(appCtx)
+                                        checkinRepo.send(status, lat = fix?.first, lng = fix?.second)
+                                        checkinMessage = "Check-in sent!"
+                                    } catch (t: Throwable) {
+                                        checkinMessage = "Check-in failed: ${t.message ?: t::class.simpleName}"
+                                    } finally {
+                                        checkinInFlight = false
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                        ) { Text(label) }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { checkinDialogOpen = false }) { Text("Cancel") }
+            },
+        )
     }
 
     if (sosConfirming) {
@@ -162,6 +397,58 @@ fun MapScreen(onLoggedOut: () -> Unit, onOpenPlaces: () -> Unit) {
         )
     }
 
+    if (showMembers) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showMembers = false },
+            title = { Text("Circle Members", fontWeight = FontWeight.Bold) },
+            text = {
+                if (membersLoading) {
+                    Text("Loading...")
+                } else if (members.isEmpty()) {
+                    Text("No members found.")
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        for (m in members) {
+                            Surface(
+                                onClick = {
+                                    showMembers = false
+                                    onOpenMember(m.userId, m.displayName)
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    Avatar(
+                                        displayName = m.displayName,
+                                        photoPath = m.photoUrl,
+                                        size = 40.dp,
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(m.displayName, style = MaterialTheme.typography.bodyLarge)
+                                        if (m.lat != null && m.lng != null) {
+                                            Text(
+                                                "%.4f, %.4f".format(m.lat, m.lng),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showMembers = false }) { Text("Close") }
+            },
+        )
+    }
+
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(modifier = Modifier.fillMaxSize()) {
 
@@ -171,17 +458,14 @@ fun MapScreen(onLoggedOut: () -> Unit, onOpenPlaces: () -> Unit) {
                     MapView(ctx).apply {
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
-                        controller.setZoom(13.0)
-                        controller.setCenter(GeoPoint(37.7749, -122.4194))
+                        controller.setZoom(3.0)
+                        mapViewState.value = this
                     }
                 },
             )
 
-            // Top bar
             Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
                 shadowElevation = 6.dp,
@@ -204,6 +488,19 @@ fun MapScreen(onLoggedOut: () -> Unit, onOpenPlaces: () -> Unit) {
                     }
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
                         Row {
+                            TextButton(onClick = {
+                                showMembers = true
+                                scope.launch {
+                                    membersLoading = true
+                                    fetchMembers()
+                                    membersLoading = false
+                                }
+                            }) {
+                                Icon(Icons.Filled.People, contentDescription = "Members")
+                            }
+                            TextButton(onClick = onOpenChat) {
+                                Icon(Icons.Filled.Forum, contentDescription = "Chat")
+                            }
                             TextButton(onClick = onOpenPlaces) {
                                 Icon(Icons.Filled.Place, contentDescription = "Safety places")
                             }
@@ -221,15 +518,45 @@ fun MapScreen(onLoggedOut: () -> Unit, onOpenPlaces: () -> Unit) {
                 }
             }
 
-            // Bottom status / SOS
             Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                membersError?.let { msg ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                        ),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Can't reach server",
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                                Text(
+                                    msg,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                            TextButton(onClick = {
+                                scope.launch {
+                                    membersLoading = true
+                                    fetchMembers()
+                                    membersLoading = false
+                                }
+                            }) { Text("Retry") }
+                        }
+                    }
+                }
+
                 if (permissionDenied) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -265,7 +592,7 @@ fun MapScreen(onLoggedOut: () -> Unit, onOpenPlaces: () -> Unit) {
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                if (serviceStarted) "Sharing location with your circle" else "Starting…",
+                                if (serviceStarted) "Sharing location with your circle" else "Starting...",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.secondary,
                             )
@@ -279,10 +606,25 @@ fun MapScreen(onLoggedOut: () -> Unit, onOpenPlaces: () -> Unit) {
                 }
 
                 Button(
+                    onClick = { if (!checkinInFlight) checkinDialogOpen = true },
+                    modifier = Modifier.fillMaxWidth().size(width = 280.dp, height = 48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    contentPadding = PaddingValues(horizontal = 24.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ),
+                    enabled = !checkinInFlight,
+                ) {
+                    Text(
+                        if (checkinInFlight) "Sending..." else "Check in",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+
+                Button(
                     onClick = { if (!sosInFlight) sosConfirming = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .size(width = 280.dp, height = 64.dp),
+                    modifier = Modifier.fillMaxWidth().size(width = 280.dp, height = 64.dp),
                     shape = RoundedCornerShape(32.dp),
                     contentPadding = PaddingValues(horizontal = 24.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -293,8 +635,16 @@ fun MapScreen(onLoggedOut: () -> Unit, onOpenPlaces: () -> Unit) {
                 ) {
                     Icon(Icons.Filled.Sos, contentDescription = null)
                     Text(
-                        if (sosInFlight) "  Sending…" else "  SOS",
+                        if (sosInFlight) "  Sending..." else "  SOS",
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    )
+                }
+
+                checkinMessage?.let { msg ->
+                    Text(
+                        text = msg,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
 
@@ -310,11 +660,6 @@ fun MapScreen(onLoggedOut: () -> Unit, onOpenPlaces: () -> Unit) {
     }
 }
 
-/**
- * Try to get a single high-accuracy fix on demand for SOS. Returns null if the
- * caller doesn't have location permission or no fix is available — the server
- * will fall back to the user's last reported location in that case.
- */
 @SuppressWarnings("MissingPermission")
 private suspend fun oneShotFix(context: Context): Triple<Double, Double, Double?>? {
     val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(

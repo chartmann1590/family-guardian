@@ -1,12 +1,17 @@
 package com.familyguardian.events
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.familyguardian.MainActivity
 import com.familyguardian.R
 
@@ -50,6 +55,20 @@ object Alerts {
         }
     }
 
+    /**
+     * Android 13+ requires POST_NOTIFICATIONS. Without it, [NotificationManager.notify]
+     * is a silent no-op — the worst kind of failure. Skip work upfront and log once
+     * per call site so missing permission is debuggable from logcat.
+     */
+    private fun canPostNotifications(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) Log.w("Alerts", "POST_NOTIFICATIONS not granted; dropping notification")
+        return granted
+    }
+
     private fun openAppIntent(context: Context, mapsUri: Uri? = null): PendingIntent {
         val intent = mapsUri?.let { Intent(Intent.ACTION_VIEW, it) }
             ?: Intent(context, MainActivity::class.java).apply {
@@ -61,6 +80,7 @@ object Alerts {
     }
 
     fun showSos(context: Context, event: GuardianEvent.SosActive) {
+        if (!canPostNotifications(context)) return
         ensureChannels(context)
         val title = "🚨 SOS from ${event.displayName ?: "a family member"}"
         val text = if (event.lat != null && event.lng != null) {
@@ -89,6 +109,34 @@ object Alerts {
         nm.cancel(sosNotifId(sosId))
     }
 
+    fun showChatMessage(
+        context: Context,
+        userId: Long,
+        displayName: String?,
+        body: String,
+    ) {
+        if (!canPostNotifications(context)) return
+        ensureChannels(context)
+        val title = displayName ?: "Family chat"
+        val notif = NotificationCompat.Builder(context, CHANNEL_NORMAL)
+            .setSmallIcon(android.R.drawable.sym_action_chat)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setAutoCancel(true)
+            .setContentIntent(openAppIntent(context))
+            .build()
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(chatNotifId(userId), notif)
+    }
+
+    fun cancelChat(context: Context, userId: Long) {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.cancel(chatNotifId(userId))
+    }
+
     fun showGeofence(
         context: Context,
         userId: Long,
@@ -96,6 +144,7 @@ object Alerts {
         placeName: String,
         entered: Boolean,
     ) {
+        if (!canPostNotifications(context)) return
         ensureChannels(context)
         val name = displayName ?: "Someone"
         val title = if (entered) "$name arrived at $placeName" else "$name left $placeName"
@@ -111,9 +160,39 @@ object Alerts {
         nm.notify(geofenceNotifId(userId, placeName, entered), notif)
     }
 
+    fun showCheckIn(
+        context: Context,
+        userId: Long,
+        displayName: String?,
+        status: String,
+    ) {
+        if (!canPostNotifications(context)) return
+        ensureChannels(context)
+        val name = displayName ?: "Someone"
+        val label = when (status) {
+            "safe_home" -> "safe at home"
+            "out_safe" -> "out & safe"
+            "heading_home" -> "heading home"
+            else -> status
+        }
+        val title = "$name checked in: $label"
+        val notif = NotificationCompat.Builder(context, CHANNEL_NORMAL)
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentTitle(title)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setAutoCancel(true)
+            .setContentIntent(openAppIntent(context))
+            .build()
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(checkinNotifId(userId), notif)
+    }
+
     private fun sosNotifId(eventId: Long): Int = 1_000_000 + (eventId.toInt() and 0xFFFFF)
     private fun geofenceNotifId(userId: Long, placeName: String, entered: Boolean): Int {
         val base = (userId.toInt() * 31 + placeName.hashCode()) and 0xFFFFF
         return (if (entered) 2_000_000 else 3_000_000) + base
     }
+    private fun chatNotifId(userId: Long): Int = 4_000_000 + (userId.toInt() and 0xFFFFF)
+    private fun checkinNotifId(userId: Long): Int = 5_000_000 + (userId.toInt() and 0xFFFFF)
 }

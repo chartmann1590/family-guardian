@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { requireAuth, getUserCircleId } from '../auth.js';
 import { publish } from '../hub.js';
+import { fanOut } from '../fcm.js';
 
 const ActivateBody = z.object({
     lat: z.number().min(-90).max(90).optional(),
@@ -82,6 +83,7 @@ export default async function sosRoutes(fastify, { db }) {
 
         const event = rowToEvent(row);
         publish(circleId, { type: 'sos_active', ...event });
+        fanOut(circleId, { type: 'sos_active', ...event }, db, userId);
         return event;
     });
 
@@ -119,6 +121,7 @@ export default async function sosRoutes(fastify, { db }) {
             .get(eventId);
         const event = rowToEvent(row);
         publish(existing.circle_id, { type: 'sos_resolved', ...event });
+        fanOut(existing.circle_id, { type: 'sos_resolved', ...event }, db, userId);
         return event;
     });
 

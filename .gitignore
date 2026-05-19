@@ -4,6 +4,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Env (commit only .env.example)
+.env
+.env.local
+
 # SQLite (dev)
 server/data/
 *.db

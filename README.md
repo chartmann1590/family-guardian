@@ -49,12 +49,34 @@ After signing in you land on `/dashboard` — a Leaflet map with one marker per 
 | `PORT`            | `8080`                 | HTTP listen port                           |
 | `HOST`            | `0.0.0.0`              | Bind address                               |
 | `DATABASE_PATH`   | `/data/guardian.db`    | SQLite file inside the Docker volume       |
-| `SESSION_SECRET`  | `change-me-…`          | Cookie signing secret. **Set in prod.**    |
+| `SESSION_SECRET`  | `change-me-…`          | Cookie signing secret. **Required when `NODE_ENV=production`** (server refuses to boot if left as default). |
+| `NODE_ENV`        | unset                  | Set to `production` to require `SESSION_SECRET` and mark the session cookie `Secure` (HTTPS only). |
 | `LOG_LEVEL`       | `info`                 | Pino log level                             |
+| `FCM_SERVICE_ACCOUNT_PATH` | unset        | Path to Firebase service account JSON. When unset, push notifications are disabled. |
+
+For local dev outside Docker, copy `server/.env.example` to `server/.env`.
 
 ### TLS
 
 The container speaks plain HTTP. Put Caddy / nginx / Traefik in front and terminate TLS there. The Android app permits cleartext for the skeleton — switch to HTTPS before you deploy outside your LAN.
+
+### Push notifications (optional)
+
+Family Guardian works without push notifications — the WebSocket connection handles all real-time events while the app is open. Push notifications are only needed when the Android app is killed or in deep sleep.
+
+To enable FCM push notifications:
+
+1. Create a Firebase project at <https://console.firebase.google.com>.
+2. Go to **Project Settings → Service Accounts** and generate a new private key JSON file.
+3. Set the env var `FCM_SERVICE_ACCOUNT_PATH` to the path of that JSON file (e.g. mount it into the Docker container).
+4. Download `google-services.json` from **Project Settings → General → Your apps → Android** and place it at `android/app/google-services.json`.
+5. Add the `com.google.gms.google-services` plugin to the Android project's root `build.gradle.kts`:
+   ```kotlin
+   id("com.google.gms.google-services")
+   ```
+6. Rebuild the Android app.
+
+Without `FCM_SERVICE_ACCOUNT_PATH`, the server logs "FCM disabled" once and continues normally. All WebSocket features (location updates, SOS, chat, geofences, check-ins) still work.
 
 ## API surface (skeleton)
 
@@ -64,11 +86,17 @@ The container speaks plain HTTP. Put Caddy / nginx / Traefik in front and termin
 | POST   | `/api/auth/login`             | —    | Returns `{token, userId, circleId}`           |
 | POST   | `/api/auth/logout`            | ✓    | Destroys session                              |
 | GET    | `/api/auth/me`                | ✓    | Current session info                          |
+| PATCH  | `/api/users/me`               | ✓    | Update display name                           |
+| POST   | `/api/users/me/photo`         | ✓    | Upload profile photo (multipart, ≤ 2 MB, JPG/PNG/WebP) |
+| DELETE | `/api/users/me/photo`         | ✓    | Remove profile photo                          |
+| GET    | `/api/users/:id/photo`        | ✓    | Fetch a circle member's photo                 |
+| POST   | `/api/users/me/fcm-token`     | ✓    | Register a Firebase Cloud Messaging token     |
 | POST   | `/api/circles/:id/invite`     | ✓    | Admin-only; generate one 8-char code, 24h expiry |
 | GET    | `/api/circles/:id/invites`    | ✓    | Admin-only; list outstanding invite codes     |
 | DELETE | `/api/invites/:code`          | ✓    | Admin-only; revoke an unused code             |
 | POST   | `/api/locations`              | ✓    | Upsert current GPS fix                        |
 | GET    | `/api/circles/:id/members`    | ✓    | Roster + last-known location per member       |
+| GET    | `/api/circles/:circleId/members/:userId/history` | ✓ | Location history for a member (time-ranged) |
 | GET    | `/api/circles/:id/places`     | ✓    | List safety places (geofences)                |
 | POST   | `/api/circles/:id/places`     | ✓    | Create a geofence                             |
 | PATCH  | `/api/places/:id`             | ✓    | Update a geofence                             |
@@ -76,7 +104,13 @@ The container speaks plain HTTP. Put Caddy / nginx / Traefik in front and termin
 | POST   | `/api/sos/activate`           | ✓    | Trigger an SOS for the current user           |
 | POST   | `/api/sos/:id/resolve`        | ✓    | Owner or admin can resolve                    |
 | GET    | `/api/circles/:id/sos`        | ✓    | List active SOS events for the circle         |
-| GET    | `/ws?token=...`               | ✓    | `location_update`, `geofence_*`, `sos_active`, `sos_resolved` |
+| GET    | `/api/circles/:id/messages`   | ✓    | Family chat history (ASC), paginate via `before` + `limit` |
+| POST   | `/api/circles/:id/messages`   | ✓    | Send a chat message; broadcasts over WS       |
+| POST   | `/api/checkins`              | ✓    | Submit a check-in (safe_home / out_safe / heading_home) |
+| GET    | `/api/circles/:id/checkins`  | ✓    | Latest check-ins for the circle             |
+| GET    | `/ws`                         | ✓    | WebSocket upgrade (auth via cookie or `Authorization: Bearer`); emits `location_update`, `geofence_*`, `sos_active`, `sos_resolved`, `chat_message`, `check_in` |
+| GET    | `/member/:userId`             | cookie | Web member detail page with route history      |
+| GET    | `/welcome`                    | cookie | Post-signup wizard: display name + photo + first invite |
 | GET    | `/healthz`                    | —    | Liveness probe                                |
 
 Auth is opaque bearer tokens (Authorization header for the mobile app, HttpOnly cookie for the web).
@@ -90,17 +124,23 @@ server/         Node.js + Fastify backend (Docker image)
     db.js                 SQLite + migrations
     auth.js               argon2id + sessions
     hub.js                WebSocket pub/sub
-    routes/               auth, circles, locations, web (HTML), ws
-    views/                login.html, dashboard.html (ported from prototypes)
+    geofence.js           haversine enter/exit detection
+    routes/               auth, checkins, circles, locations, messages, places, profile, sos, web, ws
+    views/                login.html, dashboard.html, chat.html, places.html, settings.html, member.html
     public/app.js         dashboard client (Leaflet + WS)
-    migrations/001_init.sql
+    public/chat.js        chat client
+    public/places.js      places editor client
+    public/settings.js    settings/invite client
+    public/member.js      member detail + history client
+    migrations/001_init.sql through 007_checkins.sql
 
 android/        Native Kotlin + Jetpack Compose app
   app/src/main/java/com/familyguardian/
     MainActivity.kt
-    ui/                   ServerConfigScreen, MapScreen
-    data/                 Prefs (DataStore), ApiClient (Retrofit), AuthRepo
+    ui/                   ServerConfigScreen, MapScreen, ChatScreen, PlacesScreen, MemberDetailScreen
+    data/                 Prefs, ApiClient, AuthRepo, ChatRepo, CheckinRepo, PlacesRepo, SosRepo, HistoryRepo, ProfileRepo, Models
     location/             LocationService (foreground), LocationReporter
+    events/               EventStreamClient, GuardianEvent, EventBus, Alerts
 
 mobile app/     Original HTML design prototypes (unchanged, reference)
 website/        Original HTML design prototypes (unchanged, reference)
@@ -108,19 +148,19 @@ website/        Original HTML design prototypes (unchanged, reference)
 
 ## What's next
 
-Phase 2 has begun:
+All core features are shipped:
 - ✅ Safety places / geofences (web + Android) — `places` table, CRUD endpoints, haversine enter/exit detection, live `geofence_enter` / `geofence_exit` events.
 - ✅ Invites + multi-member circles — admin Settings page with code generation + revoke + copy-to-clipboard; web login form has a "Join with code" tab; Android sign-in screen has the same.
 - ✅ SOS — `sos_events` table, activate/resolve/list endpoints, server falls back to last-known location, web dashboard shows a red top banner + pulsing red map marker for the SOS originator; admin or owner can resolve. Android SOS button fires `/api/sos/activate` with a confirmation dialog and a one-shot high-accuracy fix.
 - ✅ Android event stream + system notifications — `EventStreamClient` (OkHttp WebSocket) lives inside the foreground `LocationService`, reconnects with exponential backoff, decodes events into a `GuardianEvent` sealed class, and emits Android notifications: HIGH-priority heads-up for SOS (tap → opens the location in Maps), DEFAULT for geofence arrivals/departures. Self-originated events are filtered out.
+- ✅ Family chat — `messages` table, POST/GET endpoints, `chat_message` WS events, web chat page, Android chat screen with day headers and live WS feed.
+- ✅ Location history + member details — `locations_history` table (append-only alongside the upsert `locations` table), `GET /api/circles/:id/members/:userId/history` with time-range filtering, web member detail page at `/member/:userId` with Leaflet path polyline + time range selector + device health stats, Android `MemberDetailScreen` with osmdroid path rendering and range selector.
+- ✅ Profile photos — upload/display on web dashboard, chat, and Android.
+- ✅ Onboarding wizard — post-signup photo + display name + invite generation.
+- ✅ Kid's check-in — one-tap status signals (safe at home / out & safe / heading home) on web and Android.
+- ✅ Open source readiness — AGPLv3 license, CI (GitHub Actions), test suite (vitest), ESLint + Prettier.
 
 Still on the table:
-- Family chat (text-only first)
-- SOS button — Android side broadcasts + server fan-out
-- Member detail / activity timeline (`locations_history` table)
-- Server settings + invite UI on the web (currently API-only)
-- Profile photos
+- FCM push notifications (optional) — would allow notifications when the Android app is killed
 - HTTPS termination inside the container (optional)
-- Push notifications for alerts
 
-Each is a separate prototype already in `website/` and `mobile app/` waiting to be ported.

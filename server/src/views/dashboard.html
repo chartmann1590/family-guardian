@@ -100,19 +100,38 @@
                 <p class="font-label-md text-label-md text-on-surface-variant">Signed in as {{DISPLAY_NAME}}</p>
             </div>
         </div>
-        <button id="sos-btn" class="w-full bg-secondary text-on-secondary font-label-md text-label-md py-3 rounded-full flex items-center justify-center gap-2 hover:bg-secondary/90 shadow-sm">
-            <span class="material-symbols-outlined">sos</span> SOS Signal
-        </button>
+        <div class="flex gap-2">
+            <button id="checkin-btn" class="flex-1 bg-surface-container-high text-on-surface font-label-md text-label-md py-2.5 rounded-full flex items-center justify-center gap-2 hover:bg-surface-container-highest shadow-sm">
+                <span class="material-symbols-outlined text-[18px]">check_circle</span> Check in
+            </button>
+            <button id="sos-btn" class="flex-1 bg-secondary text-on-secondary font-label-md text-label-md py-2.5 rounded-full flex items-center justify-center gap-2 hover:bg-secondary/90 shadow-sm">
+                <span class="material-symbols-outlined text-[18px]">sos</span> SOS
+            </button>
+        </div>
+        <div id="checkin-dialog" class="hidden mt-2 bg-surface-container rounded-xl p-3 flex flex-col gap-2 shadow-inner">
+            <button data-status="safe_home" class="checkin-opt w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-container-high text-sm">
+                <span class="material-symbols-outlined text-secondary">home</span> I'm safe at home
+            </button>
+            <button data-status="out_safe" class="checkin-opt w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-container-high text-sm">
+                <span class="material-symbols-outlined text-secondary">thumb_up</span> Out & safe
+            </button>
+            <button data-status="heading_home" class="checkin-opt w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-container-high text-sm">
+                <span class="material-symbols-outlined text-secondary">directions_walk</span> Heading home
+            </button>
+        </div>
     </div>
     <div class="flex-1 overflow-y-auto py-4 flex flex-col gap-2 px-2">
         <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-primary font-bold border-r-4 border-primary bg-surface-container-high" href="/dashboard">
             <span class="material-symbols-outlined">map</span><span class="font-label-md text-label-md">Dashboard</span>
         </a>
         <span class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant opacity-50 cursor-not-allowed">
-            <span class="material-symbols-outlined">person_pin_circle</span><span class="font-label-md text-label-md">Details (soon)</span>
+            <span class="material-symbols-outlined">person_pin_circle</span><span class="font-label-md text-label-md">Details</span>
         </span>
         <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container" href="/places">
             <span class="material-symbols-outlined">distance</span><span class="font-label-md text-label-md">Safety Places</span>
+        </a>
+        <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container" href="/chat">
+            <span class="material-symbols-outlined">forum</span><span class="font-label-md text-label-md">Family Chat</span>
         </a>
         <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container" href="/settings">
             <span class="material-symbols-outlined">group_add</span><span class="font-label-md text-label-md">Circle Settings</span>
@@ -159,15 +178,15 @@
     <a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full px-4 py-1" href="/dashboard">
         <span class="material-symbols-outlined">explore</span><span class="font-label-md text-label-md mt-1">Map</span>
     </a>
-    <span class="flex flex-col items-center justify-center text-on-surface-variant opacity-50">
+    <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary" href="/settings">
         <span class="material-symbols-outlined">group</span><span class="font-label-md text-label-md mt-1">Members</span>
-    </span>
-    <span class="flex flex-col items-center justify-center text-on-surface-variant opacity-50">
+    </a>
+    <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary" href="/places">
         <span class="material-symbols-outlined">share_location</span><span class="font-label-md text-label-md mt-1">Places</span>
-    </span>
-    <span class="flex flex-col items-center justify-center text-on-surface-variant opacity-50">
-        <span class="material-symbols-outlined">notifications_active</span><span class="font-label-md text-label-md mt-1">Alerts</span>
-    </span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary" href="/chat">
+        <span class="material-symbols-outlined">forum</span><span class="font-label-md text-label-md mt-1">Chat</span>
+    </a>
 </nav>
 
 <!-- Toasts (geofence enter/exit notifications) -->

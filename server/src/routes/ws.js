@@ -1,10 +1,12 @@
-import { lookupSession } from '../auth.js';
+import { lookupSession, extractToken } from '../auth.js';
 import { subscribe, unsubscribe } from '../hub.js';
 
 export default async function wsRoutes(fastify, { db }) {
+    // Auth uses Authorization: Bearer (mobile/HTTP clients) or fg_session
+    // cookie (browsers). The legacy ?token=... query param is no longer
+    // accepted — it leaked tokens into access logs and Referer headers.
     fastify.get('/ws', { websocket: true }, (socket, req) => {
-        const url = new URL(req.url, 'http://localhost');
-        const token = url.searchParams.get('token') || req.cookies?.fg_session;
+        const token = extractToken(req);
         const session = lookupSession(db, token);
         if (!session) {
             socket.send(JSON.stringify({ type: 'error', error: 'unauthorized' }));
