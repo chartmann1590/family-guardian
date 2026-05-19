@@ -119,7 +119,7 @@ jobs:
       - name: Generate native iOS project
         run: npx expo prebuild --platform ios --non-interactive
 
-      - name: Patch Podfile post_install for Swift 5.9 + minimal strict-concurrency
+      - name: Patch Podfile post_install for minimal strict-concurrency
         # See ios-unsigned-ipa.yml for rationale. CocoaPods rejects multiple
         # post_install hooks, so inject into the generated hook instead of
         # appending a second one.
@@ -132,7 +132,7 @@ jobs:
               "\n"
               "    installer.pods_project.targets.each do |t|\n"
               "      t.build_configurations.each do |c|\n"
-              "        c.build_settings['SWIFT_VERSION'] = '5.9'\n"
+              "        c.build_settings['SWIFT_VERSION'] = '5.0'\n"
               "        c.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'\n"
               "      end\n"
               "    end\n"
@@ -168,7 +168,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build 2>&1 | tee xcodebuild.log
+            build 2>&1 | tee xcodebuild.log | grep -E "error:|fatal error:|warning:.*error|\\*\\* BUILD FAILED|The following build commands failed|^(/.*):[0-9]+:[0-9]+:"
           STATUS=${PIPESTATUS[0]}
           set -e
           if [ "$STATUS" -ne 0 ]; then

@@ -40,12 +40,10 @@ jobs:
       - name: Generate native iOS project
         run: npx expo prebuild --platform ios --non-interactive
 
-      - name: Patch Podfile post_install for Swift 5.9 + minimal strict-concurrency
-        # expo-modules-core 55.0.25 uses Swift 5.9 syntax (@MainActor on protocol
-        # conformance at SwiftUIHostingView.swift:45) but RN's post_install pins
-        # SWIFT_VERSION=5.0 on every Pod target. Inject Swift 5.9 + minimal
-        # strict-concurrency overrides INSIDE the existing post_install block
-        # (CocoaPods rejects multiple post_install blocks).
+      - name: Patch Podfile post_install for minimal strict-concurrency
+        # Keep Xcode in valid Swift 5 language mode and relax strict-concurrency
+        # checks inside the generated post_install hook. CocoaPods rejects
+        # multiple post_install hooks.
         run: |
           python3 <<'PY'
           import re, sys
@@ -55,7 +53,7 @@ jobs:
               "\n"
               "    installer.pods_project.targets.each do |t|\n"
               "      t.build_configurations.each do |c|\n"
-              "        c.build_settings['SWIFT_VERSION'] = '5.9'\n"
+              "        c.build_settings['SWIFT_VERSION'] = '5.0'\n"
               "        c.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'\n"
               "      end\n"
               "    end\n"
@@ -91,7 +89,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build 2>&1 | tee xcodebuild.log
+            build 2>&1 | tee xcodebuild.log | grep -E "error:|fatal error:|warning:.*error|\\*\\* BUILD FAILED|The following build commands failed|^(/.*):[0-9]+:[0-9]+:"
           STATUS=${PIPESTATUS[0]}
           set -e
           if [ "$STATUS" -ne 0 ]; then
