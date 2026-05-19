@@ -23,7 +23,7 @@
     "@fastify/rate-limit": "^9.1.0",
     "@fastify/static": "^7.0.4",
     "@fastify/websocket": "^10.0.1",
-    "argon2": "^0.40.3",
+    "argon2": "^0.44.0",
     "better-sqlite3": "^11.3.0",
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
