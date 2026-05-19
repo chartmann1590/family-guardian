@@ -15,7 +15,9 @@ function publicBaseUrl(req) {
 }
 
 export default async function downloadRoutes(fastify) {
-    fastify.get('/download/family-guardian.apk', async (req, reply) => {
+    fastify.get('/download/family-guardian.apk', {
+        config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+    }, async (req, reply) => {
         let stat;
         try {
             stat = statSync(APK_PATH);
@@ -30,12 +32,16 @@ export default async function downloadRoutes(fastify) {
         return reply.send(createReadStream(APK_PATH));
     });
 
-    fastify.get('/download', async (req, reply) => {
+    fastify.get('/download', {
+        config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+    }, async (req, reply) => {
         return reply.redirect('/download/family-guardian.apk');
     });
 
     // QR pointing at the APK URL — used by the install modal & how-it-works.
-    fastify.get('/download/qr.svg', async (req, reply) => {
+    fastify.get('/download/qr.svg', {
+        config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+    }, async (req, reply) => {
         const url = `${publicBaseUrl(req)}/download/family-guardian.apk`;
         const svg = await QRCode.toString(url, { type: 'svg', margin: 1, width: 220 });
         reply.header('content-type', 'image/svg+xml').header('cache-control', 'public, max-age=300');

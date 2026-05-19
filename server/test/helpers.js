@@ -10,7 +10,6 @@ export function createTestDb() {
     const db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
     db.exec(`CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)`);
-    const applied = new Set(db.prepare('SELECT name FROM _migrations').all().map(r => r.name));
     const files = readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql')).sort();
     const insert = db.prepare('INSERT INTO _migrations (name, applied_at) VALUES (?, ?)');
     for (const file of files) {

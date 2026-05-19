@@ -1,4 +1,4 @@
-import { beforeAll, describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createTestDb } from './helpers.js';
 
 // Set the env var BEFORE importing geocoder so its module-level capture sees it.

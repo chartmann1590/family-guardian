@@ -7,7 +7,7 @@
 // Run from the repo root:
 //   node scripts/build-image.mjs
 
-import { execSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, copyFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 

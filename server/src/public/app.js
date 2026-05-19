@@ -45,7 +45,6 @@
     }
 
     function makeIcon(member, active, sos) {
-        const displayName = member.displayName;
         if (sos) {
             return L.divIcon({
                 html: `<div class="fg-sos-pulse" style="position:relative;overflow:hidden">${avatarInner(member)}</div>`,
@@ -166,7 +165,7 @@
                     </div>
                 </div>`;
             card.addEventListener('click', () => {
-                window.location.href = '/member/' + m.userId;
+                window.location.href = '/member/' + encodeURIComponent(m.userId);
             });
             list.appendChild(card);
         }
@@ -193,7 +192,7 @@
             existing.setIcon(icon);
         } else {
             const marker = L.marker([m.lat, m.lng], { icon }).addTo(map);
-            marker.bindTooltip(m.displayName || 'Member', { direction: 'top', offset: [0, -16] });
+            marker.bindTooltip(escapeHtml(m.displayName || 'Member'), { direction: 'top', offset: [0, -16] });
             markers.set(m.userId, marker);
         }
     }
@@ -278,7 +277,7 @@
             resolveBtn.onclick = async () => {
                 resolveBtn.disabled = true;
                 try {
-                    const res = await fetch(`/api/sos/${first.id}/resolve`, {
+                    const res = await fetch('/api/sos/' + encodeURIComponent(first.id) + '/resolve', {
                         method: 'POST', credentials: 'same-origin',
                     });
                     if (!res.ok) {

@@ -48,7 +48,10 @@ export default async function profileRoutes(fastify, { db, uploadsDir }) {
         };
     });
 
-    fastify.post('/api/users/me/photo', { preHandler: requireAuth(db) }, async (req, reply) => {
+    fastify.post('/api/users/me/photo', {
+        preHandler: requireAuth(db),
+        config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    }, async (req, reply) => {
         const file = await req.file({ limits: { fileSize: PHOTO_BYTES } });
         if (!file) return reply.code(400).send({ error: 'no_file' });
         const ext = ALLOWED_TYPES.get(file.mimetype);
@@ -87,7 +90,10 @@ export default async function profileRoutes(fastify, { db, uploadsDir }) {
         return { photoUrl: `/api/users/${userId}/photo` };
     });
 
-    fastify.delete('/api/users/me/photo', { preHandler: requireAuth(db) }, async (req) => {
+    fastify.delete('/api/users/me/photo', {
+        preHandler: requireAuth(db),
+        config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    }, async (req) => {
         const userId = req.auth.userId;
         const prior = db.prepare('SELECT photo_path FROM users WHERE id = ?').get(userId)?.photo_path;
         if (prior) await unlink(join(uploadsDir, prior)).catch(() => {});
@@ -97,7 +103,10 @@ export default async function profileRoutes(fastify, { db, uploadsDir }) {
 
     // Public-ish: any signed-in circle member can fetch any other member's photo.
     // We enforce circle membership rather than a per-photo ACL.
-    fastify.get('/api/users/:id/photo', { preHandler: requireAuth(db) }, async (req, reply) => {
+    fastify.get('/api/users/:id/photo', {
+        preHandler: requireAuth(db),
+        config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+    }, async (req, reply) => {
         const targetId = Number(req.params.id);
         if (!Number.isInteger(targetId)) return reply.code(400).send({ error: 'invalid_id' });
 

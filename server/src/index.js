@@ -93,7 +93,7 @@ await fastify.register(wsRoutes, { db });
 await fastify.register(webRoutes, { db });
 await fastify.register(downloadRoutes);
 
-fastify.get('/healthz', async (req, reply) => {
+fastify.get('/healthz', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req, reply) => {
     try {
         db.prepare('SELECT 1').get();
         return { ok: true };

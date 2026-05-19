@@ -11,7 +11,6 @@
     }).addTo(map);
 
     const member = state.member;
-    let pathLine = null;
     let currentMarker = null;
     let historyPoints = [];
 
@@ -91,7 +90,7 @@
             currentMarker.setIcon(makeIcon());
         } else {
             currentMarker = L.marker([member.lat, member.lng], { icon: makeIcon() }).addTo(map);
-            currentMarker.bindTooltip(member.displayName || 'Member', { direction: 'top', offset: [0, -16] });
+            currentMarker.bindTooltip(esc(member.displayName || 'Member'), { direction: 'top', offset: [0, -16] });
         }
     }
 
@@ -106,7 +105,6 @@
         pathSegments.length = 0;
         for (const v of visitMarkers) { map.removeLayer(v); }
         visitMarkers.length = 0;
-        if (pathLine) { map.removeLayer(pathLine); pathLine = null; }
     }
 
     function activityColor(activity) {
