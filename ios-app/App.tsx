@@ -178,7 +178,7 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
     ws.onopen = () => setWsState('live');
     ws.onclose = () => setWsState('offline');
     ws.onerror = () => setWsState('offline');
-    ws.onmessage = async (event) => {
+    ws.onmessage = async (event: { data: string }) => {
       const msg = JSON.parse(event.data);
       if (msg.type === 'location_update') setMembers((cur) => upsertMember(cur, msg));
       if (msg.type === 'chat_message') setMessages((cur) => [...cur, msg]);
