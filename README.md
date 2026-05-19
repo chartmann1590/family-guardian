@@ -34,13 +34,32 @@ After signing in you land on `/dashboard` — a Leaflet map with one marker per 
 
 ## Quickstart — Android app
 
+You have two options to install the Android app:
+
+**Option A — sideload a pre-built debug APK from your server** (fastest):
+
+```bash
+# From the repo root, before `docker compose build`:
+cd android && ./gradlew assembleDebug && cd ..
+cp android/app/build/outputs/apk/debug/app-debug.apk server/downloads/family-guardian.apk
+docker compose up --build
+```
+
+Then on the device's browser, open `http://<server-host>:8080/download` and install the APK
+(allow "Install from unknown sources" for your browser). The image bakes the APK in at build
+time; the server exposes it at `/download/family-guardian.apk`.
+
+**Option B — build and run from Android Studio**:
+
 1. Open `android/` in Android Studio (Hedgehog or newer). Let Gradle sync.
 2. Run on a device or emulator with location services enabled.
-3. On first launch, enter:
-   - **Server URL** — `http://10.0.2.2:8080` (Android emulator → host machine) or the LAN IP/HTTPS URL of your server.
-   - **Email + password** — the credentials you created during web signup.
-4. Grant location + background-location + notification permissions when prompted.
-5. The foreground service starts; within ~30s your marker appears on the web dashboard.
+
+On first launch, enter:
+- **Server URL** — `http://10.0.2.2:8080` (Android emulator → host machine) or the LAN IP/HTTPS URL of your server.
+- **Email + password** — the credentials you created during web signup.
+
+Grant location + background-location + notification permissions when prompted.
+The foreground service starts; within ~30s your marker appears on the web dashboard.
 
 ## Configuration
 

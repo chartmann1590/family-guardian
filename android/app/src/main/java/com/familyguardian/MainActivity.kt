@@ -1,5 +1,7 @@
 package com.familyguardian
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.preference.PreferenceManager
 import androidx.activity.ComponentActivity
@@ -7,14 +9,16 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.familyguardian.data.Prefs
+import com.familyguardian.location.LocationService
 import com.familyguardian.ui.ChatScreen
 import com.familyguardian.ui.FamilyGuardianTheme
 import com.familyguardian.ui.MapScreen
@@ -56,6 +60,13 @@ private fun AppRoot() {
             token.isNullOrBlank() -> "login"
             !onboarded -> "onboarding"
             else -> "map"
+        }
+        // Keep the foreground location service running whenever the user is
+        // signed in and has granted location permission — independent of which
+        // screen they happen to be on. The service is idempotent; calling
+        // start() while it's already running is a no-op.
+        if (!token.isNullOrBlank() && hasLocationPermission(context)) {
+            LocationService.start(context.applicationContext)
         }
     }
 
@@ -119,3 +130,9 @@ private fun AppRoot() {
         }
     }
 }
+
+private fun hasLocationPermission(ctx: android.content.Context): Boolean =
+    ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED

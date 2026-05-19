@@ -63,6 +63,7 @@ class LocationService : Service() {
         override fun onLocationResult(result: LocationResult) {
             val fix = result.lastLocation ?: return
             val batteryPct = currentBatteryPct()
+            updateNotification(lastFixAtMs = fix.time, batteryPct = batteryPct)
             scope.launch {
                 reporter?.report(
                     lat = fix.latitude,
@@ -212,24 +213,47 @@ class LocationService : Service() {
         nm.createNotificationChannel(channel)
     }
 
-    private fun startForegroundCompat() {
+    private fun buildNotification(lastFixAtMs: Long?, batteryPct: Int?): android.app.Notification {
         val pendingIntent = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_SINGLE_TOP },
             PendingIntent.FLAG_IMMUTABLE,
         )
-        val notification = NotificationCompat.Builder(this, NOTIF_CHANNEL)
+        val text = buildString {
+            if (lastFixAtMs == null) {
+                append(getString(R.string.notif_sharing_text))
+            } else {
+                val time = android.text.format.DateFormat.getTimeFormat(this@LocationService)
+                    .format(java.util.Date(lastFixAtMs))
+                append("Last update ").append(time)
+                if (batteryPct != null) append(" • battery ").append(batteryPct).append('%')
+            }
+        }
+        return NotificationCompat.Builder(this, NOTIF_CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentTitle(getString(R.string.notif_sharing_title))
-            .setContentText(getString(R.string.notif_sharing_text))
+            .setContentText(text)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setContentIntent(pendingIntent)
             .build()
+    }
+
+    private fun startForegroundCompat() {
+        val notification = buildNotification(lastFixAtMs = null, batteryPct = null)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
         } else {
             startForeground(NOTIF_ID, notification)
         }
+    }
+
+    private fun updateNotification(lastFixAtMs: Long?, batteryPct: Int?) {
+        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(NOTIF_ID, buildNotification(lastFixAtMs, batteryPct))
     }
 
     private fun currentBatteryPct(): Int? {

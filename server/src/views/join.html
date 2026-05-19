@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Family Guardian — Join</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = { darkMode: "class", theme: { extend: {
+        colors: {
+            "primary": "#000000", "on-primary": "#ffffff",
+            "secondary": "#006c49", "on-secondary": "#ffffff",
+            "error": "#ba1a1a", "on-error": "#ffffff",
+            "error-container": "#ffdad6", "on-error-container": "#93000a",
+            "background": "#f8f9ff", "on-background": "#0b1c30",
+            "surface-container-lowest": "#ffffff",
+            "surface-container-low": "#eff4ff",
+            "on-surface-variant": "#45464d",
+            "outline-variant": "#c6c6cd"
+        },
+        borderRadius: { DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px" },
+        fontFamily: { sans: ["Inter", "system-ui", "sans-serif"] }
+    }}};
+</script>
+<style>.material-symbols-outlined { font-variation-settings: 'FILL' 1, 'wght' 400; }</style>
+</head>
+<body class="bg-background text-on-background antialiased min-h-screen flex items-center justify-center p-4">
+<main class="w-full max-w-md bg-surface-container-low rounded-xl shadow p-8">
+    <div class="text-center mb-6">
+        <span class="material-symbols-outlined text-secondary text-5xl">group_add</span>
+        <h1 class="text-2xl font-bold mt-2">Join the family</h1>
+        <p class="text-sm text-on-surface-variant mt-1">You've been invited. Create your account below.</p>
+    </div>
+    <form id="form-join" class="flex flex-col gap-3">
+        <input type="hidden" name="inviteCode" value="{{INVITE_CODE}}"/>
+        <label class="block">
+            <span class="text-sm font-semibold">Your name</span>
+            <input type="text" name="displayName" required maxlength="64" class="mt-1 w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none"/>
+        </label>
+        <label class="block">
+            <span class="text-sm font-semibold">Email</span>
+            <input type="email" name="email" required autocomplete="email" maxlength="254" class="mt-1 w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none"/>
+        </label>
+        <label class="block">
+            <span class="text-sm font-semibold">Password</span>
+            <input type="password" name="password" required autocomplete="new-password" minlength="8" class="mt-1 w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none"/>
+        </label>
+        <div id="error" class="hidden bg-error-container text-on-error-container rounded-lg px-4 py-3 text-sm"></div>
+        <button type="submit" id="btn-submit" class="mt-2 bg-primary text-on-primary rounded-full py-3 font-semibold hover:opacity-90 transition disabled:opacity-50">Join</button>
+        <p class="text-xs text-on-surface-variant text-center mt-2">Invite code: <code class="bg-surface-container-lowest px-1 rounded">{{INVITE_CODE}}</code></p>
+        <p class="text-xs text-on-surface-variant text-center"><a href="/" class="underline">Already have an account?</a> · <a href="/how-it-works" class="underline">What is this?</a></p>
+    </form>
+</main>
+<script>
+    document.getElementById('form-join').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errBox = document.getElementById('error');
+        errBox.classList.add('hidden');
+        const data = Object.fromEntries(new FormData(e.target).entries());
+        const btn = document.getElementById('btn-submit');
+        btn.disabled = true;
+        btn.textContent = 'Joining…';
+        try {
+            const res = await fetch('/api/auth/signup', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) {
+                const j = await res.json().catch(() => ({}));
+                throw new Error(j.error || `HTTP ${res.status}`);
+            }
+            window.location.href = '/welcome';
+        } catch (err) {
+            errBox.textContent = `Could not join: ${err.message}`;
+            errBox.classList.remove('hidden');
+            btn.disabled = false;
+            btn.textContent = 'Join';
+        }
+    });
+</script>
+</body></html>

@@ -28,6 +28,7 @@
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
     "firebase-admin": "^13.10.0",
+    "qrcode": "^1.5.4",
     "zod": "^3.23.8"
   },
   "devDependencies": {

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Family Guardian — How it works</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = { darkMode: "class", theme: { extend: {
+        colors: {
+            "primary": "#000000", "on-primary": "#ffffff",
+            "secondary": "#006c49", "on-secondary": "#ffffff",
+            "background": "#f8f9ff", "on-background": "#0b1c30",
+            "surface-container-lowest": "#ffffff",
+            "surface-container-low": "#eff4ff",
+            "surface-container": "#e5eeff",
+            "on-surface-variant": "#45464d",
+            "outline-variant": "#c6c6cd"
+        },
+        borderRadius: { DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px" },
+        fontFamily: { sans: ["Inter", "system-ui", "sans-serif"] }
+    }}};
+</script>
+<style>.material-symbols-outlined { font-variation-settings: 'FILL' 1, 'wght' 400; }</style>
+</head>
+<body class="bg-background text-on-background antialiased">
+
+<header class="border-b border-outline-variant/30 bg-surface-container-lowest sticky top-0 z-10">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+        <a href="/" class="flex items-center gap-2 font-bold"><span class="material-symbols-outlined text-primary">shield_lock</span> Family Guardian</a>
+        <nav class="flex items-center gap-4 text-sm">
+            <a href="/dashboard" class="text-on-surface-variant hover:text-primary">Dashboard</a>
+            <a href="/download" class="text-on-surface-variant hover:text-primary">Get Android app</a>
+        </nav>
+    </div>
+</header>
+
+<main class="max-w-3xl mx-auto px-4 py-10 space-y-12">
+
+    <section>
+        <h1 class="text-3xl md:text-4xl font-bold mb-3">How Family Guardian works</h1>
+        <p class="text-lg text-on-surface-variant">Family Guardian is a self-hosted family safety platform. Your server runs in your house (or on a box you own). Phones and browsers in your family talk to it directly. No third-party servers, no analytics, no cloud account.</p>
+    </section>
+
+    <section>
+        <h2 class="text-xl font-bold mb-3 flex items-center gap-2"><span class="material-symbols-outlined text-secondary">flowchart</span> The flow</h2>
+        <ol class="space-y-3 text-base">
+            <li><strong>1. An admin sets up the server</strong> by running <code class="bg-surface-container px-1 rounded">docker compose up</code>. The very first visit walks them through making an admin account and a "family circle".</li>
+            <li><strong>2. The admin invites family members</strong> by tapping "Invite family" on the dashboard. That produces a one-time link + QR code that expires in 24 hours.</li>
+            <li><strong>3. Each family member opens the link / scans the QR</strong>, picks a password, and lands on the dashboard.</li>
+            <li><strong>4. Everyone installs the Android app</strong> from <code class="bg-surface-container px-1 rounded">/download</code>. The app reports background GPS to your server and gets push-style alerts via WebSocket while the app is alive (FCM optional for deep-sleep).</li>
+            <li><strong>5. The dashboard shows everyone on a live map</strong>. SOS, chat, geofences, and check-ins all run through the same server.</li>
+        </ol>
+    </section>
+
+    <section>
+        <h2 class="text-xl font-bold mb-3 flex items-center gap-2"><span class="material-symbols-outlined text-secondary">lock</span> Privacy</h2>
+        <ul class="space-y-2 list-disc list-inside text-on-surface-variant">
+            <li>Location data is stored in a SQLite file on your server. Nothing leaves the box.</li>
+            <li>The Android app talks straight to your server — there is no Family Guardian cloud account.</li>
+            <li>Push notifications via Firebase are <em>optional</em>; if you don't configure them, the in-app WebSocket still delivers everything while the app is running.</li>
+            <li>The web session cookie is HTTP-only. Set <code>NODE_ENV=production</code> to require HTTPS for cookies.</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2 class="text-xl font-bold mb-3 flex items-center gap-2"><span class="material-symbols-outlined text-secondary">person_add</span> Adding family members</h2>
+        <p class="text-base mb-3">On the dashboard, tap <strong>Invite family</strong>. You'll get three things:</p>
+        <ul class="space-y-2 list-disc list-inside text-on-surface-variant">
+            <li>A <strong>share link</strong> — text it / AirDrop / drop it in any chat. They tap, sign up, done.</li>
+            <li>A <strong>QR code</strong> — for in-person setup. The recipient points their camera at the screen.</li>
+            <li>An <strong>8-character code</strong> — for typing into the Android app's "I have an invite" field.</li>
+        </ul>
+        <p class="text-sm text-on-surface-variant mt-3">Invites are one-time and expire in 24h. You can mint as many as you need.</p>
+    </section>
+
+    <section>
+        <h2 class="text-xl font-bold mb-3 flex items-center gap-2"><span class="material-symbols-outlined text-secondary">android</span> Installing on Android</h2>
+        <p class="text-base mb-3">Two ways:</p>
+        <ol class="space-y-3">
+            <li><strong>Sideload from the server</strong>: open <a href="/download" class="text-primary underline">/download</a> in the device's browser. The APK is baked into the server image. Allow your browser to install unknown sources.</li>
+            <li><strong>Build from source</strong>: open the <code>android/</code> module in Android Studio, attach your phone, hit Run.</li>
+        </ol>
+    </section>
+
+    <section>
+        <h2 class="text-xl font-bold mb-3 flex items-center gap-2"><span class="material-symbols-outlined text-secondary">help</span> FAQ</h2>
+        <details class="bg-surface-container-low rounded-lg p-4 mb-2">
+            <summary class="font-semibold cursor-pointer">Does anyone other than my family see our data?</summary>
+            <p class="mt-2 text-on-surface-variant">No. The server runs on your hardware; the Android app and the web client connect directly to it. Family Guardian itself has no cloud, no telemetry, no account service.</p>
+        </details>
+        <details class="bg-surface-container-low rounded-lg p-4 mb-2">
+            <summary class="font-semibold cursor-pointer">What happens if I stop the server?</summary>
+            <p class="mt-2 text-on-surface-variant">The Android app keeps queueing location updates locally until it can reach the server again. Map / chat / SOS depend on the server being up.</p>
+        </details>
+        <details class="bg-surface-container-low rounded-lg p-4 mb-2">
+            <summary class="font-semibold cursor-pointer">Can I run this outside my LAN?</summary>
+            <p class="mt-2 text-on-surface-variant">Yes — put a reverse proxy (Caddy, Traefik, nginx) in front with TLS. The Android app permits cleartext only for the simple LAN case; flip to HTTPS for anything beyond your house.</p>
+        </details>
+        <details class="bg-surface-container-low rounded-lg p-4 mb-2">
+            <summary class="font-semibold cursor-pointer">How do I get notifications when the app is closed?</summary>
+            <p class="mt-2 text-on-surface-variant">Set up Firebase Cloud Messaging (see <code>README.md</code> → "Push notifications"). It's optional — if you skip it, the in-app WebSocket still covers all events while Family Guardian is running on the device.</p>
+        </details>
+    </section>
+
+    <footer class="border-t border-outline-variant/30 pt-6 text-sm text-on-surface-variant">
+        <a href="/dashboard" class="text-primary underline">Back to dashboard</a> · <a href="https://github.com/" class="underline">Source</a> · AGPLv3
+    </footer>
+
+</main>
+
+</body></html>

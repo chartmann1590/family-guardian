@@ -18,9 +18,16 @@ server/data/
 dist/
 build/
 
+# APK baked into the server image (built locally then copied)
+server/downloads/
+
+# Local gradle distribution used to bootstrap the wrapper
+.tools/
+
 # Android
 android/.gradle/
 android/.idea/
+android/.kotlin/
 android/local.properties
 android/captures/
 android/app/build/

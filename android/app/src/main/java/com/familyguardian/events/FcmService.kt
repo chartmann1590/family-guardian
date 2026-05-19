@@ -8,6 +8,7 @@ import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
@@ -76,7 +77,7 @@ class FcmService : FirebaseMessagingService() {
                         put("platform", "android")
                     }
                     val body = json.toString()
-                        .toRequestBody(okhttp3.MediaType.Companion.parse("application/json"))
+                        .toRequestBody("application/json".toMediaType())
                     val request = Request.Builder()
                         .url(url)
                         .post(body)

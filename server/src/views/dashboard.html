@@ -134,7 +134,16 @@
             <span class="material-symbols-outlined">forum</span><span class="font-label-md text-label-md">Family Chat</span>
         </a>
         <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container" href="/settings">
-            <span class="material-symbols-outlined">group_add</span><span class="font-label-md text-label-md">Circle Settings</span>
+            <span class="material-symbols-outlined">tune</span><span class="font-label-md text-label-md">Circle Settings</span>
+        </a>
+        <button id="open-invite" data-coach="invite" class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container w-full text-left">
+            <span class="material-symbols-outlined">person_add</span><span class="font-label-md text-label-md">Invite family</span>
+        </button>
+        <button id="open-install" class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container w-full text-left">
+            <span class="material-symbols-outlined">android</span><span class="font-label-md text-label-md">Install Android app</span>
+        </button>
+        <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container" href="/how-it-works">
+            <span class="material-symbols-outlined">help</span><span class="font-label-md text-label-md">How it works</span>
         </a>
     </div>
     <div class="mt-auto border-t border-outline-variant/20 p-2 flex flex-col gap-2">
@@ -192,7 +201,66 @@
 <!-- Toasts (geofence enter/exit notifications) -->
 <div id="toast-host" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
+<!-- Invite family modal -->
+<div id="invite-modal" class="hidden fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
+    <div class="bg-surface-container-lowest rounded-xl w-full max-w-md shadow-xl overflow-hidden">
+        <div class="flex items-center justify-between p-5 border-b border-outline-variant/20">
+            <h3 class="text-lg font-bold flex items-center gap-2"><span class="material-symbols-outlined text-secondary">person_add</span> Invite a family member</h3>
+            <button class="invite-close text-on-surface-variant hover:text-primary" aria-label="Close"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <div class="p-5 space-y-4">
+            <p class="text-sm text-on-surface-variant">Share this link or the QR code. The recipient signs up in one tap — no other setup needed.</p>
+            <div id="invite-loading" class="text-sm text-on-surface-variant">Generating invite…</div>
+            <div id="invite-content" class="hidden space-y-4">
+                <div class="flex justify-center bg-white rounded-lg p-2 border border-outline-variant/30" id="invite-qr"></div>
+                <div class="flex items-center gap-2 bg-surface-container-low rounded-lg p-3">
+                    <input id="invite-link" readonly class="flex-1 bg-transparent text-sm outline-none truncate"/>
+                    <button id="invite-copy" class="text-sm font-semibold text-primary px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high">Copy</button>
+                </div>
+                <div class="text-xs text-on-surface-variant text-center">Invite code: <code id="invite-code" class="bg-surface-container px-1 rounded font-bold"></code> · expires in 24h</div>
+            </div>
+            <div id="invite-error" class="hidden bg-error-container text-on-error-container rounded-lg px-4 py-2 text-sm"></div>
+            <button id="invite-new" class="w-full bg-primary text-on-primary rounded-full py-2.5 font-semibold hover:opacity-90">Generate a new invite</button>
+        </div>
+    </div>
+</div>
+
+<!-- Install Android app modal -->
+<div id="install-modal" class="hidden fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
+    <div class="bg-surface-container-lowest rounded-xl w-full max-w-md shadow-xl overflow-hidden">
+        <div class="flex items-center justify-between p-5 border-b border-outline-variant/20">
+            <h3 class="text-lg font-bold flex items-center gap-2"><span class="material-symbols-outlined text-secondary">android</span> Install the Android app</h3>
+            <button class="install-close text-on-surface-variant hover:text-primary" aria-label="Close"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <div class="p-5 space-y-4 text-sm">
+            <ol class="list-decimal list-inside space-y-1 text-on-surface-variant">
+                <li>On your phone, scan the QR code below (or open the link).</li>
+                <li>Allow installs from your browser if prompted.</li>
+                <li>Open Family Guardian, sign in with the email + password you just made, point it at this server.</li>
+            </ol>
+            <div id="install-qr" class="flex justify-center bg-white rounded-lg p-2 border border-outline-variant/30"></div>
+            <div class="flex items-center gap-2 bg-surface-container-low rounded-lg p-3">
+                <input id="install-link" readonly class="flex-1 bg-transparent text-sm outline-none truncate"/>
+                <a id="install-direct" href="/download/family-guardian.apk" class="text-sm font-semibold text-primary px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high">Download APK</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Coach-marks (first-visit) -->
+<div id="coach" class="hidden fixed inset-0 z-[55] bg-black/50 pointer-events-auto"></div>
+<div id="coach-card" class="hidden fixed z-[56] bg-surface-container-lowest rounded-xl shadow-xl p-5 max-w-xs">
+    <div id="coach-title" class="font-bold mb-1"></div>
+    <div id="coach-body" class="text-sm text-on-surface-variant mb-3"></div>
+    <div class="flex items-center justify-between">
+        <button id="coach-skip" class="text-xs text-on-surface-variant hover:text-primary">Skip tour</button>
+        <button id="coach-next" class="bg-primary text-on-primary rounded-full px-4 py-1.5 text-sm font-semibold">Next</button>
+    </div>
+</div>
+
 <script>window.__GUARDIAN_STATE__ = {{{INITIAL_STATE_JSON}}};</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="/public/app.js"></script>
+<script src="/public/invite.js"></script>
+<script src="/public/coach.js"></script>
 </body></html>

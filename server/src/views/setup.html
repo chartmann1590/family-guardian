@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Family Guardian — Setup</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+        darkMode: "class",
+        theme: {
+            extend: {
+                colors: {
+                    "primary": "#000000", "on-primary": "#ffffff",
+                    "secondary": "#006c49", "on-secondary": "#ffffff",
+                    "secondary-container": "#6cf8bb", "on-secondary-container": "#00714d",
+                    "error": "#ba1a1a", "on-error": "#ffffff",
+                    "error-container": "#ffdad6", "on-error-container": "#93000a",
+                    "background": "#f8f9ff", "on-background": "#0b1c30",
+                    "surface": "#f8f9ff", "on-surface": "#0b1c30",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-low": "#eff4ff",
+                    "surface-container": "#e5eeff",
+                    "surface-container-high": "#dce9ff",
+                    "on-surface-variant": "#45464d",
+                    "outline": "#76777d", "outline-variant": "#c6c6cd"
+                },
+                borderRadius: { DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px" },
+                fontFamily: { sans: ["Inter", "system-ui", "sans-serif"] }
+            }
+        }
+    };
+</script>
+<style>
+    .material-symbols-outlined { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    .step-dot { width: 32px; height: 32px; }
+    .step-active { background: #000; color: #fff; }
+    .step-done { background: #006c49; color: #fff; }
+    .step-pending { background: #e5eeff; color: #45464d; }
+    .step.hidden { display: none; }
+</style>
+</head>
+<body class="bg-background text-on-background antialiased min-h-screen flex flex-col items-center justify-center p-4 md:p-8">
+
+<main class="w-full max-w-2xl">
+
+    <!-- Stepper -->
+    <div class="flex items-center justify-center gap-2 mb-8">
+        <div id="dot-1" class="step-dot step-active rounded-full flex items-center justify-center font-bold">1</div>
+        <div class="w-12 h-px bg-outline-variant"></div>
+        <div id="dot-2" class="step-dot step-pending rounded-full flex items-center justify-center font-bold">2</div>
+        <div class="w-12 h-px bg-outline-variant"></div>
+        <div id="dot-3" class="step-dot step-pending rounded-full flex items-center justify-center font-bold">3</div>
+    </div>
+
+    <!-- STEP 1 — welcome -->
+    <section id="step-1" class="step bg-surface-container-low rounded-xl shadow p-8 md:p-12">
+        <div class="flex items-center gap-3 mb-6">
+            <span class="material-symbols-outlined text-primary text-4xl">shield_lock</span>
+            <h1 class="text-3xl font-bold">Welcome to Family Guardian</h1>
+        </div>
+        <p class="text-base mb-6">A self-hosted family safety platform. Your family's location data stays on the server you control — nothing is sent to any third party.</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 text-sm">
+            <div class="bg-surface-container-lowest rounded-lg p-4">
+                <span class="material-symbols-outlined text-secondary mb-2">map</span>
+                <div class="font-semibold mb-1">Live map</div>
+                <div class="text-on-surface-variant">See every family member's location on a single Leaflet map, updated in real time.</div>
+            </div>
+            <div class="bg-surface-container-lowest rounded-lg p-4">
+                <span class="material-symbols-outlined text-secondary mb-2">chat</span>
+                <div class="font-semibold mb-1">Family chat</div>
+                <div class="text-on-surface-variant">Private group chat — runs through your server, not a third-party service.</div>
+            </div>
+            <div class="bg-surface-container-lowest rounded-lg p-4">
+                <span class="material-symbols-outlined text-secondary mb-2">sos</span>
+                <div class="font-semibold mb-1">SOS &amp; check-ins</div>
+                <div class="text-on-surface-variant">One-tap distress signal. Geofence enter/exit and "I'm safe" check-ins.</div>
+            </div>
+        </div>
+        <p class="text-sm text-on-surface-variant mb-6">In a moment we'll create the <strong>admin account</strong> — that's you. After that you'll be able to invite the rest of your family with a single link or QR code.</p>
+        <button id="btn-step-1-next" class="w-full bg-primary text-on-primary rounded-full py-3 font-semibold hover:opacity-90 transition flex items-center justify-center gap-2">
+            <span>Get started</span>
+            <span class="material-symbols-outlined">arrow_forward</span>
+        </button>
+    </section>
+
+    <!-- STEP 2 — create admin -->
+    <section id="step-2" class="step hidden bg-surface-container-low rounded-xl shadow p-8 md:p-12">
+        <h1 class="text-2xl font-bold mb-2">Create your admin account</h1>
+        <p class="text-sm text-on-surface-variant mb-6">You're the first user — that makes you the admin. You can change everything later from the dashboard.</p>
+        <form id="form-admin" class="flex flex-col gap-4">
+            <label class="block">
+                <span class="text-sm font-semibold">Your name</span>
+                <input type="text" name="displayName" required maxlength="64" placeholder="e.g. Alex" class="mt-1 w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none"/>
+            </label>
+            <label class="block">
+                <span class="text-sm font-semibold">Family name</span>
+                <input type="text" name="circleName" maxlength="64" placeholder="e.g. The Hartmanns (optional)" class="mt-1 w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none"/>
+                <span class="text-xs text-on-surface-variant">If left blank we'll use "<span id="circle-default">Your family</span>".</span>
+            </label>
+            <label class="block">
+                <span class="text-sm font-semibold">Email</span>
+                <input type="email" name="email" required autocomplete="email" maxlength="254" placeholder="you@example.com" class="mt-1 w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none"/>
+            </label>
+            <label class="block">
+                <span class="text-sm font-semibold">Password</span>
+                <input type="password" name="password" required autocomplete="new-password" minlength="8" placeholder="at least 8 characters" class="mt-1 w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none"/>
+            </label>
+            <div id="step-2-error" class="hidden bg-error-container text-on-error-container rounded-lg px-4 py-3 text-sm"></div>
+            <button type="submit" id="btn-step-2-submit" class="bg-primary text-on-primary rounded-full py-3 font-semibold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                <span id="btn-step-2-label">Create my account</span>
+            </button>
+        </form>
+    </section>
+
+    <!-- STEP 3 — done -->
+    <section id="step-3" class="step hidden bg-surface-container-low rounded-xl shadow p-8 md:p-12 text-center">
+        <span class="material-symbols-outlined text-secondary text-6xl">check_circle</span>
+        <h1 class="text-2xl font-bold mt-4 mb-2">You're all set</h1>
+        <p class="text-sm text-on-surface-variant mb-8">Your circle is live. Here's how to bring the rest of the family in.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+            <div class="bg-surface-container-lowest rounded-lg p-4">
+                <div class="font-semibold mb-2 flex items-center gap-2"><span class="material-symbols-outlined text-secondary">person_add</span>Invite a family member</div>
+                <p class="text-sm text-on-surface-variant">From the dashboard, tap <strong>Invite family</strong>. Share the link or QR code with them — they tap it and sign up in seconds.</p>
+            </div>
+            <div class="bg-surface-container-lowest rounded-lg p-4">
+                <div class="font-semibold mb-2 flex items-center gap-2"><span class="material-symbols-outlined text-secondary">android</span>Install the Android app</div>
+                <p class="text-sm text-on-surface-variant">Each family member opens <code class="bg-surface-container px-1 rounded">/download</code> on their phone, installs the APK, and signs in.</p>
+            </div>
+        </div>
+
+        <a href="/dashboard" class="mt-8 inline-flex items-center gap-2 bg-primary text-on-primary rounded-full py-3 px-6 font-semibold hover:opacity-90 transition">
+            <span>Go to the dashboard</span>
+            <span class="material-symbols-outlined">arrow_forward</span>
+        </a>
+        <div class="mt-4">
+            <a href="/how-it-works" class="text-sm text-on-surface-variant hover:text-on-surface underline">How does Family Guardian work?</a>
+        </div>
+    </section>
+
+</main>
+
+<script src="/public/setup.js"></script>
+</body></html>

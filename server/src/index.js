@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 
 import { openDb } from './db.js';
+import { maybeBootstrapAdmin } from './bootstrap.js';
 import authRoutes from './routes/auth.js';
 import circleRoutes from './routes/circles.js';
 import locationRoutes from './routes/locations.js';
@@ -21,6 +22,7 @@ import checkinRoutes from './routes/checkins.js';
 import sosRoutes from './routes/sos.js';
 import wsRoutes from './routes/ws.js';
 import webRoutes from './routes/web.js';
+import downloadRoutes from './routes/download.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -41,6 +43,10 @@ const UPLOADS_DIR = join(dirname(DB_PATH), 'uploads');
 mkdirSync(UPLOADS_DIR, { recursive: true });
 
 const db = openDb(DB_PATH);
+await maybeBootstrapAdmin(db, {
+    info: (data, msg) => console.log(JSON.stringify({ level: 30, msg, ...data })),
+    warn: (data, msg) => console.warn(JSON.stringify({ level: 40, msg, ...data })),
+});
 
 const fastify = Fastify({
     logger: { level: process.env.LOG_LEVEL || 'info' },
@@ -71,6 +77,7 @@ await fastify.register(checkinRoutes, { db });
 await fastify.register(messageRoutes, { db });
 await fastify.register(wsRoutes, { db });
 await fastify.register(webRoutes, { db });
+await fastify.register(downloadRoutes);
 
 fastify.get('/healthz', async (req, reply) => {
     try {

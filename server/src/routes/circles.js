@@ -1,5 +1,16 @@
 import { randomBytes } from 'node:crypto';
+import QRCode from 'qrcode';
 import { requireAuth } from '../auth.js';
+
+function publicBaseUrl(req) {
+    // Prefer the host the user actually used (LAN IP, hostname, etc.) so the
+    // QR code / link works for them. Fall back to the request's host header.
+    const fwdProto = req.headers['x-forwarded-proto'];
+    const fwdHost = req.headers['x-forwarded-host'];
+    const proto = (typeof fwdProto === 'string' ? fwdProto.split(',')[0].trim() : null) || req.protocol || 'http';
+    const host = (typeof fwdHost === 'string' ? fwdHost.split(',')[0].trim() : null) || req.headers.host;
+    return `${proto}://${host}`;
+}
 
 const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -39,7 +50,9 @@ export default async function circleRoutes(fastify, { db }) {
             'INSERT INTO invites (code, circle_id, created_at, expires_at) VALUES (?, ?, ?, ?)'
         ).run(code, circleId, now, now + INVITE_TTL_MS);
 
-        return { code, expiresAt: now + INVITE_TTL_MS };
+        const joinUrl = `${publicBaseUrl(req)}/join?code=${code}`;
+        const qrSvg = await QRCode.toString(joinUrl, { type: 'svg', margin: 1, width: 220 });
+        return { code, expiresAt: now + INVITE_TTL_MS, joinUrl, qrSvg };
     });
 
     fastify.get('/api/circles/:id/invites', { preHandler: requireAuth(db) }, async (req, reply) => {

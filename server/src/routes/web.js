@@ -47,7 +47,26 @@ export default async function webRoutes(fastify, { db }) {
         const session = lookupSession(db, extractToken(req));
         if (session) return reply.redirect('/dashboard');
         const bootstrap = db.prepare('SELECT COUNT(*) AS n FROM users').get().n === 0;
-        send(reply, render('login.html', { BOOTSTRAP_FLAG: bootstrap ? '1' : '0' }));
+        if (bootstrap) return reply.redirect('/setup');
+        send(reply, render('login.html', { BOOTSTRAP_FLAG: '0' }));
+    });
+
+    fastify.get('/setup', async (req, reply) => {
+        const bootstrap = db.prepare('SELECT COUNT(*) AS n FROM users').get().n === 0;
+        if (!bootstrap) return reply.redirect('/');
+        send(reply, render('setup.html'));
+    });
+
+    fastify.get('/how-it-works', async (req, reply) => {
+        send(reply, render('how-it-works.html'));
+    });
+
+    fastify.get('/join', async (req, reply) => {
+        const code = String(req.query?.code || '').trim();
+        if (!code) return reply.redirect('/');
+        send(reply, render('join.html', {
+            INVITE_CODE: code,
+        }));
     });
 
     fastify.get('/welcome', async (req, reply) => {

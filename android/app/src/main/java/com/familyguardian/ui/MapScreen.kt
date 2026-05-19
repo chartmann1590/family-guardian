@@ -87,10 +87,10 @@ private fun memberActive(recordedAt: Long?): Boolean {
 }
 
 private class InitialsMarker(
-    context: Context,
+    mapView: MapView,
     private val label: String,
     active: Boolean,
-) : Marker(context) {
+) : Marker(mapView) {
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         style = Paint.Style.FILL
@@ -154,6 +154,10 @@ fun MapScreen(
 
     var bgLocRequested by remember { mutableStateOf(false) }
 
+    val bgLocPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
+
     val fineLocPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { granted ->
@@ -176,10 +180,6 @@ fun MapScreen(
             permissionDenied = true
         }
     }
-
-    val bgLocPermission = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { }
 
     val notifPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -238,7 +238,7 @@ fun MapScreen(
                 toRemove.remove(existing)
             } else {
                 val marker = InitialsMarker(
-                    mv.context,
+                    mv,
                     initials(m.displayName),
                     memberActive(m.recordedAt),
                 )
