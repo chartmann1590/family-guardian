@@ -52,18 +52,19 @@
             (isActive(member.recordedAt) ? 'bg-secondary' : 'bg-outline-variant');
 
         if (member.lat != null) {
-            document.getElementById('member-coords').textContent = member.lat.toFixed(4) + ', ' + member.lng.toFixed(4);
+            document.getElementById('member-coords').textContent = member.address || (member.lat.toFixed(4) + ', ' + member.lng.toFixed(4));
         }
 
         const battery = document.getElementById('battery-pct');
         battery.textContent = member.batteryPct != null ? member.batteryPct + '%' : '—';
 
         const speed = document.getElementById('speed-info');
-        if (member.speedMps != null) {
-            const kmh = (member.speedMps * 3.6).toFixed(1);
-            speed.textContent = kmh + ' km/h';
-        } else {
-            speed.textContent = '—';
+        speed.textContent = window.FgUnits ? window.FgUnits.formatSpeed(member.speedMps) : (member.speedMps != null ? (member.speedMps * 3.6).toFixed(1) + ' km/h' : '—');
+
+        const activityEl = document.getElementById('activity-info');
+        if (activityEl) {
+            const label = window.FgUnits && window.FgUnits.activityLabel(member.activity);
+            activityEl.textContent = label || '—';
         }
 
         document.getElementById('last-seen').textContent = relativeTime(member.recordedAt);
@@ -95,11 +96,28 @@
     }
 
     const historyDots = [];
+    const pathSegments = [];
+    const visitMarkers = [];
 
     function clearHistoryLayers() {
         for (const d of historyDots) { map.removeLayer(d); }
         historyDots.length = 0;
+        for (const s of pathSegments) { map.removeLayer(s); }
+        pathSegments.length = 0;
+        for (const v of visitMarkers) { map.removeLayer(v); }
+        visitMarkers.length = 0;
         if (pathLine) { map.removeLayer(pathLine); pathLine = null; }
+    }
+
+    function activityColor(activity) {
+        switch (activity) {
+            case 'driving': return '#ba1a1a';
+            case 'running': return '#943700';
+            case 'cycling': return '#006c49';
+            case 'walking': return '#006c49';
+            case 'still': return '#76777d';
+            default: return '#0b1c30';
+        }
     }
 
     function renderHistory(points) {
@@ -118,8 +136,8 @@
             const opacity = 0.3 + 0.7 * (i / points.length);
             const dot = L.circleMarker([p.lat, p.lng], {
                 radius: 3,
-                color: '#006c49',
-                fillColor: '#006c49',
+                color: activityColor(p.activity),
+                fillColor: activityColor(p.activity),
                 fillOpacity: opacity,
                 weight: 0,
             }).addTo(map);
@@ -127,14 +145,26 @@
         }
 
         if (points.length >= 2) {
-            const latlngs = points.map(p => [p.lat, p.lng]);
-            pathLine = L.polyline(latlngs, {
-                color: '#006c49',
-                weight: 3,
-                opacity: 0.6,
-                smoothFactor: 1,
-                dashArray: '6 4',
-            }).addTo(map);
+            // Draw one polyline per same-activity run so each segment can be
+            // coloured for the movement mode (driving = red, walking = green, …).
+            let runStart = 0;
+            for (let i = 1; i <= points.length; i++) {
+                const prevActivity = points[runStart].activity || null;
+                const curActivity = i < points.length ? (points[i].activity || null) : null;
+                if (i === points.length || curActivity !== prevActivity) {
+                    const slice = points.slice(runStart, i + 1).map(p => [p.lat, p.lng]);
+                    if (slice.length >= 2) {
+                        const line = L.polyline(slice, {
+                            color: activityColor(prevActivity),
+                            weight: 3,
+                            opacity: 0.7,
+                            smoothFactor: 1,
+                        }).addTo(map);
+                        pathSegments.push(line);
+                    }
+                    runStart = i;
+                }
+            }
         }
 
         const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
@@ -142,17 +172,42 @@
         map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
     }
 
-    async function loadHistory(range) {
-        const now = Date.now();
-        let from;
-        switch (range) {
-            case '1h': from = now - 3600000; break;
-            case '24h': from = now - 86400000; break;
-            case '7d': from = now - 7 * 86400000; break;
-            case '30d': from = now - 30 * 86400000; break;
-            default: from = now - 86400000;
+    function renderVisitPins(visits) {
+        for (const v of visitMarkers) { map.removeLayer(v); }
+        visitMarkers.length = 0;
+        for (const v of visits) {
+            const label = v.placeName || v.label || `${v.lat.toFixed(4)}, ${v.lng.toFixed(4)}`;
+            const dur = window.FgUnits ? window.FgUnits.formatDuration(v.durationMs) : '';
+            const marker = L.marker([v.lat, v.lng], {
+                icon: L.divIcon({
+                    className: 'fg-visit-pin',
+                    html: `<div style="background:#dce9ff;border:2px solid #006c49;border-radius:50%;width:14px;height:14px;"></div>`,
+                    iconSize: [14, 14],
+                    iconAnchor: [7, 7],
+                }),
+            }).addTo(map);
+            marker.bindPopup(`<strong>${esc(label)}</strong><br>${esc(dur)}`);
+            visitMarkers.push(marker);
         }
+    }
 
+    function rangeFrom(range) {
+        const now = Date.now();
+        switch (range) {
+            case '1h': return now - 3600000;
+            case '24h': return now - 86400000;
+            case '7d': return now - 7 * 86400000;
+            case '30d': return now - 30 * 86400000;
+            default: return now - 86400000;
+        }
+    }
+
+    let currentRange = '24h';
+
+    async function loadHistory(range) {
+        currentRange = range;
+        const from = rangeFrom(range);
+        const now = Date.now();
         try {
             const res = await fetch(
                 '/api/circles/' + state.circleId + '/members/' + state.targetUserId + '/history?from=' + from + '&to=' + now + '&limit=5000',
@@ -163,6 +218,87 @@
             renderHistory(data.points || []);
         } catch (err) {
             document.getElementById('point-count').textContent = 'Failed to load history: ' + err.message;
+        }
+        // Refresh sidebar list whenever the range changes.
+        if (activeTab === 'visits') loadVisits();
+        else loadTrips();
+    }
+
+    let activeTab = 'visits';
+
+    async function loadVisits() {
+        const from = rangeFrom(currentRange);
+        const now = Date.now();
+        const list = document.getElementById('visits-trips-list');
+        list.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant">Loading…</p>';
+        try {
+            const res = await fetch(
+                '/api/circles/' + state.circleId + '/members/' + state.targetUserId + '/visits?from=' + from + '&to=' + now,
+                { credentials: 'same-origin' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            const visits = data.visits || [];
+            renderVisitPins(visits);
+            if (visits.length === 0) {
+                list.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant">No visits in this period.</p>';
+                return;
+            }
+            list.innerHTML = visits.map(v => {
+                const label = esc(v.placeName || v.label || `${v.lat.toFixed(4)}, ${v.lng.toFixed(4)}`);
+                const when = new Date(v.startedAt).toLocaleString();
+                const dur = v.endedAt == null
+                    ? 'ongoing'
+                    : (window.FgUnits ? window.FgUnits.formatDuration(v.durationMs) : '');
+                return `<div class="p-2 rounded-lg bg-surface-container flex justify-between gap-2">
+                    <div class="min-w-0">
+                        <p class="font-status-number text-status-number truncate">${label}</p>
+                        <p class="font-label-md text-label-md text-on-surface-variant">${esc(when)}</p>
+                    </div>
+                    <span class="font-status-number text-status-number whitespace-nowrap">${esc(dur)}</span>
+                </div>`;
+            }).join('');
+        } catch (err) {
+            list.innerHTML = '<p class="font-label-md text-label-md text-error">Failed: ' + esc(err.message) + '</p>';
+        }
+    }
+
+    async function loadTrips() {
+        const from = rangeFrom(currentRange);
+        const now = Date.now();
+        const list = document.getElementById('visits-trips-list');
+        list.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant">Loading…</p>';
+        // Clear visit pins when switching to trips tab.
+        for (const v of visitMarkers) { map.removeLayer(v); }
+        visitMarkers.length = 0;
+        try {
+            const res = await fetch(
+                '/api/circles/' + state.circleId + '/members/' + state.targetUserId + '/trips?from=' + from + '&to=' + now,
+                { credentials: 'same-origin' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            const trips = data.trips || [];
+            if (trips.length === 0) {
+                list.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant">No trips in this period.</p>';
+                return;
+            }
+            list.innerHTML = trips.map(t => {
+                const fromLabel = esc(t.startLabel || (t.startLat != null ? `${t.startLat.toFixed(4)}, ${t.startLng.toFixed(4)}` : 'Unknown'));
+                const toLabel = esc(t.endLabel || (t.endLat != null ? `${t.endLat.toFixed(4)}, ${t.endLng.toFixed(4)}` : 'Unknown'));
+                const when = new Date(t.startedAt).toLocaleString();
+                const parts = [];
+                if (window.FgUnits) {
+                    parts.push(window.FgUnits.formatDistance(t.distanceM));
+                    parts.push(window.FgUnits.formatDuration(t.durationMs));
+                    if (t.maxSpeedMps != null) parts.push('max ' + window.FgUnits.formatSpeed(t.maxSpeedMps));
+                }
+                return `<div class="p-2 rounded-lg bg-surface-container">
+                    <p class="font-status-number text-status-number truncate">${fromLabel} → ${toLabel}</p>
+                    <p class="font-label-md text-label-md text-on-surface-variant">${esc(when)}</p>
+                    <p class="font-label-md text-label-md text-on-surface-variant">${esc(parts.join(' • '))}</p>
+                </div>`;
+            }).join('');
+        } catch (err) {
+            list.innerHTML = '<p class="font-label-md text-label-md text-error">Failed: ' + esc(err.message) + '</p>';
         }
     }
 
@@ -183,6 +319,23 @@
             map.flyTo(currentMarker.getLatLng(), 15);
         }
     });
+
+    const tabVisits = document.getElementById('tab-visits');
+    const tabTrips = document.getElementById('tab-trips');
+    function selectTab(name) {
+        activeTab = name;
+        if (name === 'visits') {
+            tabVisits.className = 'px-3 py-1.5 rounded-full text-sm font-semibold bg-secondary text-on-secondary';
+            tabTrips.className = 'px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high';
+            loadVisits();
+        } else {
+            tabTrips.className = 'px-3 py-1.5 rounded-full text-sm font-semibold bg-secondary text-on-secondary';
+            tabVisits.className = 'px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high';
+            loadTrips();
+        }
+    }
+    if (tabVisits) tabVisits.addEventListener('click', () => selectTab('visits'));
+    if (tabTrips) tabTrips.addEventListener('click', () => selectTab('trips'));
 
     // Boot
     updateHeader();
@@ -209,10 +362,21 @@
                     lng: msg.lng,
                     batteryPct: msg.batteryPct,
                     speedMps: msg.speedMps,
+                    activity: msg.activity,
+                    activityConfidence: msg.activityConfidence,
+                    bearing: msg.bearing,
+                    altitudeM: msg.altitudeM,
                     recordedAt: msg.recordedAt,
+                    address: msg.address ?? member.address,
                 });
                 updateHeader();
                 updateCurrentMarker();
+            } else if (msg.type === 'location_address' && msg.userId === state.targetUserId) {
+                member.address = msg.address;
+                updateHeader();
+            } else if (msg.type === 'visit_end' && msg.userId === state.targetUserId) {
+                // Refresh the visits list when a new visit closes.
+                if (activeTab === 'visits') loadVisits();
             }
         });
         ws.addEventListener('close', () => {

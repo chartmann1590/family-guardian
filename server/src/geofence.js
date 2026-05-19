@@ -18,8 +18,12 @@ export function haversineMeters(lat1, lng1, lat2, lng2) {
  * For a single user's new fix, compare against every place in their circle.
  * Insert / delete rows in place_presence to reflect transitions, and emit
  * `geofence_enter` / `geofence_exit` events on the circle's WS channel.
+ *
+ * `onTransition`, if provided, is called for every transition regardless of
+ * the place's alert configuration. Used by the visit engine to track
+ * arrivals/departures even when geofence alerts are disabled.
  */
-export function reconcileGeofences(db, { userId, circleId, displayName, lat, lng, recordedAt }) {
+export function reconcileGeofences(db, { userId, circleId, displayName, lat, lng, recordedAt }, onTransition) {
     const places = db
         .prepare(
             `SELECT id, name, lat, lng, radius_m, alerts_on_enter, alerts_on_exit
@@ -43,6 +47,7 @@ export function reconcileGeofences(db, { userId, circleId, displayName, lat, lng
     );
 
     const events = [];
+    const transitions = [];
 
     // All presence-table writes for a single fix must be atomic; otherwise a
     // crash mid-loop leaves presence inconsistent with the location row.
@@ -54,30 +59,30 @@ export function reconcileGeofences(db, { userId, circleId, displayName, lat, lng
 
             if (inside && !wasInside) {
                 insertPresence.run(userId, p.id, recordedAt);
-                if (p.alerts_on_enter) {
-                    events.push({
-                        type: 'geofence_enter',
-                        userId,
-                        displayName,
-                        placeId: p.id,
-                        placeName: p.name,
-                        distanceM: dist,
-                        recordedAt,
-                    });
-                }
+                const transition = {
+                    type: 'geofence_enter',
+                    userId,
+                    displayName,
+                    placeId: p.id,
+                    placeName: p.name,
+                    distanceM: dist,
+                    recordedAt,
+                };
+                transitions.push(transition);
+                if (p.alerts_on_enter) events.push(transition);
             } else if (!inside && wasInside) {
                 deletePresence.run(userId, p.id);
-                if (p.alerts_on_exit) {
-                    events.push({
-                        type: 'geofence_exit',
-                        userId,
-                        displayName,
-                        placeId: p.id,
-                        placeName: p.name,
-                        distanceM: dist,
-                        recordedAt,
-                    });
-                }
+                const transition = {
+                    type: 'geofence_exit',
+                    userId,
+                    displayName,
+                    placeId: p.id,
+                    placeName: p.name,
+                    distanceM: dist,
+                    recordedAt,
+                };
+                transitions.push(transition);
+                if (p.alerts_on_exit) events.push(transition);
             }
         }
     });
@@ -85,5 +90,8 @@ export function reconcileGeofences(db, { userId, circleId, displayName, lat, lng
 
     for (const ev of events) publish(circleId, ev);
     for (const ev of events) fanOut(circleId, ev, db, userId);
+    if (typeof onTransition === 'function') {
+        for (const t of transitions) onTransition(t);
+    }
     return events;
 }

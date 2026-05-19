@@ -130,7 +130,7 @@
                         <span class="font-headline-md text-headline-md text-on-surface text-base truncate">${escapeHtml(m.displayName || 'Member')}</span>
                         <span class="font-label-md text-label-md text-on-surface-variant whitespace-nowrap">${relativeTime(m.recordedAt)}</span>
                     </div>
-                    <p class="font-body-md text-body-md text-on-surface-variant text-sm mb-2">${m.lat != null ? `${m.lat.toFixed(4)}, ${m.lng.toFixed(4)}` : 'No location yet'}</p>
+                    <p class="font-body-md text-body-md text-on-surface-variant text-sm mb-2">${m.lat != null ? escapeHtml(m.address || `${m.lat.toFixed(4)}, ${m.lng.toFixed(4)}`) : 'No location yet'}</p>
                     <div class="flex gap-status-pill-gap flex-wrap">
                         ${(() => {
                             const ci = checkins.get(m.userId);
@@ -146,6 +146,18 @@
                                 <span class="material-symbols-outlined text-[14px]" style="color:${battery.fg}">battery_full</span>
                                 <span class="font-status-number text-status-number" style="color:${battery.fg}">${m.batteryPct}%</span>
                             </div>` : ''}
+                        ${(() => {
+                            const icon = window.FgUnits && window.FgUnits.activityIcon(m.activity);
+                            if (!icon) return '';
+                            const speed = m.speedMps != null && m.speedMps > 0.3
+                                ? window.FgUnits.formatSpeed(m.speedMps) : '';
+                            const label = (window.FgUnits.activityLabel(m.activity) || '') + (speed ? ' • ' + speed : '');
+                            return `
+                            <div class="flex items-center gap-1 px-2 py-0.5 rounded-full" style="background:#e5eeff66">
+                                <span class="material-symbols-outlined text-[14px]" style="color:#0b1c30">${icon}</span>
+                                <span class="font-status-number text-status-number" style="color:#0b1c30">${escapeHtml(label)}</span>
+                            </div>`;
+                        })()}
                         ${liveNow ? '' : `
                             <div class="flex items-center gap-1 bg-surface-container px-2 py-0.5 rounded-full">
                                 <span class="material-symbols-outlined text-[14px] text-outline">wifi_off</span>
@@ -246,9 +258,13 @@
 
         const first = active[0];
         const isMine = first.userId === state.me.userId;
+        const firstMember = members.get(first.userId);
+        const locText = first.lat != null
+            ? (firstMember?.address || `${first.lat.toFixed(4)}, ${first.lng.toFixed(4)}`)
+            : 'location unknown';
         title.textContent = `${first.displayName} triggered SOS`;
         meta.textContent =
-            (first.lat != null ? `at ${first.lat.toFixed(4)}, ${first.lng.toFixed(4)}` : 'location unknown') +
+            `at ${locText}` +
             ` · ${relativeTime(first.startedAt)}` +
             (active.length > 1 ? ` · ${active.length - 1} other active SOS` : '');
         banner.classList.remove('hidden');
@@ -389,11 +405,34 @@
                     lat: msg.lat,
                     lng: msg.lng,
                     batteryPct: msg.batteryPct,
+                    speedMps: msg.speedMps,
+                    activity: msg.activity,
+                    activityConfidence: msg.activityConfidence,
+                    bearing: msg.bearing,
+                    altitudeM: msg.altitudeM,
                     recordedAt: msg.recordedAt,
+                    address: msg.address ?? existing.address,
                 });
                 members.set(msg.userId, updated);
                 upsertMarker(updated);
                 renderMemberList();
+            } else if (msg.type === 'location_address') {
+                const existing = members.get(msg.userId);
+                if (existing) {
+                    existing.address = msg.address;
+                    renderMemberList();
+                }
+            } else if (msg.type === 'speeding_alert') {
+                const speed = window.FgUnits ? window.FgUnits.formatSpeed(msg.speedMps) : (msg.speedMps + ' m/s');
+                toast(`⚠️ ${msg.displayName} is going ${speed}`, 'exit');
+            } else if (msg.type === 'low_battery_alert') {
+                toast(`🪫 ${msg.displayName}'s battery: ${msg.batteryPct}%`, 'exit');
+            } else if (msg.type === 'offline_alert') {
+                toast(`📵 ${msg.displayName} hasn't reported for ${msg.minutesOffline}m`, 'exit');
+            } else if (msg.type === 'visit_end') {
+                const dur = window.FgUnits ? window.FgUnits.formatDuration(msg.durationMs) : '';
+                const where = msg.label || (msg.lat ? `${msg.lat.toFixed(3)}, ${msg.lng.toFixed(3)}` : 'a location');
+                toast(`📍 ${msg.displayName} left ${where} after ${dur}`, 'enter');
             } else if (msg.type === 'geofence_enter') {
                 toast(`${msg.displayName} arrived at ${msg.placeName}`, 'enter');
             } else if (msg.type === 'geofence_exit') {

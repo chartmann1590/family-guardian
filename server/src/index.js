@@ -20,9 +20,15 @@ import placeRoutes from './routes/places.js';
 import profileRoutes from './routes/profile.js';
 import checkinRoutes from './routes/checkins.js';
 import sosRoutes from './routes/sos.js';
+import visitsRoutes from './routes/visits.js';
+import tripsRoutes from './routes/trips.js';
+import alertPrefsRoutes from './routes/alertPrefs.js';
 import wsRoutes from './routes/ws.js';
 import webRoutes from './routes/web.js';
 import downloadRoutes from './routes/download.js';
+import { loadOpenVisits } from './visits.js';
+import { loadOpenTrips } from './trips.js';
+import { startScheduler } from './scheduler.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -47,6 +53,11 @@ await maybeBootstrapAdmin(db, {
     info: (data, msg) => console.log(JSON.stringify({ level: 30, msg, ...data })),
     warn: (data, msg) => console.warn(JSON.stringify({ level: 40, msg, ...data })),
 });
+
+// Rebuild in-memory caches for the visit/trip engines from any rows left
+// open by a prior process. Without this, a restart leaks the open state.
+loadOpenVisits(db);
+loadOpenTrips(db);
 
 const fastify = Fastify({
     logger: { level: process.env.LOG_LEVEL || 'info' },
@@ -75,6 +86,9 @@ await fastify.register(profileRoutes, { db, uploadsDir: UPLOADS_DIR });
 await fastify.register(sosRoutes, { db });
 await fastify.register(checkinRoutes, { db });
 await fastify.register(messageRoutes, { db });
+await fastify.register(visitsRoutes, { db });
+await fastify.register(tripsRoutes, { db });
+await fastify.register(alertPrefsRoutes, { db });
 await fastify.register(wsRoutes, { db });
 await fastify.register(webRoutes, { db });
 await fastify.register(downloadRoutes);
@@ -88,6 +102,8 @@ fastify.get('/healthz', async (req, reply) => {
         return reply.code(503).send({ ok: false, error: 'db_unhealthy' });
     }
 });
+
+startScheduler(db, fastify.log);
 
 fastify.listen({ host: HOST, port: PORT }).catch((err) => {
     fastify.log.error(err);

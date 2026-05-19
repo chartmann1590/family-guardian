@@ -1,14 +1,12 @@
 package com.familyguardian.events
 
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * Process-wide hot stream of GuardianEvents. The [LocationService] writes into
- * this; any Composable can collect it. Buffer is bounded so a paused subscriber
- * (e.g. a backgrounded chat screen) drops the oldest events rather than blocking.
- */
 object EventBus {
     private val _events = MutableSharedFlow<GuardianEvent>(
         replay = 0,
@@ -16,7 +14,14 @@ object EventBus {
     )
     val events: SharedFlow<GuardianEvent> = _events.asSharedFlow()
 
+    private val _wsState = MutableStateFlow(EventStreamClient.ConnectionState.DISCONNECTED)
+    val wsState: StateFlow<EventStreamClient.ConnectionState> = _wsState.asStateFlow()
+
     fun emit(event: GuardianEvent) {
         _events.tryEmit(event)
+    }
+
+    fun updateWsState(state: EventStreamClient.ConnectionState) {
+        _wsState.value = state
     }
 }

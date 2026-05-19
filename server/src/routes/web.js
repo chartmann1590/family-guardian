@@ -126,7 +126,10 @@ export default async function webRoutes(fastify, { db }) {
             .prepare(
                 `SELECT u.id AS userId, u.display_name AS displayName,
                         u.photo_path AS photoPath,
-                        l.lat, l.lng, l.battery_pct AS batteryPct, l.recorded_at AS recordedAt
+                        l.lat, l.lng, l.speed_mps AS speedMps, l.battery_pct AS batteryPct,
+                        l.activity AS activity, l.activity_confidence AS activityConfidence,
+                        l.bearing AS bearing, l.recorded_at AS recordedAt,
+                        l.address
                  FROM circle_members cm
                  JOIN users u ON u.id = cm.user_id
                  LEFT JOIN locations l ON l.user_id = u.id
@@ -353,7 +356,9 @@ export default async function webRoutes(fastify, { db }) {
                         u.photo_path AS photoPath,
                         l.lat, l.lng, l.accuracy_m AS accuracyM,
                         l.speed_mps AS speedMps, l.battery_pct AS batteryPct,
-                        l.recorded_at AS recordedAt
+                        l.bearing AS bearing, l.altitude_m AS altitudeM,
+                        l.activity AS activity, l.activity_confidence AS activityConfidence,
+                        l.recorded_at AS recordedAt, l.address
                  FROM circle_members cm
                  JOIN users u ON u.id = cm.user_id
                  LEFT JOIN locations l ON l.user_id = u.id

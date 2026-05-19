@@ -72,6 +72,9 @@ The foreground service starts; within ~30s your marker appears on the web dashbo
 | `NODE_ENV`        | unset                  | Set to `production` to require `SESSION_SECRET` and mark the session cookie `Secure` (HTTPS only). |
 | `LOG_LEVEL`       | `info`                 | Pino log level                             |
 | `FCM_SERVICE_ACCOUNT_PATH` | unset        | Path to Firebase service account JSON. When unset, push notifications are disabled. |
+| `NOMINATIM_DISABLED` | unset          | Set to `1` to skip reverse-geocoding visits/trips. Labels remain `null`; no outbound HTTP. |
+| `NOMINATIM_USER_AGENT` | `family-guardian-selfhosted (…)` | Sent as `User-Agent` to Nominatim. Set to something identifying *your* deployment (Nominatim ToS). |
+| `NOMINATIM_URL`      | OSM public Nominatim   | Override to point at a self-hosted Nominatim instance. |
 
 For local dev outside Docker, copy `server/.env.example` to `server/.env`.
 
@@ -127,6 +130,12 @@ Without `FCM_SERVICE_ACCOUNT_PATH`, the server logs "FCM disabled" once and cont
 | POST   | `/api/circles/:id/messages`   | ✓    | Send a chat message; broadcasts over WS       |
 | POST   | `/api/checkins`              | ✓    | Submit a check-in (safe_home / out_safe / heading_home) |
 | GET    | `/api/circles/:id/checkins`  | ✓    | Latest check-ins for the circle             |
+| GET    | `/api/circles/:id/visits`    | ✓    | Recent visits (closed stays) across the circle, joined with place names |
+| GET    | `/api/circles/:circleId/members/:userId/visits` | ✓ | Per-member visit log, range-filtered |
+| GET    | `/api/circles/:circleId/members/:userId/trips`  | ✓ | Per-member trip log (driving/walking segments) |
+| GET    | `/api/users/me/alert-prefs`  | ✓    | Read the caller's alert thresholds          |
+| PATCH  | `/api/users/me/alert-prefs`  | ✓    | Update speeding/low-battery/offline alert prefs |
+| GET    | `/api/circles/:id/alerts`    | ✓    | Recent `alert_events` for the circle (speeding/low_battery/offline) |
 | GET    | `/ws`                         | ✓    | WebSocket upgrade (auth via cookie or `Authorization: Bearer`); emits `location_update`, `geofence_*`, `sos_active`, `sos_resolved`, `chat_message`, `check_in` |
 | GET    | `/member/:userId`             | cookie | Web member detail page with route history      |
 | GET    | `/welcome`                    | cookie | Post-signup wizard: display name + photo + first invite |
@@ -178,6 +187,20 @@ All core features are shipped:
 - ✅ Onboarding wizard — post-signup photo + display name + invite generation.
 - ✅ Kid's check-in — one-tap status signals (safe at home / out & safe / heading home) on web and Android.
 - ✅ Open source readiness — AGPLv3 license, CI (GitHub Actions), test suite (vitest), ESLint + Prettier.
+
+Recently added (movement + insights):
+- ✅ **Movement detection** — Android uses the Activity Recognition API with a speed-threshold fallback to label every fix as `still / walking / running / cycling / driving`. Persisted on `locations` + `locations_history`; surfaced as an icon + label on the dashboard and a coloured polyline (red = driving, green = walking, grey = stationary) on the member page.
+- ✅ **Speed display in mph or km/h** — both web and Android pick the unit from the device/browser locale (`en-US` → mph, anything else → km/h). See `server/src/public/units.js` and `android/.../ui/Units.kt`.
+- ✅ **Visits + dwell duration** — server keeps an in-memory live-visit cache (`server/src/visits.js`) backed by a `visits` table; a stay is closed when the user moves consistently for ~2 fixes. Known places (geofences) are linked via `place_id`; auto-detected stays get reverse-geocoded labels via Nominatim. Browse a member's last 7 days of visits on the Android **Visits** screen or the **Visits** tab on `/member/:id`.
+- ✅ **Trip summaries** — every moving segment is captured in a `trips` table with distance, max/avg speed, and a `driving / walking / running / cycling / mixed` mode pulled from the activity stream. Trips appear on the same Android screen and the **Trips** tab.
+- ✅ **Speeding alert** — fires (with 5-min debounce) when a driving user crosses the configurable `speeding_threshold_mps` (default ~70 mph). WS event `speeding_alert` + system notification.
+- ✅ **Low-battery alert** — fires on the falling-edge crossing of the threshold (default 15%). WS event `low_battery_alert`.
+- ✅ **Offline / stale alert** — a 60s scheduler scans `locations` and fires `offline_alert` for users who haven't reported in `offline_minutes` (default 30).
+- ✅ **Per-user alert preferences** — every alert type can be toggled and its threshold tuned from the Android **Alert settings** screen (`PATCH /api/users/me/alert-prefs`).
+
+Privacy notes:
+- Reverse geocoding hits the public OSM Nominatim service. Each lookup is rate-limited (≤1 req/sec) and cached in `geocode_cache`, but if you'd rather keep all addresses local set `NOMINATIM_DISABLED=1` (or point `NOMINATIM_URL` at your own Nominatim instance). When disabled, visits keep a `lat,lng` label only.
+- Android needs the `ACTIVITY_RECOGNITION` runtime permission for activity detection. Denial is non-fatal — the server falls back to inferring `walking / driving` from the GPS speed.
 
 Still on the table:
 - FCM push notifications (optional) — would allow notifications when the Android app is killed

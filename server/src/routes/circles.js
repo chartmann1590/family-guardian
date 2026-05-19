@@ -29,6 +29,37 @@ function assertAdmin(db, circleId, userId, reply) {
 }
 
 export default async function circleRoutes(fastify, { db }) {
+    fastify.patch('/api/circles/:id', { preHandler: requireAuth(db) }, async (req, reply) => {
+        const circleId = Number(req.params.id);
+        if (!Number.isInteger(circleId)) return reply.code(400).send({ error: 'invalid_circle' });
+        if (!assertAdmin(db, circleId, req.auth.userId, reply)) return;
+
+        const name = String(req.body?.name || '').trim();
+        if (!name || name.length > 100) return reply.code(400).send({ error: 'invalid_name' });
+
+        db.prepare('UPDATE circles SET name = ? WHERE id = ?').run(name, circleId);
+        const row = db.prepare('SELECT id, name, owner_id AS ownerId, created_at AS createdAt FROM circles WHERE id = ?').get(circleId);
+        return row;
+    });
+
+    fastify.delete('/api/circles/:id/members/:userId', { preHandler: requireAuth(db) }, async (req, reply) => {
+        const circleId = Number(req.params.id);
+        const targetUserId = Number(req.params.userId);
+        if (!Number.isInteger(circleId) || !Number.isInteger(targetUserId)) {
+            return reply.code(400).send({ error: 'invalid_params' });
+        }
+        if (!assertAdmin(db, circleId, req.auth.userId, reply)) return;
+
+        const target = db
+            .prepare('SELECT role FROM circle_members WHERE circle_id = ? AND user_id = ?')
+            .get(circleId, targetUserId);
+        if (!target) return reply.code(404).send({ error: 'not_a_member' });
+        if (target.role === 'admin') return reply.code(403).send({ error: 'cannot_remove_admin' });
+
+        db.prepare('DELETE FROM circle_members WHERE circle_id = ? AND user_id = ?').run(circleId, targetUserId);
+        return { ok: true };
+    });
+
     fastify.post('/api/circles/:id/invite', {
         preHandler: requireAuth(db),
         config: { rateLimit: { max: 20, timeWindow: '1 hour' } },

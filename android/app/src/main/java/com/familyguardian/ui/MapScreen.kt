@@ -15,15 +15,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Sos
@@ -57,8 +61,10 @@ import com.familyguardian.data.AuthRepo
 import com.familyguardian.data.CheckinRepo
 import com.familyguardian.data.CircleMember
 import com.familyguardian.data.Prefs
+import com.familyguardian.data.SosEvent
 import com.familyguardian.data.SosRepo
 import com.familyguardian.events.EventBus
+import com.familyguardian.events.EventStreamClient
 import com.familyguardian.events.GuardianEvent
 import com.familyguardian.location.LocationService
 import com.google.android.gms.location.CurrentLocationRequest
@@ -84,6 +90,16 @@ private fun initials(name: String?): String {
 
 private fun memberActive(recordedAt: Long?): Boolean {
     return recordedAt != null && (System.currentTimeMillis() - recordedAt) < 5 * 60_000L
+}
+
+private fun relativeTimeString(ms: Long): String {
+    val diff = System.currentTimeMillis() - ms
+    return when {
+        diff < 60_000L -> "just now"
+        diff < 3_600_000L -> "${diff / 60_000L}m ago"
+        diff < 86_400_000L -> "${diff / 3_600_000L}h ago"
+        else -> "${diff / 86_400_000L}d ago"
+    }
 }
 
 private class InitialsMarker(
@@ -127,6 +143,8 @@ fun MapScreen(
     onOpenPlaces: () -> Unit,
     onOpenChat: () -> Unit,
     onOpenMember: (Long, String) -> Unit,
+    onOpenAlertSettings: (() -> Unit)? = null,
+    onOpenAlertHistory: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val appCtx = context.applicationContext
@@ -149,6 +167,11 @@ fun MapScreen(
     var members by remember { mutableStateOf<List<CircleMember>>(emptyList()) }
     var membersLoading by remember { mutableStateOf(false) }
     var membersError by remember { mutableStateOf<String?>(null) }
+    var activeSosList by remember { mutableStateOf<List<SosEvent>>(emptyList()) }
+    var resolveInFlight by remember { mutableStateOf(false) }
+    val wsState by EventBus.wsState.collectAsStateWithLifecycle(
+        initialValue = EventStreamClient.ConnectionState.DISCONNECTED
+    )
 
     val mapViewState = remember { mutableStateOf<MapView?>(null) }
 
@@ -185,12 +208,22 @@ fun MapScreen(
         ActivityResultContracts.RequestPermission(),
     ) { }
 
+    val activityRecognitionPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
+
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val granted = ContextCompat.checkSelfPermission(
                 appCtx, Manifest.permission.POST_NOTIFICATIONS,
             ) == PackageManager.PERMISSION_GRANTED
             if (!granted) notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val granted = ContextCompat.checkSelfPermission(
+                appCtx, Manifest.permission.ACTIVITY_RECOGNITION,
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) activityRecognitionPermission.launch(Manifest.permission.ACTIVITY_RECOGNITION)
         }
         val hasFine = ContextCompat.checkSelfPermission(
             appCtx, Manifest.permission.ACCESS_FINE_LOCATION,
@@ -284,6 +317,11 @@ fun MapScreen(
         membersLoading = true
         fetchMembers()
         membersLoading = false
+        try {
+            val snap = prefs.snapshot()
+            val cid = snap.circleId
+            if (cid != null) activeSosList = sosRepo.listActive(cid)
+        } catch (_: Throwable) { }
     }
 
     LaunchedEffect(members) {
@@ -304,11 +342,26 @@ fun MapScreen(
                                 lng = event.lng,
                                 batteryPct = event.batteryPct,
                                 speedMps = event.speedMps,
+                                bearing = event.bearing ?: m.bearing,
+                                altitudeM = event.altitudeM ?: m.altitudeM,
+                                activity = event.activity ?: m.activity,
+                                activityConfidence = event.activityConfidence ?: m.activityConfidence,
                                 recordedAt = event.recordedAt,
                                 displayName = event.displayName ?: m.displayName,
                             )
                         } else m
                     }
+                } else if (event is GuardianEvent.SosActive) {
+                    activeSosList = activeSosList
+                        .filter { it.userId != event.userId }
+                        .plus(SosEvent(
+                            id = event.id, circleId = 0, userId = event.userId,
+                            displayName = event.displayName, startedAt = event.startedAt,
+                            lat = event.lat, lng = event.lng, note = event.note,
+                            status = "active",
+                        ))
+                } else if (event is GuardianEvent.SosResolved) {
+                    activeSosList = activeSosList.filter { it.id != event.id }
                 }
             }
         }
@@ -436,6 +489,18 @@ fun MapScreen(
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                         }
+                                        val secondary = buildList {
+                                            activityLabel(m.activity)?.let { add(it) }
+                                            if (m.speedMps != null && (m.speedMps ?: 0.0) > 0.3) add(formatSpeed(m.speedMps))
+                                            m.batteryPct?.let { add("$it%") }
+                                        }.joinToString(" • ")
+                                        if (secondary.isNotBlank()) {
+                                            Text(
+                                                secondary,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -503,6 +568,16 @@ fun MapScreen(
                             }
                             TextButton(onClick = onOpenPlaces) {
                                 Icon(Icons.Filled.Place, contentDescription = "Safety places")
+                            }
+                            if (onOpenAlertSettings != null) {
+                                TextButton(onClick = onOpenAlertSettings) {
+                                    Icon(Icons.Filled.Notifications, contentDescription = "Alert settings")
+                                }
+                            }
+                            if (onOpenAlertHistory != null) {
+                                TextButton(onClick = onOpenAlertHistory) {
+                                    Icon(Icons.Filled.History, contentDescription = "Alert history")
+                                }
                             }
                             TextButton(onClick = {
                                 scope.launch {
@@ -591,16 +666,91 @@ fun MapScreen(
                         shape = RoundedCornerShape(20.dp),
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                if (serviceStarted) "Sharing location with your circle" else "Starting...",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.secondary,
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    if (serviceStarted) "Sharing location with your circle" else "Starting...",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                )
+                                Spacer(modifier = Modifier.size(8.dp))
+                                when (wsState) {
+                                    EventStreamClient.ConnectionState.CONNECTED -> {
+                                        Text(
+                                            "Live",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.secondary,
+                                        )
+                                    }
+                                    EventStreamClient.ConnectionState.CONNECTING -> {
+                                        Text(
+                                            "Connecting...",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.tertiary,
+                                        )
+                                    }
+                                    EventStreamClient.ConnectionState.DISCONNECTED -> {
+                                        Text(
+                                            "Disconnected",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                    }
+                                }
+                            }
                             Text(
                                 "Your last fix is sent every ~30 seconds to your self-hosted server.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        }
+                    }
+                }
+
+                if (activeSosList.isNotEmpty()) {
+                    val first = activeSosList.first()
+                    val isMine = first.userId == prefs.snapshotBlocking().userId
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                if (isMine) "Your SOS is active" else "${first.displayName ?: "Member"} has active SOS",
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                            )
+                            Text(
+                                "Started ${relativeTimeString(first.startedAt)}" +
+                                    if (activeSosList.size > 1) " · ${activeSosList.size - 1} more active" else "",
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            if (isMine) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            resolveInFlight = true
+                                            try {
+                                                sosRepo.resolve(first.id)
+                                                activeSosList = activeSosList.filter { it.id != first.id }
+                                            } catch (t: Throwable) { }
+                                            resolveInFlight = false
+                                        }
+                                    },
+                                    enabled = !resolveInFlight,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.error,
+                                        contentColor = MaterialTheme.colorScheme.onError,
+                                    ),
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text(if (resolveInFlight) "Resolving..." else "Resolve SOS")
+                                }
+                            }
                         }
                     }
                 }

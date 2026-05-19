@@ -188,6 +188,60 @@ object Alerts {
         nm.notify(checkinNotifId(userId), notif)
     }
 
+    fun showSpeeding(context: Context, userId: Long, displayName: String?, speedMps: Double) {
+        if (!canPostNotifications(context)) return
+        ensureChannels(context)
+        val name = displayName ?: "Someone"
+        val mph = speedMps * 2.2369
+        val title = "$name is going fast"
+        val text = "Current speed: ${"%.0f".format(mph)} mph (${"%.0f".format(speedMps * 3.6)} km/h)"
+        val notif = NotificationCompat.Builder(context, CHANNEL_HIGH)
+            .setSmallIcon(android.R.drawable.ic_menu_directions)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setAutoCancel(true)
+            .setContentIntent(openAppIntent(context))
+            .build()
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(speedingNotifId(userId), notif)
+    }
+
+    fun showLowBattery(context: Context, userId: Long, displayName: String?, batteryPct: Int) {
+        if (!canPostNotifications(context)) return
+        ensureChannels(context)
+        val name = displayName ?: "Someone"
+        val notif = NotificationCompat.Builder(context, CHANNEL_NORMAL)
+            .setSmallIcon(android.R.drawable.ic_menu_compass)
+            .setContentTitle("$name's phone battery is low")
+            .setContentText("Battery at ${batteryPct}%")
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setAutoCancel(true)
+            .setContentIntent(openAppIntent(context))
+            .build()
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(lowBatteryNotifId(userId), notif)
+    }
+
+    fun showOffline(context: Context, userId: Long, displayName: String?, minutesOffline: Int) {
+        if (!canPostNotifications(context)) return
+        ensureChannels(context)
+        val name = displayName ?: "Someone"
+        val notif = NotificationCompat.Builder(context, CHANNEL_NORMAL)
+            .setSmallIcon(android.R.drawable.stat_sys_warning)
+            .setContentTitle("Haven't heard from $name")
+            .setContentText("No location for $minutesOffline min")
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setAutoCancel(true)
+            .setContentIntent(openAppIntent(context))
+            .build()
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(offlineNotifId(userId), notif)
+    }
+
     private fun sosNotifId(eventId: Long): Int = 1_000_000 + (eventId.toInt() and 0xFFFFF)
     private fun geofenceNotifId(userId: Long, placeName: String, entered: Boolean): Int {
         val base = (userId.toInt() * 31 + placeName.hashCode()) and 0xFFFFF
@@ -195,4 +249,7 @@ object Alerts {
     }
     private fun chatNotifId(userId: Long): Int = 4_000_000 + (userId.toInt() and 0xFFFFF)
     private fun checkinNotifId(userId: Long): Int = 5_000_000 + (userId.toInt() and 0xFFFFF)
+    private fun speedingNotifId(userId: Long): Int = 6_000_000 + (userId.toInt() and 0xFFFFF)
+    private fun lowBatteryNotifId(userId: Long): Int = 7_000_000 + (userId.toInt() and 0xFFFFF)
+    private fun offlineNotifId(userId: Long): Int = 8_000_000 + (userId.toInt() and 0xFFFFF)
 }

@@ -19,6 +19,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.familyguardian.data.Prefs
 import com.familyguardian.location.LocationService
+import com.familyguardian.ui.AlertHistoryScreen
+import com.familyguardian.ui.AlertSettingsScreen
 import com.familyguardian.ui.ChatScreen
 import com.familyguardian.ui.FamilyGuardianTheme
 import com.familyguardian.ui.MapScreen
@@ -27,6 +29,8 @@ import com.familyguardian.ui.MemberInfo
 import com.familyguardian.ui.OnboardingScreen
 import com.familyguardian.ui.PlacesScreen
 import com.familyguardian.ui.ServerConfigScreen
+import com.familyguardian.ui.TripsScreen
+import com.familyguardian.ui.VisitsScreen
 import org.osmdroid.config.Configuration
 
 class MainActivity : ComponentActivity() {
@@ -107,6 +111,8 @@ private fun AppRoot() {
                 onOpenMember = { userId, displayName ->
                     nav.navigate("member/$userId/$displayName")
                 },
+                onOpenAlertSettings = { nav.navigate("alert-settings") },
+                onOpenAlertHistory = { nav.navigate("alert-history") },
             )
         }
         composable("places") {
@@ -126,7 +132,31 @@ private fun AppRoot() {
                 member = MemberInfo(userId = userId, displayName = displayName),
                 circleId = cid,
                 onBack = { nav.popBackStack() },
+                onOpenVisits = { nav.navigate("visits/$cid/$userId/$displayName") },
+                onOpenTrips = { nav.navigate("trips/$cid/$userId/$displayName") },
             )
+        }
+        composable("visits/{circleId}/{userId}/{displayName}") { backStackEntry ->
+            val cid = backStackEntry.arguments?.getString("circleId")?.toLongOrNull() ?: return@composable Box {}
+            val userId = backStackEntry.arguments?.getString("userId")?.toLongOrNull() ?: return@composable Box {}
+            val displayName = java.net.URLDecoder.decode(
+                backStackEntry.arguments?.getString("displayName") ?: "Member", "UTF-8"
+            )
+            VisitsScreen(circleId = cid, userId = userId, displayName = displayName, onBack = { nav.popBackStack() })
+        }
+        composable("trips/{circleId}/{userId}/{displayName}") { backStackEntry ->
+            val cid = backStackEntry.arguments?.getString("circleId")?.toLongOrNull() ?: return@composable Box {}
+            val userId = backStackEntry.arguments?.getString("userId")?.toLongOrNull() ?: return@composable Box {}
+            val displayName = java.net.URLDecoder.decode(
+                backStackEntry.arguments?.getString("displayName") ?: "Member", "UTF-8"
+            )
+            TripsScreen(circleId = cid, userId = userId, displayName = displayName, onBack = { nav.popBackStack() })
+        }
+        composable("alert-settings") {
+            AlertSettingsScreen(onBack = { nav.popBackStack() })
+        }
+        composable("alert-history") {
+            AlertHistoryScreen(onBack = { nav.popBackStack() })
         }
     }
 }

@@ -22,6 +22,7 @@ import com.familyguardian.events.Alerts
 import com.familyguardian.events.EventBus
 import com.familyguardian.events.EventStreamClient
 import com.familyguardian.events.GuardianEvent
+import com.google.android.gms.location.ActivityRecognition
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
@@ -58,23 +59,56 @@ class LocationService : Service() {
     private var reporter: LocationReporter? = null
     private var eventStream: EventStreamClient? = null
     private val client by lazy { LocationServices.getFusedLocationProviderClient(this) }
+    private val activityClient by lazy { ActivityRecognition.getClient(this) }
+    private val activityPendingIntent by lazy {
+        PendingIntent.getBroadcast(
+            this,
+            0,
+            Intent(this, ActivityRecognitionReceiver::class.java),
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            else PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+    }
 
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
             val fix = result.lastLocation ?: return
             val batteryPct = currentBatteryPct()
             updateNotification(lastFixAtMs = fix.time, batteryPct = batteryPct)
+            val speedMps = if (fix.hasSpeed()) fix.speed.toDouble() else null
+            val (activity, confidence) = inferActivity(speedMps, latestActivitySample())
             scope.launch {
                 reporter?.report(
                     lat = fix.latitude,
                     lng = fix.longitude,
                     accuracyM = if (fix.hasAccuracy()) fix.accuracy.toDouble() else null,
-                    speedMps  = if (fix.hasSpeed()) fix.speed.toDouble() else null,
+                    speedMps = speedMps,
                     batteryPct = batteryPct,
                     recordedAtMs = fix.time,
+                    bearing = if (fix.hasBearing()) fix.bearing.toDouble() else null,
+                    altitudeM = if (fix.hasAltitude()) fix.altitude else null,
+                    activity = activity,
+                    activityConfidence = confidence,
                 )
             }
         }
+    }
+
+    private fun inferActivity(speedMps: Double?, sample: ActivitySample?): Pair<String?, Int?> {
+        // Prefer the API when it's confident; otherwise fall back to a speed heuristic
+        // so we always emit *something* for the server's trip/visit/alert classifiers.
+        if (sample != null && sample.confidence >= 60 && sample.type != "unknown") {
+            return sample.type to sample.confidence
+        }
+        if (speedMps == null) return null to null
+        val inferred = when {
+            speedMps < 0.7 -> "still"
+            speedMps < 2.5 -> "walking"
+            speedMps < 7.0 -> "running"
+            else -> "driving"
+        }
+        return inferred to null
     }
 
     override fun onCreate() {
@@ -85,6 +119,11 @@ class LocationService : Service() {
         eventStream = EventStreamClient(prefs, scope).also { stream ->
             stream.start()
             scope.launch { observeEvents(prefs, stream) }
+            scope.launch {
+                stream.connectionState.collect { state ->
+                    EventBus.updateWsState(state)
+                }
+            }
         }
     }
 
@@ -98,6 +137,7 @@ class LocationService : Service() {
             return START_NOT_STICKY
         }
         requestUpdates()
+        requestActivityUpdates()
         return START_STICKY
     }
 
@@ -105,6 +145,11 @@ class LocationService : Service() {
 
     override fun onDestroy() {
         client.removeLocationUpdates(callback)
+        try {
+            activityClient.removeActivityUpdates(activityPendingIntent)
+        } catch (_: Throwable) {
+            // Best-effort: never let a missing permission crash teardown.
+        }
         eventStream?.shutdown()
         eventStream = null
         scope.cancel()
@@ -170,6 +215,21 @@ class LocationService : Service() {
                         )
                     }
                 }
+                is GuardianEvent.SpeedingAlert -> {
+                    if (ev.userId != selfId) {
+                        Alerts.showSpeeding(applicationContext, ev.userId, ev.displayName, ev.speedMps)
+                    }
+                }
+                is GuardianEvent.LowBatteryAlert -> {
+                    if (ev.userId != selfId) {
+                        Alerts.showLowBattery(applicationContext, ev.userId, ev.displayName, ev.batteryPct)
+                    }
+                }
+                is GuardianEvent.OfflineAlert -> {
+                    if (ev.userId != selfId) {
+                        Alerts.showOffline(applicationContext, ev.userId, ev.displayName, ev.minutesOffline)
+                    }
+                }
                 else -> Unit
             }
         }
@@ -184,6 +244,20 @@ class LocationService : Service() {
             client.requestLocationUpdates(request, callback, Looper.getMainLooper())
         } catch (sec: SecurityException) {
             stopSelfWithService()
+        }
+    }
+
+    private fun requestActivityUpdates() {
+        // ACTIVITY_RECOGNITION is a runtime permission on API 29+. The user may
+        // deny it; missing permission causes the call to throw SecurityException,
+        // which is fine — the LocationService.inferActivity() path still emits
+        // an activity value derived from speed.
+        try {
+            activityClient.requestActivityUpdates(15_000L, activityPendingIntent)
+        } catch (_: SecurityException) {
+            // permission not granted — leave the speed-fallback running
+        } catch (_: Throwable) {
+            // Play Services missing on some emulators; same fallback applies.
         }
     }
 

@@ -154,11 +154,29 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-on-surface-variant">directions_car</span>
+                        <div>
+                            <p id="activity-info" class="font-status-number text-status-number text-primary text-lg">—</p>
+                            <p class="font-label-md text-label-md text-on-surface-variant">Movement</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
                         <span class="material-symbols-outlined text-on-surface-variant">schedule</span>
                         <div>
                             <p id="last-seen" class="font-status-number text-status-number text-primary text-lg">—</p>
                             <p class="font-label-md text-label-md text-on-surface-variant">Last Seen</p>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Visits + Trips tabs -->
+                <div class="bg-surface-container-lowest rounded-xl shadow-[0_4px_12px_rgba(15,23,42,0.08)] p-4 flex flex-col gap-3">
+                    <div class="flex gap-2">
+                        <button id="tab-visits" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-secondary text-on-secondary">Visits</button>
+                        <button id="tab-trips" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high">Trips</button>
+                    </div>
+                    <div id="visits-trips-list" class="flex flex-col gap-2 max-h-72 overflow-y-auto">
+                        <p class="font-label-md text-label-md text-on-surface-variant">Loading…</p>
                     </div>
                 </div>
 
@@ -191,5 +209,6 @@
 
 <script>window.__MEMBER_STATE__ = {{{INITIAL_STATE_JSON}}};</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="/public/units.js"></script>
 <script src="/public/member.js"></script>
 </body></html>

@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,10 +43,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.familyguardian.data.ApiClient
 import com.familyguardian.data.HistoryRepo
 import com.familyguardian.data.LocationPoint
 import com.familyguardian.data.Prefs
@@ -53,9 +56,8 @@ import kotlinx.coroutines.launch
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
-import java.text.SimpleDateFormat
-import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 data class MemberInfo(
@@ -66,6 +68,7 @@ data class MemberInfo(
     val batteryPct: Int? = null,
     val speedMps: Double? = null,
     val recordedAt: Long? = null,
+    val address: String? = null,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -74,6 +77,8 @@ fun MemberDetailScreen(
     member: MemberInfo,
     circleId: Long,
     onBack: () -> Unit,
+    onOpenVisits: (() -> Unit)? = null,
+    onOpenTrips: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current.applicationContext
     val prefs = remember { Prefs(context) }
@@ -84,6 +89,7 @@ fun MemberDetailScreen(
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var selectedRange by remember { mutableStateOf("24h") }
+    var liveMember by remember { mutableStateOf(member) }
 
     val ranges = listOf("1h", "24h", "7d", "30d")
 
@@ -118,19 +124,38 @@ fun MemberDetailScreen(
 
     LaunchedEffect(selectedRange) { loadHistory(selectedRange) }
 
+    LaunchedEffect(Unit) {
+        try {
+            val snap = prefs.snapshot()
+            val server = snap.serverUrl ?: return@LaunchedEffect
+            val token = snap.token ?: return@LaunchedEffect
+            val url = ApiClient.endpoint(server, "/api/circles/$circleId/members")
+            val resp = ApiClient.api.listMembers(url, "Bearer $token")
+            val found = resp.members.find { it.userId == member.userId }
+            if (found != null) {
+                liveMember = member.copy(
+                    lat = found.lat,
+                    lng = found.lng,
+                    batteryPct = found.batteryPct,
+                    speedMps = found.speedMps,
+                    recordedAt = found.recordedAt,
+                    address = found.address,
+                )
+            }
+        } catch (_: Throwable) { }
+    }
+
     val initials = remember(member.displayName) {
         member.displayName.split(Regex("\\s+"))
             .mapNotNull { it.firstOrNull()?.uppercase() }
             .take(2).joinToString("").ifEmpty { "?" }
     }
 
-    val isActive = member.recordedAt != null &&
-        (System.currentTimeMillis() - member.recordedAt) < 5 * 60_000
-
-    val relativeTime = remember(member.recordedAt) {
-        if (member.recordedAt == null) "—"
+    val recordedAt = liveMember.recordedAt
+    val relativeTime = remember(recordedAt) {
+        if (recordedAt == null) "—"
         else {
-            val diff = System.currentTimeMillis() - member.recordedAt
+            val diff = System.currentTimeMillis() - recordedAt
             when {
                 diff < 60_000 -> "Just now"
                 diff < 3_600_000 -> "${diff / 60_000}m ago"
@@ -138,6 +163,94 @@ fun MemberDetailScreen(
                 else -> "${diff / 86_400_000}d ago"
             }
         }
+    }
+
+    val mapRef = remember { mutableStateOf<MapView?>(null) }
+
+    DisposableEffect(mapRef.value) {
+        onDispose { mapRef.value?.onPause() }
+    }
+
+    val mapView = mapRef.value
+    val memberLat = liveMember.lat
+    val memberLng = liveMember.lng
+
+    LaunchedEffect(points, mapView, memberLat, memberLng) {
+        val mv = mapView ?: return@LaunchedEffect
+        mv.overlays.clear()
+        val geoPoints = points.map { GeoPoint(it.lat, it.lng) }
+
+        if (geoPoints.size >= 2) {
+            val line = Polyline(mv).apply {
+                setPoints(geoPoints)
+                outlinePaint.color = 0xFF006C49.toInt()
+                outlinePaint.strokeWidth = 4f
+                outlinePaint.isAntiAlias = true
+            }
+            mv.overlays.add(line)
+        }
+
+        if (memberLat != null && memberLng != null) {
+            val memberMarker = Marker(mv).apply {
+                position = GeoPoint(memberLat, memberLng)
+                title = member.displayName
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            }
+            mv.overlays.add(memberMarker)
+        }
+
+        if (geoPoints.size >= 1) {
+            val startMarker = Marker(mv).apply {
+                position = geoPoints.first()
+                title = "Start"
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            }
+            mv.overlays.add(startMarker)
+        }
+        if (geoPoints.size >= 2) {
+            val endMarker = Marker(mv).apply {
+                position = geoPoints.last()
+                title = "End"
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            }
+            mv.overlays.add(endMarker)
+        }
+
+        val allGeo = if (memberLat != null && memberLng != null) {
+            geoPoints + GeoPoint(memberLat, memberLng)
+        } else {
+            geoPoints
+        }
+
+        if (allGeo.isEmpty()) return@LaunchedEffect
+
+        if (allGeo.size == 1) {
+            mv.controller.setCenter(allGeo.first())
+            mv.controller.setZoom(15.0)
+        } else {
+            val minLat = allGeo.minOf { it.latitude }
+            val maxLat = allGeo.maxOf { it.latitude }
+            val minLon = allGeo.minOf { it.longitude }
+            val maxLon = allGeo.maxOf { it.longitude }
+            val center = GeoPoint((minLat + maxLat) / 2, (minLon + maxLon) / 2)
+            val latSpan = maxLat - minLat
+            val lonSpan = maxLon - minLon
+            val maxSpan = maxOf(latSpan, lonSpan, 0.001)
+            val zoom = when {
+                maxSpan < 0.001 -> 17.0
+                maxSpan < 0.005 -> 16.0
+                maxSpan < 0.01 -> 15.0
+                maxSpan < 0.03 -> 14.0
+                maxSpan < 0.05 -> 13.0
+                maxSpan < 0.1 -> 12.0
+                maxSpan < 0.5 -> 10.0
+                else -> 8.0
+            }
+            mv.controller.setCenter(center)
+            mv.controller.setZoom(zoom)
+        }
+
+        mv.invalidate()
     }
 
     Scaffold(
@@ -162,7 +275,6 @@ fun MemberDetailScreen(
                 .padding(padding)
                 .fillMaxSize(),
         ) {
-            // Member info row
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.surface,
@@ -193,9 +305,10 @@ fun MemberDetailScreen(
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            if (member.lat != null)
-                                "${String.format("%.4f", member.lat)}, ${String.format("%.4f", member.lng)}"
-                            else "No location yet",
+                            liveMember.address
+                                ?: if (liveMember.lat != null)
+                                    "${String.format("%.4f", liveMember.lat)}, ${String.format("%.4f", liveMember.lng)}"
+                                else "No location yet",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -203,7 +316,6 @@ fun MemberDetailScreen(
                 }
             }
 
-            // Device health chips
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -212,11 +324,11 @@ fun MemberDetailScreen(
             ) {
                 DeviceStat(
                     icon = { Icon(Icons.Filled.BatteryFull, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    label = member.batteryPct?.let { "$it%" } ?: "—",
+                    label = liveMember.batteryPct?.let { "$it%" } ?: "—",
                 )
                 DeviceStat(
                     icon = { Icon(Icons.Filled.Speed, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    label = member.speedMps?.let { "${String.format("%.1f", it * 3.6)} km/h" } ?: "—",
+                    label = formatSpeed(liveMember.speedMps),
                 )
                 DeviceStat(
                     icon = { Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(18.dp)) },
@@ -224,7 +336,28 @@ fun MemberDetailScreen(
                 )
             }
 
-            // Time range selector
+            if (onOpenVisits != null || onOpenTrips != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (onOpenVisits != null) {
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = onOpenVisits,
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Visits") }
+                    }
+                    if (onOpenTrips != null) {
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = onOpenTrips,
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Trips") }
+                    }
+                }
+            }
+
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -249,7 +382,6 @@ fun MemberDetailScreen(
                 }
             }
 
-            // Status line
             Text(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 text = if (loading) "Loading…" else if (error != null) error!! else "${points.size} data points",
@@ -257,52 +389,28 @@ fun MemberDetailScreen(
                 color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            // Map
-            AndroidView(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-                factory = { ctx ->
-                    MapView(ctx).apply {
-                        setTileSource(TileSourceFactory.MAPNIK)
-                        setMultiTouchControls(true)
-                        controller.setZoom(13.0)
-                        controller.setCenter(GeoPoint(37.7749, -122.4194))
-                    }
-                },
-                update = { mapView ->
-                    mapView.overlays.clear()
-                    val geoPoints = points.map { GeoPoint(it.lat, it.lng) }
-
-                    if (geoPoints.size >= 2) {
-                        val line = Polyline(mapView).apply {
-                            setPoints(geoPoints)
-                            outlinePaint.color = 0xFF006C49.toInt()
-                            outlinePaint.strokeWidth = 4f
-                            outlinePaint.isAntiAlias = true
+                    .weight(1f)
+                    .clipToBounds(),
+            ) {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { ctx ->
+                        MapView(ctx).apply {
+                            setTileSource(TileSourceFactory.MAPNIK)
+                            setMultiTouchControls(true)
+                            setMinZoomLevel(4.0)
+                            setMaxZoomLevel(19.0)
+                            controller.setZoom(12.0)
+                            controller.setCenter(GeoPoint(37.7749, -122.4194))
+                            onResume()
+                            mapRef.value = this
                         }
-                        mapView.overlays.add(line)
-                    }
-
-                    // Center on member's last known location or path bounds
-                    if (member.lat != null && member.lng != null) {
-                        val center = GeoPoint(member.lat, member.lng)
-                        if (geoPoints.isEmpty()) {
-                            mapView.controller.setCenter(center)
-                            mapView.controller.setZoom(14)
-                        } else {
-                            val allPoints = geoPoints + center
-                            val bounds = org.osmdroid.util.BoundingBox.fromGeoPoints(allPoints)
-                            mapView.zoomToBoundingBox(bounds, true, 60)
-                        }
-                    } else if (geoPoints.isNotEmpty()) {
-                        val bounds = org.osmdroid.util.BoundingBox.fromGeoPoints(geoPoints)
-                        mapView.zoomToBoundingBox(bounds, true, 60)
-                    }
-
-                    mapView.invalidate()
-                },
-            )
+                    },
+                )
+            }
         }
     }
 }

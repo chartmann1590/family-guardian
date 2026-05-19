@@ -23,6 +23,10 @@ sealed interface GuardianEvent {
         val accuracyM: Double? = null,
         val speedMps: Double? = null,
         val batteryPct: Int? = null,
+        val bearing: Double? = null,
+        val altitudeM: Double? = null,
+        val activity: String? = null,
+        val activityConfidence: Int? = null,
         val recordedAt: Long,
     ) : GuardianEvent
 
@@ -91,6 +95,65 @@ sealed interface GuardianEvent {
         val lng: Double? = null,
         val note: String? = null,
         val createdAt: Long,
+    ) : GuardianEvent
+
+    @Serializable
+    @SerialName("speeding_alert")
+    data class SpeedingAlert(
+        val userId: Long,
+        val displayName: String? = null,
+        val speedMps: Double,
+        val thresholdMps: Double,
+        val recordedAt: Long,
+    ) : GuardianEvent
+
+    @Serializable
+    @SerialName("low_battery_alert")
+    data class LowBatteryAlert(
+        val userId: Long,
+        val displayName: String? = null,
+        val batteryPct: Int,
+        val thresholdPct: Int,
+        val recordedAt: Long,
+    ) : GuardianEvent
+
+    @Serializable
+    @SerialName("offline_alert")
+    data class OfflineAlert(
+        val userId: Long,
+        val displayName: String? = null,
+        val minutesOffline: Int,
+        val thresholdMinutes: Int,
+        val recordedAt: Long,
+    ) : GuardianEvent
+
+    @Serializable
+    @SerialName("visit_end")
+    data class VisitEnd(
+        val userId: Long,
+        val displayName: String? = null,
+        val visitId: Long,
+        val placeId: Long? = null,
+        val label: String? = null,
+        val lat: Double,
+        val lng: Double,
+        val startedAt: Long,
+        val endedAt: Long,
+        val durationMs: Long,
+    ) : GuardianEvent
+
+    @Serializable
+    @SerialName("trip_end")
+    data class TripEnd(
+        val userId: Long,
+        val displayName: String? = null,
+        val tripId: Long,
+        val mode: String,
+        val distanceM: Double,
+        val maxSpeedMps: Double? = null,
+        val avgSpeedMps: Double? = null,
+        val startedAt: Long,
+        val endedAt: Long,
     ) : GuardianEvent
 
     @Serializable

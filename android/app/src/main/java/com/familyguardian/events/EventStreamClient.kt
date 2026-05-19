@@ -8,8 +8,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -33,6 +36,8 @@ class EventStreamClient(
     private val prefs: Prefs,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob()),
 ) {
+    enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED }
+
     private val json = Json { ignoreUnknownKeys = true; classDiscriminator = "type" }
     private val client = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS) // streaming
@@ -41,6 +46,9 @@ class EventStreamClient(
 
     private val _events = MutableSharedFlow<GuardianEvent>(replay = 0, extraBufferCapacity = 64)
     val events: SharedFlow<GuardianEvent> = _events.asSharedFlow()
+
+    private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
+    val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
     private val mutex = Mutex()
     private var loopJob: Job? = null
@@ -73,7 +81,7 @@ class EventStreamClient(
             val server = snap.serverUrl
             val token = snap.token
             if (server.isNullOrBlank() || token.isNullOrBlank()) {
-                // Nothing to connect to; wait and retry rather than spin.
+                _connectionState.value = ConnectionState.DISCONNECTED
                 delay(5_000L)
                 continue
             }
@@ -81,8 +89,10 @@ class EventStreamClient(
                 .replaceFirst("http://", "ws://")
                 .replaceFirst("https://", "wss://") + "/ws"
             Log.i("EventStream", "Connecting $wsUrl")
+            _connectionState.value = ConnectionState.CONNECTING
             val opened = connectOnce(wsUrl, token)
             if (opened) backoffMs = 1_000L
+            _connectionState.value = ConnectionState.DISCONNECTED
             // After the socket closes, wait before reconnecting.
             delay(backoffMs)
             backoffMs = (backoffMs * 2).coerceAtMost(30_000L)
@@ -101,6 +111,7 @@ class EventStreamClient(
         val ws = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 openedFlag = true
+                _connectionState.value = ConnectionState.CONNECTED
                 Log.i("EventStream", "WS open")
             }
             override fun onMessage(webSocket: WebSocket, text: String) {

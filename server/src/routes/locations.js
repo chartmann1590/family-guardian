@@ -2,6 +2,12 @@ import { z } from 'zod';
 import { requireAuth, getUserCircleId } from '../auth.js';
 import { publish } from '../hub.js';
 import { reconcileGeofences } from '../geofence.js';
+import { onLocationFix as visitsOnFix } from '../visits.js';
+import { onLocationFix as tripsOnFix } from '../trips.js';
+import { evaluateAlerts } from '../alerts.js';
+import { enqueueGeocode, getCachedLabel } from '../geocoder.js';
+
+const ACTIVITY_VALUES = ['still', 'walking', 'running', 'cycling', 'driving', 'unknown'];
 
 const LocationBody = z.object({
     lat: z.number().min(-90).max(90),
@@ -10,6 +16,10 @@ const LocationBody = z.object({
     speedMps: z.number().nonnegative().optional(),
     batteryPct: z.number().int().min(0).max(100).optional(),
     recordedAt: z.number().int().positive().optional(),
+    bearing: z.number().min(0).max(360).optional(),
+    altitudeM: z.number().optional(),
+    activity: z.enum(ACTIVITY_VALUES).optional(),
+    activityConfidence: z.number().int().min(0).max(100).optional(),
 });
 
 export default async function locationRoutes(fastify, { db }) {
@@ -18,29 +28,51 @@ export default async function locationRoutes(fastify, { db }) {
         if (!parsed.success) {
             return reply.code(400).send({ error: 'invalid_body', details: parsed.error.flatten() });
         }
-        const { lat, lng, accuracyM, speedMps, batteryPct } = parsed.data;
+        const { lat, lng, accuracyM, speedMps, batteryPct, bearing, altitudeM, activity, activityConfidence } = parsed.data;
         // Clamp client-supplied recordedAt to "now" so a misconfigured clock
         // can't poison the history with future timestamps.
         const recordedAt = Math.min(parsed.data.recordedAt ?? Date.now(), Date.now());
         const userId = req.auth.userId;
 
+        const prevBattery = db
+            .prepare('SELECT battery_pct AS batteryPct FROM locations WHERE user_id = ?')
+            .get(userId)?.batteryPct ?? null;
+
+        const cachedAddress = getCachedLabel(db, lat, lng);
+
         const writeLocation = db.transaction(() => {
             db.prepare(
-                `INSERT INTO locations (user_id, lat, lng, accuracy_m, speed_mps, battery_pct, recorded_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)
+                `INSERT INTO locations
+                    (user_id, lat, lng, accuracy_m, speed_mps, battery_pct, recorded_at,
+                     bearing, altitude_m, activity, activity_confidence, address)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON CONFLICT(user_id) DO UPDATE SET
                     lat = excluded.lat,
                     lng = excluded.lng,
                     accuracy_m = excluded.accuracy_m,
                     speed_mps = excluded.speed_mps,
                     battery_pct = excluded.battery_pct,
-                    recorded_at = excluded.recorded_at`
-            ).run(userId, lat, lng, accuracyM ?? null, speedMps ?? null, batteryPct ?? null, recordedAt);
+                    recorded_at = excluded.recorded_at,
+                    bearing = excluded.bearing,
+                    altitude_m = excluded.altitude_m,
+                    activity = excluded.activity,
+                    activity_confidence = excluded.activity_confidence,
+                    address = excluded.address`
+            ).run(
+                userId, lat, lng, accuracyM ?? null, speedMps ?? null, batteryPct ?? null, recordedAt,
+                bearing ?? null, altitudeM ?? null, activity ?? null, activityConfidence ?? null,
+                cachedAddress,
+            );
 
             db.prepare(
-                `INSERT INTO locations_history (user_id, lat, lng, accuracy_m, speed_mps, battery_pct, recorded_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`
-            ).run(userId, lat, lng, accuracyM ?? null, speedMps ?? null, batteryPct ?? null, recordedAt);
+                `INSERT INTO locations_history
+                    (user_id, lat, lng, accuracy_m, speed_mps, battery_pct, recorded_at,
+                     bearing, altitude_m, activity, activity_confidence)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            ).run(
+                userId, lat, lng, accuracyM ?? null, speedMps ?? null, batteryPct ?? null, recordedAt,
+                bearing ?? null, altitudeM ?? null, activity ?? null, activityConfidence ?? null,
+            );
         });
         writeLocation();
 
@@ -55,8 +87,28 @@ export default async function locationRoutes(fastify, { db }) {
                 accuracyM: accuracyM ?? null,
                 speedMps: speedMps ?? null,
                 batteryPct: batteryPct ?? null,
+                bearing: bearing ?? null,
+                altitudeM: altitudeM ?? null,
+                activity: activity ?? null,
+                activityConfidence: activityConfidence ?? null,
                 recordedAt,
+                address: cachedAddress,
             });
+
+            if (!cachedAddress) {
+                enqueueGeocode(db, lat, lng, (label) => {
+                    if (label) {
+                        db.prepare('UPDATE locations SET address = ? WHERE user_id = ?').run(label, userId);
+                        publish(circleId, {
+                            type: 'location_address',
+                            userId,
+                            address: label,
+                        });
+                    }
+                });
+            }
+
+            const transitions = [];
             reconcileGeofences(db, {
                 userId,
                 circleId,
@@ -64,7 +116,33 @@ export default async function locationRoutes(fastify, { db }) {
                 lat,
                 lng,
                 recordedAt,
-            });
+            }, (t) => transitions.push(t));
+            const fix = {
+                userId,
+                circleId,
+                displayName: req.auth.displayName,
+                lat,
+                lng,
+                speedMps: speedMps ?? null,
+                batteryPct: batteryPct ?? null,
+                activity: activity ?? null,
+                recordedAt,
+            };
+            try {
+                visitsOnFix(db, fix, transitions);
+            } catch (err) {
+                req.log.warn({ err: err.message, userId }, 'visits_onfix_failed');
+            }
+            try {
+                tripsOnFix(db, fix);
+            } catch (err) {
+                req.log.warn({ err: err.message, userId }, 'trips_onfix_failed');
+            }
+            try {
+                evaluateAlerts(db, { ...fix, prevBatteryPct: prevBattery });
+            } catch (err) {
+                req.log.warn({ err: err.message, userId }, 'alerts_eval_failed');
+            }
         }
         return { ok: true };
     });
@@ -86,7 +164,12 @@ export default async function locationRoutes(fastify, { db }) {
                         l.accuracy_m AS accuracyM,
                         l.speed_mps AS speedMps,
                         l.battery_pct AS batteryPct,
-                        l.recorded_at AS recordedAt
+                        l.bearing AS bearing,
+                        l.altitude_m AS altitudeM,
+                        l.activity AS activity,
+                        l.activity_confidence AS activityConfidence,
+                        l.recorded_at AS recordedAt,
+                        l.address AS address
                  FROM circle_members cm
                  JOIN users u ON u.id = cm.user_id
                  LEFT JOIN locations l ON l.user_id = u.id
@@ -124,7 +207,9 @@ export default async function locationRoutes(fastify, { db }) {
 
         const rows = db.prepare(
             `SELECT id, lat, lng, accuracy_m AS accuracyM, speed_mps AS speedMps,
-                    battery_pct AS batteryPct, recorded_at AS recordedAt
+                    battery_pct AS batteryPct, bearing, altitude_m AS altitudeM,
+                    activity, activity_confidence AS activityConfidence,
+                    recorded_at AS recordedAt
              FROM locations_history
              WHERE user_id = ? AND recorded_at >= ? AND recorded_at <= ?
              ORDER BY recorded_at ASC

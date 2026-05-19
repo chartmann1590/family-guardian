@@ -75,6 +75,18 @@ interface GuardianApi {
         @Body body: SosActivateBody,
     ): SosEvent
 
+    @POST
+    suspend fun resolveSos(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): SosEvent
+
+    @GET
+    suspend fun listActiveSos(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): SosListResponse
+
     @GET
     suspend fun listMessages(
         @Url url: String,
@@ -100,6 +112,37 @@ interface GuardianApi {
         @Header("Authorization") auth: String,
         @Body body: CheckinBody,
     ): CheckinResponse
+
+    @GET
+    suspend fun getVisits(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): VisitsResponse
+
+    @GET
+    suspend fun getTrips(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): TripsResponse
+
+    @GET
+    suspend fun getAlertPrefs(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): AlertPrefs
+
+    @PATCH
+    suspend fun patchAlertPrefs(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: AlertPrefs,
+    ): AlertPrefs
+
+    @GET
+    suspend fun getAlerts(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): AlertsResponse
 }
 
 object ApiClient {

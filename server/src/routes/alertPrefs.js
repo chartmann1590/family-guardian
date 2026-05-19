@@ -1,0 +1,91 @@
+import { z } from 'zod';
+import { requireAuth } from '../auth.js';
+
+const PrefsPatch = z.object({
+    speedingEnabled: z.boolean().optional(),
+    speedingThresholdMps: z.number().nonnegative().max(200).optional(),
+    lowBatteryEnabled: z.boolean().optional(),
+    lowBatteryThreshold: z.number().int().min(1).max(99).optional(),
+    offlineEnabled: z.boolean().optional(),
+    offlineMinutes: z.number().int().min(5).max(1440).optional(),
+});
+
+function rowToJson(r) {
+    return {
+        userId: r.user_id,
+        speedingEnabled: !!r.speeding_enabled,
+        speedingThresholdMps: r.speeding_threshold_mps,
+        lowBatteryEnabled: !!r.low_battery_enabled,
+        lowBatteryThreshold: r.low_battery_threshold,
+        offlineEnabled: !!r.offline_enabled,
+        offlineMinutes: r.offline_minutes,
+    };
+}
+
+function ensurePrefs(db, userId) {
+    let prefs = db.prepare('SELECT * FROM alert_prefs WHERE user_id = ?').get(userId);
+    if (!prefs) {
+        db.prepare('INSERT INTO alert_prefs (user_id) VALUES (?)').run(userId);
+        prefs = db.prepare('SELECT * FROM alert_prefs WHERE user_id = ?').get(userId);
+    }
+    return prefs;
+}
+
+function assertMember(db, circleId, userId, reply) {
+    const m = db
+        .prepare('SELECT 1 FROM circle_members WHERE circle_id = ? AND user_id = ?')
+        .get(circleId, userId);
+    if (!m) { reply.code(403).send({ error: 'not_a_member' }); return false; }
+    return true;
+}
+
+export default async function alertPrefsRoutes(fastify, { db }) {
+    fastify.get('/api/users/me/alert-prefs', { preHandler: requireAuth(db) }, async (req) => {
+        const prefs = ensurePrefs(db, req.auth.userId);
+        return rowToJson(prefs);
+    });
+
+    fastify.patch('/api/users/me/alert-prefs', { preHandler: requireAuth(db) }, async (req, reply) => {
+        const parsed = PrefsPatch.safeParse(req.body);
+        if (!parsed.success) return reply.code(400).send({ error: 'invalid_body', details: parsed.error.flatten() });
+        ensurePrefs(db, req.auth.userId);
+        const fieldMap = {
+            speedingEnabled: 'speeding_enabled',
+            speedingThresholdMps: 'speeding_threshold_mps',
+            lowBatteryEnabled: 'low_battery_enabled',
+            lowBatteryThreshold: 'low_battery_threshold',
+            offlineEnabled: 'offline_enabled',
+            offlineMinutes: 'offline_minutes',
+        };
+        const updates = [];
+        const params = [];
+        for (const [k, col] of Object.entries(fieldMap)) {
+            if (parsed.data[k] === undefined) continue;
+            let v = parsed.data[k];
+            if (typeof v === 'boolean') v = v ? 1 : 0;
+            updates.push(`${col} = ?`);
+            params.push(v);
+        }
+        if (updates.length) {
+            params.push(req.auth.userId);
+            db.prepare(`UPDATE alert_prefs SET ${updates.join(', ')} WHERE user_id = ?`).run(...params);
+        }
+        return rowToJson(ensurePrefs(db, req.auth.userId));
+    });
+
+    fastify.get('/api/circles/:id/alerts', { preHandler: requireAuth(db) }, async (req, reply) => {
+        const circleId = Number(req.params.id);
+        if (!Number.isInteger(circleId)) return reply.code(400).send({ error: 'invalid_circle' });
+        if (!assertMember(db, circleId, req.auth.userId, reply)) return;
+        const since = Number(req.query.since) || 0;
+        const limit = Math.min(Number(req.query.limit) || 100, 500);
+        const rows = db.prepare(
+            `SELECT a.id, a.user_id AS userId, u.display_name AS displayName,
+                    a.circle_id AS circleId, a.type, a.value, a.created_at AS createdAt
+             FROM alert_events a JOIN users u ON u.id = a.user_id
+             WHERE a.circle_id = ? AND a.created_at >= ?
+             ORDER BY a.created_at DESC LIMIT ?`,
+        ).all(circleId, since, limit);
+        return { alerts: rows };
+    });
+}

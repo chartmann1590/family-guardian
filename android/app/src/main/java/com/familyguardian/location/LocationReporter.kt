@@ -15,6 +15,10 @@ class LocationReporter(private val prefs: Prefs) {
         speedMps: Double?,
         batteryPct: Int?,
         recordedAtMs: Long,
+        bearing: Double? = null,
+        altitudeM: Double? = null,
+        activity: String? = null,
+        activityConfidence: Int? = null,
     ) {
         val snapshot = prefs.snapshot()
         val serverUrl = snapshot.serverUrl ?: return
@@ -26,6 +30,10 @@ class LocationReporter(private val prefs: Prefs) {
             speedMps = speedMps,
             batteryPct = batteryPct,
             recordedAt = recordedAtMs,
+            bearing = bearing,
+            altitudeM = altitudeM,
+            activity = activity,
+            activityConfidence = activityConfidence,
         )
         val url = ApiClient.endpoint(serverUrl, "/api/locations")
         var attempt = 0
