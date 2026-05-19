@@ -124,11 +124,12 @@ jobs:
 
       - name: Build unsigned iPhoneOS app
         run: |
-          set -euo pipefail
+          set -uo pipefail
           WORKSPACE=$(find ios -maxdepth 1 -name '*.xcworkspace' -type d | head -n 1)
           if [ -z "$WORKSPACE" ]; then echo "No .xcworkspace found in ios/"; exit 1; fi
           SCHEME=$(basename "$WORKSPACE" .xcworkspace)
           echo "Using workspace=$WORKSPACE scheme=$SCHEME"
+          set +e
           xcodebuild \
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
@@ -138,7 +139,26 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build
+            build 2>&1 | tee xcodebuild.log
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          if [ "$STATUS" -ne 0 ]; then
+            echo "::group::xcodebuild error lines"
+            grep -nE "error:|fatal error:|warning:.*error|\*\* BUILD FAILED|The following build commands failed" xcodebuild.log || true
+            echo "::endgroup::"
+            echo "::group::Swift diagnostic files"
+            find build -name '*.dia' 2>/dev/null | while read d; do
+              if strings "$d" 2>/dev/null | grep -qE "error:|warning:"; then
+                echo "--- $d ---"
+                strings "$d" 2>/dev/null | grep -E "error:|warning:|note:" | head -40
+              fi
+            done
+            echo "::endgroup::"
+            echo "::group::Last 200 lines of build log"
+            tail -n 200 xcodebuild.log
+            echo "::endgroup::"
+            exit "$STATUS"
+          fi
 
       - name: Package unsigned IPA
         run: |

@@ -24,6 +24,7 @@
       }
     },
     "plugins": [
+      ["expo-build-properties", { "ios": { "deploymentTarget": "15.1" } }],
       ["expo-location", { "locationAlwaysAndWhenInUsePermission": "Allow Family Guardian to update your family map in the background." }],
       "expo-secure-store",
       "expo-notifications"
