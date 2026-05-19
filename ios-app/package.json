@@ -27,6 +27,11 @@
   "devDependencies": {
     "@types/react": "~18.3.12",
     "typescript": "~5.3.3"
+  },
+  "overrides": {
+    "@expo/plist": {
+      "@xmldom/xmldom": "^0.8.13"
+    }
   }
 }
 

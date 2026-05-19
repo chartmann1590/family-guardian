@@ -46,7 +46,7 @@ jobs:
       - name: Build unsigned iPhoneOS app
         run: |
           set -euo pipefail
-          WORKSPACE=$(ls ios/*.xcworkspace | head -n 1)
+          WORKSPACE=$(find ios -maxdepth 1 -name '*.xcworkspace' -type d | head -n 1)
           if [ -z "$WORKSPACE" ]; then echo "No .xcworkspace found in ios/"; exit 1; fi
           SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list -json \
             | python3 -c 'import json,sys; print(json.load(sys.stdin)["workspace"]["schemes"][0])')
