@@ -21,6 +21,7 @@ import com.familyguardian.data.Prefs
 import com.familyguardian.location.LocationService
 import com.familyguardian.ui.AlertHistoryScreen
 import com.familyguardian.ui.AlertSettingsScreen
+import com.familyguardian.ui.AboutScreen
 import com.familyguardian.ui.ChatScreen
 import com.familyguardian.ui.FamilyGuardianTheme
 import com.familyguardian.ui.MapScreen
@@ -113,6 +114,7 @@ private fun AppRoot() {
                 },
                 onOpenAlertSettings = { nav.navigate("alert-settings") },
                 onOpenAlertHistory = { nav.navigate("alert-history") },
+                onOpenAbout = { nav.navigate("about") },
             )
         }
         composable("places") {
@@ -157,6 +159,9 @@ private fun AppRoot() {
         }
         composable("alert-history") {
             AlertHistoryScreen(onBack = { nav.popBackStack() })
+        }
+        composable("about") {
+            AboutScreen(onBack = { nav.popBackStack() })
         }
     }
 }

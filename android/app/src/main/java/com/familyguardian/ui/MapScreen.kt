@@ -2,7 +2,6 @@ package com.familyguardian.ui
 
 import android.Manifest
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Color
@@ -25,8 +24,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Notifications
@@ -38,6 +38,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -147,6 +148,7 @@ fun MapScreen(
     onOpenMember: (Long, String) -> Unit,
     onOpenAlertSettings: (() -> Unit)? = null,
     onOpenAlertHistory: (() -> Unit)? = null,
+    onOpenAbout: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val appCtx = context.applicationContext
@@ -555,6 +557,9 @@ fun MapScreen(
                     }
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
                         Row {
+                            IconButton(onClick = onOpenAbout, modifier = Modifier.size(40.dp)) {
+                                Icon(Icons.Filled.Info, contentDescription = "About", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                             TextButton(onClick = {
                                 showMembers = true
                                 scope.launch {
@@ -580,12 +585,6 @@ fun MapScreen(
                                 TextButton(onClick = onOpenAlertHistory) {
                                     Icon(Icons.Filled.History, contentDescription = "Alert history")
                                 }
-                            }
-                            TextButton(onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://buymeacoffee.com/charleshartmann"))
-                                context.startActivity(intent)
-                            }) {
-                                Icon(Icons.Filled.Favorite, contentDescription = "Support the developer", tint = MaterialTheme.colorScheme.tertiary)
                             }
                             TextButton(onClick = {
                                 scope.launch {
