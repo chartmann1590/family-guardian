@@ -8,18 +8,18 @@ test.describe('invite flow', () => {
     test('admin can log in and open the invite modal', async ({ page }) => {
         await page.goto('/');
         await expect(page).toHaveURL(/\/$/);
-        await page.locator('input[name="email"]').fill('alice@example.com');
-        await page.locator('input[name="password"]').fill('hunter2hunter');
-        await page.getByRole('button', { name: /^sign in$/i }).click();
+        await page.locator('#login-email').fill('alice@example.com');
+        await page.locator('#login-password').fill('hunter2hunter');
+        await page.locator('#login-form button[type="submit"]').click();
 
         await expect(page).toHaveURL(/\/dashboard$/, { timeout: 10_000 });
 
         // The dashboard shows the coach overlay on first visit; dismiss it.
-        const skip = page.getByRole('button', { name: /skip tour/i });
+        const skip = page.locator('#coach-skip');
         if (await skip.isVisible().catch(() => false)) await skip.click();
 
-        // Click "Invite family" in the sidebar.
-        await page.getByRole('button', { name: /invite family/i }).click();
+        // Click "Invite family" in the sidebar (stable selector via id).
+        await page.locator('#open-invite').click();
 
         // Modal renders with the invite content once minted.
         await expect(page.locator('#invite-content')).toBeVisible({ timeout: 10_000 });
