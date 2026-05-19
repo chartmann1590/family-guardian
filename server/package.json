@@ -24,7 +24,7 @@
     "@fastify/static": "^7.0.4",
     "@fastify/websocket": "^10.0.1",
     "argon2": "^0.40.3",
-    "better-sqlite3": "^11.3.0",
+    "better-sqlite3": "^12.10.0",
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
     "firebase-admin": "^13.10.0",
