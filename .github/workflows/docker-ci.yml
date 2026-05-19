@@ -1,0 +1,88 @@
+name: Docker CI
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'server/**'
+      - 'android/**'
+      - 'docker-compose.yml'
+      - 'scripts/**'
+      - '.github/workflows/docker-ci.yml'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'server/**'
+      - 'android/**'
+      - 'docker-compose.yml'
+      - 'scripts/**'
+      - '.github/workflows/docker-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build APK + Docker image (full bake)
+        run: node scripts/build-image.mjs
+
+      - name: Boot container
+        env:
+          SESSION_SECRET: ci-session-secret-not-for-production
+          HOST_PORT: 18080
+        run: |
+          docker compose up -d
+          # wait up to 90s for healthy
+          for i in $(seq 1 45); do
+            status=$(docker inspect family-guardian --format '{{.State.Health.Status}}' 2>/dev/null || echo starting)
+            echo "health=$status"
+            [ "$status" = "healthy" ] && break
+            sleep 2
+          done
+          [ "$(docker inspect family-guardian --format '{{.State.Health.Status}}')" = "healthy" ] || (docker compose logs && exit 1)
+
+      - name: Smoke test endpoints
+        run: |
+          set -e
+          curl -sf http://127.0.0.1:18080/healthz
+          # Fresh DB → / should redirect to /setup
+          loc=$(curl -s -o /dev/null -w '%{redirect_url}' http://127.0.0.1:18080/)
+          echo "redirect=$loc"
+          echo "$loc" | grep -q '/setup$'
+          # /setup, /how-it-works, /download, APK all return 200
+          for path in /setup /how-it-works /download/family-guardian.apk /download/qr.svg; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:18080$path")
+            echo "$path -> HTTP $code"
+            [ "$code" = "200" ]
+          done
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker compose logs --tail 200
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

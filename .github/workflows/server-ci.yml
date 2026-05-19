@@ -2,16 +2,24 @@ name: Server CI
 
 on:
   push:
-    branches: [main]
-    paths: ['server/**']
+    branches: [master, main]
+    paths:
+      - 'server/**'
+      - '.github/workflows/server-ci.yml'
   pull_request:
-    branches: [main]
-    paths: ['server/**']
+    branches: [master, main]
+    paths:
+      - 'server/**'
+      - '.github/workflows/server-ci.yml'
+
+permissions:
+  contents: read
 
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         node-version: [20, 22]
     defaults:
@@ -23,6 +31,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-      - run: npm install
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
       - run: npm run lint
       - run: npm test
