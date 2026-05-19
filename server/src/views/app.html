@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#061b16" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Family Guardian" />
+  <title>Family Guardian App</title>
+  <link rel="manifest" href="/public/app-mobile/manifest.webmanifest" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/public/app-mobile/icon-180.png" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="/public/app-mobile/app.css" />
+</head>
+<body>
+  <div id="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">{{CIRCLE_NAME}}</div>
+        <h1>Family Guardian</h1>
+      </div>
+      <a class="ghost" href="/dashboard">Web</a>
+    </header>
+
+    <main>
+      <section id="map-view" class="screen active">
+        <div id="mobile-map"></div>
+        <div class="map-card glass">
+          <div class="row spread">
+            <div>
+              <div class="eyebrow">Live Circle</div>
+              <strong id="active-count">0 active</strong>
+            </div>
+            <button id="locate-me" class="pill">Center</button>
+          </div>
+          <div id="location-status" class="notice">Location sharing is off.</div>
+          <div class="quick-grid">
+            <button id="share-location" class="primary">Share GPS</button>
+            <button id="sos-button" class="danger">SOS</button>
+            <button data-checkin="safe_home" class="soft">Safe home</button>
+            <button data-checkin="heading_home" class="soft">Heading home</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="members-view" class="screen panel-screen">
+        <div class="section-head"><h2>Members</h2><button id="refresh-members" class="pill">Refresh</button></div>
+        <div id="member-list" class="cards"></div>
+        <div id="member-detail" class="detail hidden"></div>
+      </section>
+
+      <section id="chat-view" class="screen panel-screen">
+        <div class="section-head"><h2>Family Chat</h2><span id="ws-state" class="badge">offline</span></div>
+        <div id="chat-list" class="chat-list"></div>
+        <form id="chat-form" class="composer">
+          <input id="chat-input" maxlength="2000" autocomplete="off" placeholder="Message your circle" />
+          <button class="primary" type="submit">Send</button>
+        </form>
+      </section>
+
+      <section id="places-view" class="screen panel-screen">
+        <div class="section-head"><h2>Places</h2><button id="place-use-map" class="pill">Use map center</button></div>
+        <form id="place-form" class="stack card">
+          <input id="place-name" required maxlength="64" placeholder="Place name" />
+          <input id="place-address" maxlength="256" placeholder="Address/label optional" />
+          <div class="split"><input id="place-lat" required inputmode="decimal" placeholder="Latitude" /><input id="place-lng" required inputmode="decimal" placeholder="Longitude" /></div>
+          <input id="place-radius" required inputmode="decimal" value="150" placeholder="Radius meters" />
+          <label><input id="place-enter" type="checkbox" checked /> Alert on enter</label>
+          <label><input id="place-exit" type="checkbox" checked /> Alert on exit</label>
+          <button class="primary" type="submit">Save place</button>
+        </form>
+        <div id="places-list" class="cards"></div>
+      </section>
+
+      <section id="alerts-view" class="screen panel-screen">
+        <div class="section-head"><h2>Alerts</h2><button id="save-alerts" class="pill">Save</button></div>
+        <div class="card stack">
+          <label><input id="speeding-enabled" type="checkbox" /> Speeding alerts</label>
+          <input id="speeding-threshold" inputmode="decimal" placeholder="Speed threshold mph" />
+          <label><input id="battery-enabled" type="checkbox" /> Low battery alerts</label>
+          <input id="battery-threshold" inputmode="numeric" placeholder="Battery threshold %" />
+          <label><input id="offline-enabled" type="checkbox" /> Offline alerts</label>
+          <input id="offline-minutes" inputmode="numeric" placeholder="Offline minutes" />
+        </div>
+        <div id="alerts-list" class="cards"></div>
+      </section>
+
+      <section id="more-view" class="screen panel-screen">
+        <h2>More</h2>
+        <div class="card stack">
+          <p><strong>iPhone PWA mode:</strong> GPS reports while this app is open. iOS may pause web apps in the background.</p>
+          <a class="primary link-button" href="/docs/ios-pwa.html">PWA instructions</a>
+          <a class="soft link-button" href="/docs/ios-native-sideloading.html">Native sideload instructions</a>
+          <a class="soft link-button" href="/settings">Circle settings</a>
+          <form method="POST" action="/api/auth/logout"><button class="danger" type="submit">Log out</button></form>
+        </div>
+      </section>
+    </main>
+
+    <nav class="tabbar">
+      <button class="tab active" data-tab="map-view">Map</button>
+      <button class="tab" data-tab="members-view">Members</button>
+      <button class="tab" data-tab="chat-view">Chat</button>
+      <button class="tab" data-tab="places-view">Places</button>
+      <button class="tab" data-tab="alerts-view">Alerts</button>
+      <button class="tab" data-tab="more-view">More</button>
+    </nav>
+  </div>
+  <div id="toast-host"></div>
+  <script>window.__GUARDIAN_APP_STATE__ = {{{INITIAL_STATE_JSON}}};</script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/public/units.js"></script>
+  <script src="/public/app-mobile/app.js"></script>
+</body>
+</html>
+

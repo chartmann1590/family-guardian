@@ -77,6 +77,11 @@ await fastify.register(staticPlugin, {
     root: join(__dirname, 'public'),
     prefix: '/public/',
 });
+await fastify.register(staticPlugin, {
+    root: join(__dirname, '..', '..', 'docs'),
+    prefix: '/docs/',
+    decorateReply: false,
+});
 
 await fastify.register(authRoutes, { db });
 await fastify.register(circleRoutes, { db });

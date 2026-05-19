@@ -13,8 +13,8 @@ android {
         applicationId = "com.familyguardian"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = (providers.gradleProperty("FG_VERSION_CODE").orNull ?: "1").toInt()
+        versionName = providers.gradleProperty("FG_VERSION_NAME").orNull ?: "0.1.0"
     }
 
     // Reads keystore details from ~/.gradle/gradle.properties so the keystore

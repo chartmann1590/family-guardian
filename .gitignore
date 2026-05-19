@@ -36,6 +36,14 @@ android/**/build/
 android/.cxx/
 *.iml
 
+# Expo / iOS app
+ios-app/node_modules/
+ios-app/.expo/
+ios-app/ios/
+ios-app/android/
+ios-app/build/
+ios-app/FamilyGuardian-unsigned.ipa
+
 # OS / editor
 .DS_Store
 Thumbs.db

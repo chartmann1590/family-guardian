@@ -2,7 +2,7 @@
 <html class="light" lang="en"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Family Guardian — How it works</title>
+<title>Family Guardian â€” How it works</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
@@ -49,7 +49,7 @@
             <li><strong>1. An admin sets up the server</strong> by running <code class="bg-surface-container px-1 rounded">docker compose up</code>. The very first visit walks them through making an admin account and a "family circle".</li>
             <li><strong>2. The admin invites family members</strong> by tapping "Invite family" on the dashboard. That produces a one-time link + QR code that expires in 24 hours.</li>
             <li><strong>3. Each family member opens the link / scans the QR</strong>, picks a password, and lands on the dashboard.</li>
-            <li><strong>4. Everyone installs the Android app</strong> from <code class="bg-surface-container px-1 rounded">/download</code>. The app reports background GPS to your server and gets push-style alerts via WebSocket while the app is alive (FCM optional for deep-sleep).</li>
+            <li><strong>4. Everyone installs a phone client</strong> from <code class="bg-surface-container px-1 rounded">/download</code>. Android and native iOS report background GPS; the iPhone PWA reports GPS while open. All clients use the same server APIs and WebSocket events.</li>
             <li><strong>5. The dashboard shows everyone on a live map</strong>. SOS, chat, geofences, and check-ins all run through the same server.</li>
         </ol>
     </section>
@@ -58,7 +58,7 @@
         <h2 class="text-xl font-bold mb-3 flex items-center gap-2"><span class="material-symbols-outlined text-secondary">lock</span> Privacy</h2>
         <ul class="space-y-2 list-disc list-inside text-on-surface-variant">
             <li>Location data is stored in a SQLite file on your server. Nothing leaves the box.</li>
-            <li>The Android app talks straight to your server — there is no Family Guardian cloud account.</li>
+            <li>The Android app talks straight to your server â€” there is no Family Guardian cloud account.</li>
             <li>Push notifications via Firebase are <em>optional</em>; if you don't configure them, the in-app WebSocket still delivers everything while the app is running.</li>
             <li>The web session cookie is HTTP-only. Set <code>NODE_ENV=production</code> to require HTTPS for cookies.</li>
         </ul>
@@ -68,9 +68,9 @@
         <h2 class="text-xl font-bold mb-3 flex items-center gap-2"><span class="material-symbols-outlined text-secondary">person_add</span> Adding family members</h2>
         <p class="text-base mb-3">On the dashboard, tap <strong>Invite family</strong>. You'll get three things:</p>
         <ul class="space-y-2 list-disc list-inside text-on-surface-variant">
-            <li>A <strong>share link</strong> — text it / AirDrop / drop it in any chat. They tap, sign up, done.</li>
-            <li>A <strong>QR code</strong> — for in-person setup. The recipient points their camera at the screen.</li>
-            <li>An <strong>8-character code</strong> — for typing into the Android app's "I have an invite" field.</li>
+            <li>A <strong>share link</strong> â€” text it / AirDrop / drop it in any chat. They tap, sign up, done.</li>
+            <li>A <strong>QR code</strong> â€” for in-person setup. The recipient points their camera at the screen.</li>
+            <li>An <strong>8-character code</strong> â€” for typing into the Android app's "I have an invite" field.</li>
         </ul>
         <p class="text-sm text-on-surface-variant mt-3">Invites are one-time and expire in 24h. You can mint as many as you need.</p>
     </section>
@@ -79,7 +79,7 @@
         <h2 class="text-xl font-bold mb-3 flex items-center gap-2"><span class="material-symbols-outlined text-secondary">android</span> Installing on Android</h2>
         <p class="text-base mb-3">Two ways:</p>
         <ol class="space-y-3">
-            <li><strong>Sideload from the server</strong>: open <a href="/download" class="text-primary underline">/download</a> in the device's browser. The APK is baked into the server image. Allow your browser to install unknown sources.</li>
+            <li><strong>Install from the server</strong>: open <a href="/download" class="text-primary underline">/download</a>. Android users can sideload the APK; iPhone users can install the PWA or follow the native sideloading guide.</li>
             <li><strong>Build from source</strong>: open the <code>android/</code> module in Android Studio, attach your phone, hit Run.</li>
         </ol>
     </section>
@@ -96,18 +96,20 @@
         </details>
         <details class="bg-surface-container-low rounded-lg p-4 mb-2">
             <summary class="font-semibold cursor-pointer">Can I run this outside my LAN?</summary>
-            <p class="mt-2 text-on-surface-variant">Yes — put a reverse proxy (Caddy, Traefik, nginx) in front with TLS. The Android app permits cleartext only for the simple LAN case; flip to HTTPS for anything beyond your house.</p>
+            <p class="mt-2 text-on-surface-variant">Yes â€” put a reverse proxy (Caddy, Traefik, nginx) in front with TLS. The Android app permits cleartext only for the simple LAN case; flip to HTTPS for anything beyond your house.</p>
         </details>
         <details class="bg-surface-container-low rounded-lg p-4 mb-2">
             <summary class="font-semibold cursor-pointer">How do I get notifications when the app is closed?</summary>
-            <p class="mt-2 text-on-surface-variant">Set up Firebase Cloud Messaging (see <code>README.md</code> → "Push notifications"). It's optional — if you skip it, the in-app WebSocket still covers all events while Family Guardian is running on the device.</p>
+            <p class="mt-2 text-on-surface-variant">Set up Firebase Cloud Messaging (see <code>README.md</code> â†’ "Push notifications"). It's optional â€” if you skip it, the in-app WebSocket still covers all events while Family Guardian is running on the device.</p>
         </details>
     </section>
 
     <footer class="border-t border-outline-variant/30 pt-6 text-sm text-on-surface-variant">
-        <a href="/dashboard" class="text-primary underline">Back to dashboard</a> · <a href="https://github.com/" class="underline">Source</a> · <a href="https://buymeacoffee.com/charleshartmann" target="_blank" rel="noopener" class="text-amber-600 underline">☕ Support the developer</a> · AGPLv3
+        <a href="/dashboard" class="text-primary underline">Back to dashboard</a> Â· <a href="https://github.com/" class="underline">Source</a> Â· <a href="https://buymeacoffee.com/charleshartmann" target="_blank" rel="noopener" class="text-amber-600 underline">â˜• Support the developer</a> Â· AGPLv3
     </footer>
 
 </main>
 
 </body></html>
+
+

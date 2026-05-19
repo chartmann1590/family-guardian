@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Family Guardian",
+    "slug": "family-guardian-ios",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "familyguardian",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "ios": {
+      "bundleIdentifier": "com.familyguardian.ios",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Family Guardian shares your location with your private family circle.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Family Guardian needs background location to keep your family map current.",
+        "NSLocationAlwaysUsageDescription": "Family Guardian needs background location to keep your family map current.",
+        "UIBackgroundModes": ["location", "fetch", "remote-notification"],
+        "NSLocalNetworkUsageDescription": "Family Guardian connects to your self-hosted server on your local network.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
+    "plugins": [
+      ["expo-location", { "locationAlwaysAndWhenInUsePermission": "Allow Family Guardian to update your family map in the background." }],
+      "expo-secure-store",
+      "expo-notifications"
+    ]
+  }
+}
+
+

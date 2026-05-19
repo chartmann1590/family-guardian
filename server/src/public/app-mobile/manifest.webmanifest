@@ -1,0 +1,15 @@
+{
+  "name": "Family Guardian",
+  "short_name": "Guardian",
+  "description": "Self-hosted family safety app for iPhone and Android.",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#eef7f0",
+  "theme_color": "#061b16",
+  "icons": [
+    { "src": "/public/app-mobile/icon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/public/app-mobile/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
+

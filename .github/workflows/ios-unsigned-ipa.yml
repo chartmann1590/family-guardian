@@ -1,0 +1,82 @@
+name: iOS Unsigned IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master, main]
+    paths:
+      - 'ios-app/**'
+      - '.github/workflows/ios-unsigned-ipa.yml'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'ios-app/**'
+      - '.github/workflows/ios-unsigned-ipa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-unsigned-ipa:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: ios-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ios-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Generate native iOS project
+        run: npx expo prebuild --platform ios --non-interactive
+
+      - name: Install CocoaPods
+        run: pod install --project-directory=ios
+
+      - name: Build unsigned iPhoneOS app
+        run: |
+          set -euo pipefail
+          WORKSPACE=$(ls ios/*.xcworkspace | head -n 1)
+          if [ -z "$WORKSPACE" ]; then echo "No .xcworkspace found in ios/"; exit 1; fi
+          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list -json \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["workspace"]["schemes"][0])')
+          echo "Using workspace=$WORKSPACE scheme=$SCHEME"
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          APP_PATH=$(find build/Build/Products/Release-iphoneos -name '*.app' -maxdepth 1 | head -n 1)
+          if [ -z "$APP_PATH" ]; then echo "No .app found"; exit 1; fi
+          rm -rf Payload FamilyGuardian-unsigned.ipa
+          mkdir Payload
+          cp -R "$APP_PATH" Payload/FamilyGuardian.app
+          zip -qry FamilyGuardian-unsigned.ipa Payload
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: FamilyGuardian-unsigned-ipa
+          path: ios-app/FamilyGuardian-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
+

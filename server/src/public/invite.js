@@ -76,10 +76,12 @@
     // --- Install Android app ---
 
     function fillInstall() {
-        const url = `${location.origin}/download/family-guardian.apk`;
+        const url = `${location.origin}/download`;
         $('install-link').value = url;
-        $('install-qr').innerHTML = `<img src="/download/qr.svg" alt="Install QR" width="220" height="220"/>`;
+        $('install-qr').innerHTML = `<img src="/download/app-qr.svg" alt="Install QR" width="220" height="220"/>`;
     }
 
     $('open-install').addEventListener('click', () => { open(installModal); fillInstall(); });
 })();
+
+

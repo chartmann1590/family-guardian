@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>iOS Native Sideloading</title><style>body{font-family:system-ui,sans-serif;max-width:860px;margin:0 auto;padding:32px 18px;line-height:1.55;color:#071b24}code,pre{background:#eef7f0;border-radius:8px;padding:2px 6px}li{margin:.5rem 0}.warn{background:#fff4d8;border:1px solid #f1c36d;border-radius:16px;padding:14px}</style></head><body>
+<h1>Native iOS sideloading</h1>
+<p>Family Guardian can build an unsigned iOS IPA in GitHub Actions. You do not need a Mac locally. A stock iPhone still requires Apple signing at install time, so use a free Apple ID with Sideloadly or AltStore on Windows.</p>
+<div class="warn"><strong>Free Apple ID limitation:</strong> free sideloaded apps usually need to be refreshed or reinstalled every 7 days. A paid Apple Developer Program account improves distribution, but is not required for this free path.</div>
+<h2>Build the IPA</h2>
+<ol><li>Open the repository on GitHub.</li><li>Go to <strong>Actions</strong> -> <strong>iOS Unsigned IPA</strong>.</li><li>Run the workflow manually, or let it run on changes under <code>ios-app/</code>.</li><li>Download the <code>FamilyGuardian-unsigned-ipa</code> artifact.</li></ol>
+<h2>Install from Windows</h2>
+<ol><li>Install Sideloadly or AltStore.</li><li>Connect the iPhone over USB and trust the computer.</li><li>Select <code>FamilyGuardian-unsigned.ipa</code>.</li><li>Sign with your free Apple ID and install.</li><li>On the iPhone, trust the developer profile if iOS asks.</li></ol>
+<h2>Testing</h2>
+<ol><li>Run the Family Guardian server on your LAN with <code>docker compose up --build</code>.</li><li>Open the iOS app and set the server URL to <code>http://YOUR-LAN-IP:8080</code>.</li><li>Sign in or join with an invite code.</li><li>Grant location permissions. Choose <strong>Always</strong> for background location testing.</li><li>Verify the iPhone marker appears in the dashboard and Android app.</li></ol>
+<h2>Known limits</h2>
+<ul><li>No APNs remote push in v1. The app uses local notifications for WebSocket events while running.</li><li>Background GPS depends on iOS permission and power management.</li><li>The unsigned IPA is not installable directly; Sideloadly/AltStore signs it during install.</li></ul>
+</body></html>
+

@@ -34,9 +34,16 @@ After signing in you land on `/dashboard` — a Leaflet map with one marker per 
 
 ## Quickstart — Android app
 
-You have two options to install the Android app:
+You have three options to install the Android app:
 
-**Option A — sideload a pre-built debug APK from your server** (fastest):
+**Option A — download from GitHub Releases** (easiest, no build required):
+
+Every push to `master` produces a tagged release at
+[Releases](https://github.com/chartmann1590/family-guardian/releases/latest).
+Grab the latest `family-guardian-<version>.apk`, transfer to the phone, and tap
+to install. Allow "Install from unknown sources" for your browser/file manager.
+
+**Option B — sideload a pre-built debug APK from your server**:
 
 ```bash
 # From the repo root, before `docker compose build`:
@@ -49,7 +56,7 @@ Then on the device's browser, open `http://<server-host>:8080/download` and inst
 (allow "Install from unknown sources" for your browser). The image bakes the APK in at build
 time; the server exposes it at `/download/family-guardian.apk`.
 
-**Option B — build and run from Android Studio**:
+**Option C — build and run from Android Studio**:
 
 1. Open `android/` in Android Studio (Hedgehog or newer). Let Gradle sync.
 2. Run on a device or emulator with location services enabled.
@@ -60,6 +67,32 @@ On first launch, enter:
 
 Grant location + background-location + notification permissions when prompted.
 The foreground service starts; within ~30s your marker appears on the web dashboard.
+
+## Quickstart — iPhone clients
+
+Family Guardian has two iPhone paths:
+
+**PWA (no build, no signing):** open `http://<server-host>:8080/app` in Safari,
+sign in, then Share → Add to Home Screen. The web app gives you full feature
+parity (map, members, chat, places, alerts, SOS, check-ins). The only
+limitation iOS imposes is **no reliable background GPS** — location only
+reports while the PWA is open. Great for parents/admins; use the native app
+for users who need background tracking. See
+[`docs/ios-pwa.html`](docs/ios-pwa.html).
+
+**Native sideload (real background GPS):** download the latest
+`FamilyGuardian-<version>-unsigned.ipa` from
+[Releases](https://github.com/chartmann1590/family-guardian/releases/latest),
+then sign and install it on Windows or macOS with **Sideloadly** or **AltStore**
+using a free Apple ID. The free-Apple-ID signature expires after 7 days — just
+re-sign when iOS prompts you. See
+[`docs/ios-native-sideloading.html`](docs/ios-native-sideloading.html).
+
+## Downloads
+
+Each push to `master` produces a versioned GitHub release with both the Android
+APK and the iOS IPA attached. Find them at
+[Releases](https://github.com/chartmann1590/family-guardian/releases/latest).
 
 ## Configuration
 
@@ -213,4 +246,3 @@ Still on the table:
 If Family Guardian is useful to your family, consider buying the developer a coffee — it helps cover server costs and fuels new features.
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?style=flat-square&logo=buy-me-a-coffee&logoColor=white&labelColor=FFDD00)](https://buymeacoffee.com/charleshartmann)
-

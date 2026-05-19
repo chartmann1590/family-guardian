@@ -197,6 +197,97 @@ export default async function webRoutes(fastify, { db }) {
         );
     });
 
+    fastify.get('/app', async (req, reply) => {
+        const session = lookupSession(db, extractToken(req));
+        if (!session) return reply.redirect('/');
+
+        const circleRow = db
+            .prepare(
+                `SELECT c.id AS circleId, c.name AS circleName, cm.role AS role
+                 FROM circle_members cm JOIN circles c ON c.id = cm.circle_id
+                 WHERE cm.user_id = ? LIMIT 1`
+            )
+            .get(session.userId);
+        if (!circleRow) return reply.code(500).send('User has no circle.');
+
+        const members = db
+            .prepare(
+                `SELECT u.id AS userId, u.display_name AS displayName,
+                        u.photo_path AS photoPath,
+                        cm.role AS role,
+                        l.lat, l.lng, l.accuracy_m AS accuracyM,
+                        l.speed_mps AS speedMps, l.battery_pct AS batteryPct,
+                        l.bearing AS bearing, l.altitude_m AS altitudeM,
+                        l.activity AS activity, l.activity_confidence AS activityConfidence,
+                        l.recorded_at AS recordedAt, l.address
+                 FROM circle_members cm
+                 JOIN users u ON u.id = cm.user_id
+                 LEFT JOIN locations l ON l.user_id = u.id
+                 WHERE cm.circle_id = ?
+                 ORDER BY cm.role DESC, u.display_name COLLATE NOCASE ASC`
+            )
+            .all(circleRow.circleId)
+            .map(({ photoPath, ...m }) => ({
+                ...m,
+                photoUrl: photoPath ? `/api/users/${m.userId}/photo` : null,
+            }));
+
+        const places = db
+            .prepare(
+                `SELECT id, circle_id AS circleId, name, address, lat, lng,
+                        radius_m AS radiusM, alerts_on_enter AS alertsOnEnter,
+                        alerts_on_exit AS alertsOnExit
+                 FROM places WHERE circle_id = ? ORDER BY name COLLATE NOCASE`
+            )
+            .all(circleRow.circleId)
+            .map((p) => ({
+                ...p,
+                alertsOnEnter: !!p.alertsOnEnter,
+                alertsOnExit: !!p.alertsOnExit,
+            }));
+
+        const sosActive = db
+            .prepare(
+                `SELECT e.id, e.circle_id AS circleId, e.user_id AS userId,
+                        u.display_name AS displayName, e.started_at AS startedAt,
+                        e.lat, e.lng, e.accuracy_m AS accuracyM, e.note, e.status
+                 FROM sos_events e JOIN users u ON u.id = e.user_id
+                 WHERE e.circle_id = ? AND e.status = 'active'
+                 ORDER BY e.started_at DESC`
+            )
+            .all(circleRow.circleId);
+
+        const latestCheckins = db
+            .prepare(
+                `SELECT c.user_id AS userId, c.status, c.created_at AS createdAt
+                 FROM check_ins c
+                 INNER JOIN (
+                     SELECT user_id, MAX(created_at) AS max_at
+                     FROM check_ins WHERE circle_id = ?
+                     GROUP BY user_id
+                 ) latest ON c.user_id = latest.user_id AND c.created_at = latest.max_at`
+            )
+            .all(circleRow.circleId);
+
+        const initialState = {
+            circleId: circleRow.circleId,
+            circleName: circleRow.circleName,
+            me: { userId: session.userId, displayName: session.displayName, role: circleRow.role },
+            members,
+            places,
+            sosActive,
+            latestCheckins,
+        };
+
+        send(
+            reply,
+            render('app.html', {
+                CIRCLE_NAME: circleRow.circleName,
+                INITIAL_STATE_JSON: JSON.stringify(initialState).replace(/</g, '\\u003c'),
+            }),
+        );
+    });
+
     fastify.get('/chat', async (req, reply) => {
         const session = lookupSession(db, extractToken(req));
         if (!session) return reply.redirect('/');
