@@ -23,10 +23,6 @@ const queue = [];           // { key, lat, lng, db, cb }
 let pumpScheduled = false;
 let lastFetchAt = 0;
 
-function roundKey(lat, lng) {
-    return `${lat.toFixed(4)},${lng.toFixed(4)}`;
-}
-
 function lruGet(key) {
     const v = lru.get(key);
     if (!v) return null;

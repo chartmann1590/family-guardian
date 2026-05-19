@@ -6,7 +6,6 @@ import { evaluateOfflineSweep } from './alerts.js';
 const OFFLINE_SWEEP_INTERVAL_MS = 60_000;
 const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1_000;
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
 
 export function startScheduler(db, log) {
     const offlineTick = () => {
