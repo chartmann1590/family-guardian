@@ -70,7 +70,12 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
 });
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false }),
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
 });
 
 function inferActivity(speed?: number | null) {
