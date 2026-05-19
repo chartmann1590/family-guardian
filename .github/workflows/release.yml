@@ -119,6 +119,21 @@ jobs:
       - name: Generate native iOS project
         run: npx expo prebuild --platform ios --non-interactive
 
+      - name: Patch Podfile for Swift 5.9 + minimal strict-concurrency
+        # See ios-unsigned-ipa.yml for rationale (expo-modules-core 55.0.25 Swift 6 fix).
+        run: |
+          cat >> ios/Podfile <<'RUBY'
+
+          post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              target.build_configurations.each do |config|
+                config.build_settings['SWIFT_VERSION'] = '5.9'
+                config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'
+              end
+            end
+          end
+          RUBY
+
       - name: Install CocoaPods
         run: pod install --project-directory=ios
 
