@@ -46,6 +46,21 @@
     }
 
     $('open-invite').addEventListener('click', () => { open(inviteModal); mintInvite(); });
+
+    // Allow other pages to deep-link the modals via /dashboard?modal=invite (or install).
+    // Clean the URL after triggering so a refresh doesn't re-open the modal.
+    const params = new URLSearchParams(location.search);
+    const modal = params.get('modal');
+    if (modal === 'invite') {
+        history.replaceState(null, '', location.pathname);
+        open(inviteModal);
+        mintInvite();
+    } else if (modal === 'install') {
+        history.replaceState(null, '', location.pathname);
+        open(installModal);
+        // fillInstall is defined below; call after a tick so DOM is ready.
+        setTimeout(() => fillInstall(), 0);
+    }
     $('invite-new').addEventListener('click', mintInvite);
     $('invite-copy').addEventListener('click', async () => {
         const link = $('invite-link').value;
