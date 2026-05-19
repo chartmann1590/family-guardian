@@ -1,61 +1,41 @@
+# Dependabot config — version-update PRs are disabled (open-pull-requests-limit: 0)
+# so the repo stays clean. Security updates still PR automatically when enabled
+# in repo settings (Settings → Code security → Dependabot security updates).
+# Bump these limits if you want regular version-update PRs again.
+
 version: 2
 updates:
-  # npm — server
   - package-ecosystem: npm
     directory: '/server'
     schedule:
       interval: weekly
-      day: monday
-      time: '07:00'
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     labels: [dependencies, server]
-    groups:
-      dev-dependencies:
-        dependency-type: development
-      production-dependencies:
-        dependency-type: production
-        update-types: [patch, minor]
 
-  # npm — e2e test harness
   - package-ecosystem: npm
     directory: '/e2e'
     schedule:
       interval: weekly
-      day: monday
-      time: '07:00'
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     labels: [dependencies, e2e]
 
-  # gradle — android app
   - package-ecosystem: gradle
     directory: '/android'
     schedule:
       interval: weekly
-      day: monday
-      time: '07:00'
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     labels: [dependencies, android]
-    ignore:
-      # Android Gradle Plugin needs Gradle wrapper bumps in lockstep — review manually.
-      - dependency-name: com.android.application
-      - dependency-name: com.android.library
 
-  # GitHub Actions
   - package-ecosystem: github-actions
     directory: '/'
     schedule:
       interval: weekly
-      day: monday
-      time: '07:00'
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     labels: [dependencies, ci]
 
-  # Docker base image
   - package-ecosystem: docker
     directory: '/server'
     schedule:
       interval: weekly
-      day: monday
-      time: '07:00'
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     labels: [dependencies, docker]
