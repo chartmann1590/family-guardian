@@ -40,25 +40,39 @@ jobs:
       - name: Generate native iOS project
         run: npx expo prebuild --platform ios --non-interactive
 
-      - name: Patch Podfile for Swift 5.9 + minimal strict-concurrency
+      - name: Patch Podfile post_install for Swift 5.9 + minimal strict-concurrency
         # expo-modules-core 55.0.25 uses Swift 5.9 syntax (@MainActor on protocol
-        # conformance, line 45 of SwiftUIHostingView.swift) but RN's default
-        # post_install sets SWIFT_VERSION=5.0 on every Pod target, which rejects it.
-        # Append a second post_install hook (runs after RN's) to bump SWIFT_VERSION
-        # to 5.9 and force SWIFT_STRICT_CONCURRENCY=minimal so Xcode 16.4's Swift 6
-        # compiler doesn't flag expo-modules-core's actor-isolation gaps as errors.
+        # conformance at SwiftUIHostingView.swift:45) but RN's post_install pins
+        # SWIFT_VERSION=5.0 on every Pod target. Inject Swift 5.9 + minimal
+        # strict-concurrency overrides INSIDE the existing post_install block
+        # (CocoaPods rejects multiple post_install blocks).
         run: |
-          cat >> ios/Podfile <<'RUBY'
-
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              target.build_configurations.each do |config|
-                config.build_settings['SWIFT_VERSION'] = '5.9'
-                config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'
-              end
-            end
-          end
-          RUBY
+          python3 <<'PY'
+          import re, sys
+          p = "ios/Podfile"
+          src = open(p).read()
+          inject = (
+              "\n  installer.pods_project.targets.each do |t|\n"
+              "    t.build_configurations.each do |c|\n"
+              "      c.build_settings['SWIFT_VERSION'] = '5.9'\n"
+              "      c.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'\n"
+              "    end\n"
+              "  end\n"
+          )
+          # Find post_install block; inject before its closing `end` at column 0.
+          new, n = re.subn(
+              r"(post_install do \|installer\|.*?)(\nend(?:\s*$|\s*\n))",
+              r"\1" + inject + r"\2",
+              src, count=1, flags=re.DOTALL | re.MULTILINE,
+          )
+          if n == 0:
+              sys.stderr.write("ERROR: post_install block not found in Podfile\n")
+              sys.exit(1)
+          open(p, "w").write(new)
+          print(f"Patched ios/Podfile (injected {len(inject)} chars).")
+          PY
+          echo "--- Patched ios/Podfile ---"
+          cat ios/Podfile
 
       - name: Install CocoaPods
         run: pod install --project-directory=ios
