@@ -206,3 +206,11 @@ Still on the table:
 - FCM push notifications (optional) — would allow notifications when the Android app is killed
 - HTTPS termination inside the container (optional)
 
+---
+
+## ☕ Support the Project
+
+If Family Guardian is useful to your family, consider buying the developer a coffee — it helps cover server costs and fuels new features.
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?style=flat-square&logo=buy-me-a-coffee&logoColor=white&labelColor=FFDD00)](https://buymeacoffee.com/charleshartmann)
+

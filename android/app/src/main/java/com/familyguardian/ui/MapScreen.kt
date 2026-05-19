@@ -2,6 +2,7 @@ package com.familyguardian.ui
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Color
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Logout
@@ -578,6 +580,12 @@ fun MapScreen(
                                 TextButton(onClick = onOpenAlertHistory) {
                                     Icon(Icons.Filled.History, contentDescription = "Alert history")
                                 }
+                            }
+                            TextButton(onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://buymeacoffee.com/charleshartmann"))
+                                context.startActivity(intent)
+                            }) {
+                                Icon(Icons.Filled.Favorite, contentDescription = "Support the developer", tint = MaterialTheme.colorScheme.tertiary)
                             }
                             TextButton(onClick = {
                                 scope.launch {
