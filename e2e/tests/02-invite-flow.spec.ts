@@ -24,7 +24,8 @@ test.describe('invite flow', () => {
         // Modal renders with the invite content once minted.
         await expect(page.locator('#invite-content')).toBeVisible({ timeout: 10_000 });
         const code = await page.locator('#invite-code').textContent();
-        expect(code?.trim()).toMatch(/^[A-Z0-9]{6,8}$/);
+        // generateInviteCode uses base64url, which after uppercasing yields A-Z0-9_-
+        expect(code?.trim()).toMatch(/^[A-Z0-9_-]{6,8}$/);
         await expect(page.locator('#invite-qr svg')).toBeVisible();
         const linkVal = await page.locator('#invite-link').inputValue();
         expect(linkVal).toContain('/join?code=');
