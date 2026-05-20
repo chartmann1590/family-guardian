@@ -301,7 +301,7 @@ fun ServerConfigScreen(onLoggedIn: () -> Unit) {
                 }
 
                 Text(
-                    "Your server URL is the address of the GuardianMesh Docker container you control.",
+                    "Your server URL is the address of the Family Guardian Docker container you control.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp),

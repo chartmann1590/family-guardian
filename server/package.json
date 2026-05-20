@@ -1,7 +1,7 @@
 {
     "name": "guardianmesh-server",
     "version": "0.1.0",
-    "description": "Self-hosted Family Guardian / GuardianMesh server",
+    "description": "Self-hosted Family Guardian server",
     "type": "module",
     "private": true,
     "main": "src/index.js",

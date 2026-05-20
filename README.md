@@ -1,4 +1,4 @@
-# Family Guardian / GuardianMesh
+# Family Guardian
 
 Self-hosted family safety platform — a Docker-deployed server, a native Kotlin **Android** app, an Expo **iOS** app (sideloadable IPA or build-from-source), and a fully-featured **PWA** for any browser. The server runs on infrastructure you control; location data never leaves your box.
 

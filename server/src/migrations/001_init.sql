@@ -1,4 +1,4 @@
--- Family Guardian / GuardianMesh — initial schema
+-- Family Guardian — initial schema
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 

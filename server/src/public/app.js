@@ -1,4 +1,4 @@
-// GuardianMesh dashboard client
+// Family Guardian dashboard client
 // - Renders Leaflet map with one marker per circle member
 // - Opens WebSocket and applies `location_update` events live
 // - Refreshes the sidebar member list

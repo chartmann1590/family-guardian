@@ -2,7 +2,7 @@
 <html class="light" lang="en"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>GuardianMesh — Sign in</title>
+<title>Family Guardian — Sign in</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
@@ -58,7 +58,7 @@
     <section class="flex flex-col gap-6 p-6 md:p-12 rounded-xl bg-surface-container-low shadow-[0_4px_12px_rgba(15,23,42,0.08)]">
         <div class="flex items-center gap-3">
             <span class="material-symbols-outlined text-primary text-4xl">shield_lock</span>
-            <h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary">GuardianMesh</h1>
+            <h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary">Family Guardian</h1>
         </div>
         <div class="space-y-4">
             <h2 class="font-headline-md text-headline-md text-on-surface">Your Family. Your Data. Your Server.</h2>
@@ -89,7 +89,7 @@
         <div class="bg-surface rounded-xl shadow-[0_12px_24px_rgba(15,23,42,0.15)] p-8 border border-outline-variant/20">
             <div class="text-center mb-6">
                 <h2 id="form-title" class="font-headline-md text-headline-md text-primary mb-2">Sign in</h2>
-                <p id="form-subtitle" class="font-body-md text-body-md text-on-surface-variant">Access your GuardianMesh dashboard.</p>
+                <p id="form-subtitle" class="font-body-md text-body-md text-on-surface-variant">Access your Family Guardian dashboard.</p>
             </div>
 
             <!-- Mode tabs (non-bootstrap only) -->
@@ -129,7 +129,7 @@
                 </div>
                 <button type="submit"
                     class="w-full flex justify-center items-center py-3 px-4 rounded-lg font-label-md text-label-md text-on-primary bg-primary hover:bg-primary/90">
-                    Deploy GuardianMesh
+                    Deploy Family Guardian
                     <span class="material-symbols-outlined ml-2 text-sm">rocket_launch</span>
                 </button>
             </form>
@@ -223,7 +223,7 @@
             (!isLogin ? 'bg-surface text-primary shadow-sm' : 'text-on-surface-variant');
         title.textContent = isLogin ? 'Sign in' : 'Join the circle';
         subtitle.textContent = isLogin
-            ? 'Access your GuardianMesh dashboard.'
+            ? 'Access your Family Guardian dashboard.'
             : 'Use the invite code your family admin shared with you.';
         clearAlert();
     }
@@ -231,7 +231,7 @@
     if (BOOTSTRAP) {
         signupForm.classList.remove('hidden');
         title.textContent = 'Create admin account';
-        subtitle.textContent = 'Initialize your secure GuardianMesh circle.';
+        subtitle.textContent = 'Initialize your secure Family Guardian circle.';
     } else {
         tabs.classList.remove('hidden');
         tabs.classList.add('flex');
