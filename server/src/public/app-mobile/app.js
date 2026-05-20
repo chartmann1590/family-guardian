@@ -2,10 +2,12 @@
   const state = window.__GUARDIAN_APP_STATE__;
   if (!state) return;
 
+  const API_BASE = location.origin;
   const api = {
     async json(path, options = {}) {
-      if (typeof path !== 'string' || !path.startsWith('/')) throw new Error('Invalid API path');
-      const res = await fetch(path, {
+      const url = new URL(path, API_BASE);
+      if (url.origin !== API_BASE) throw new Error('Invalid API path');
+      const res = await fetch(url.pathname + url.search, {
         credentials: 'same-origin',
         headers: { 'Accept': 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) },
         ...options,
@@ -93,6 +95,18 @@
     const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     return sameDay ? time : `${d.toLocaleDateString()} ${time}`;
   }
+  function appendAvatar(container, m) {
+    if (m.photoUrl) {
+      const img = document.createElement('img');
+      img.src = m.photoUrl;
+      img.alt = initials(m.displayName);
+      container.appendChild(img);
+    } else {
+      const span = document.createElement('span');
+      span.textContent = initials(m.displayName);
+      container.appendChild(span);
+    }
+  }
   function renderMembers() {
     let active = 0;
     const list = $('member-list');
@@ -102,8 +116,32 @@
       upsertMarker(m);
       const div = document.createElement('button');
       div.className = 'card member-card';
-      const pauseLine = m.paused ? `<div class="meta" style="color:#943700">⏸ Paused${m.pausedUntil ? ' until ' + escapeHtml(fmtPauseUntil(m.pausedUntil)) : ''}</div>` : '';
-      div.innerHTML = `<div class="avatar">${avatarHtml(m)}</div><div style="text-align:left;min-width:0"><strong>${escapeHtml(m.displayName)}</strong><div class="meta">${escapeHtml(m.address || (m.lat != null ? `${m.lat.toFixed(4)}, ${m.lng.toFixed(4)}` : 'No location yet'))}</div><div class="meta">${rel(m.recordedAt)}${m.batteryPct != null ? ` · ${m.batteryPct}%` : ''}</div>${pauseLine}</div>`;
+      const avatarDiv = document.createElement('div');
+      avatarDiv.className = 'avatar';
+      appendAvatar(avatarDiv, m);
+      const info = document.createElement('div');
+      info.style.textAlign = 'left';
+      info.style.minWidth = '0';
+      const nameEl = document.createElement('strong');
+      nameEl.textContent = m.displayName || '';
+      const addrEl = document.createElement('div');
+      addrEl.className = 'meta';
+      addrEl.textContent = m.address || (m.lat != null ? `${m.lat.toFixed(4)}, ${m.lng.toFixed(4)}` : 'No location yet');
+      const metaEl = document.createElement('div');
+      metaEl.className = 'meta';
+      metaEl.textContent = `${rel(m.recordedAt)}${m.batteryPct != null ? ` · ${m.batteryPct}%` : ''}`;
+      info.appendChild(nameEl);
+      info.appendChild(addrEl);
+      info.appendChild(metaEl);
+      if (m.paused) {
+        const pauseEl = document.createElement('div');
+        pauseEl.className = 'meta';
+        pauseEl.style.color = '#943700';
+        pauseEl.textContent = `⏸ Paused${m.pausedUntil ? ' until ' + fmtPauseUntil(m.pausedUntil) : ''}`;
+        info.appendChild(pauseEl);
+      }
+      div.appendChild(avatarDiv);
+      div.appendChild(info);
       div.addEventListener('click', () => openMember(m.userId));
       list.appendChild(div);
     }
