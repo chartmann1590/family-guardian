@@ -56,9 +56,10 @@ html { scroll-behavior: smooth; }
     </a>
     <div class="hidden md:flex items-center gap-8 text-sm text-white/70">
       <a href="#features" class="hover:text-white transition">Features</a>
+      <a href="#screenshots" class="hover:text-white transition">Screenshots</a>
       <a href="#how-it-works" class="hover:text-white transition">How It Works</a>
       <a href="#download" class="hover:text-white transition">Download</a>
-      <a href="#self-hosted" class="hover:text-white transition">Self-Hosted</a>
+      <a href="ios-pwa.html" class="hover:text-white transition">iOS</a>
       <a href="privacy.html" class="hover:text-white transition">Privacy</a>
     </div>
     <div class="flex items-center gap-3">
@@ -185,8 +186,82 @@ html { scroll-behavior: smooth; }
   </div>
 </section>
 
+<!-- Screenshots -->
+<section id="screenshots" class="py-24 bg-surface">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="text-center mb-16 fade-in">
+      <h2 class="text-3xl font-bold mb-4">Real screenshots from a real install</h2>
+      <p class="text-navy/50 max-w-2xl mx-auto">Captured from a Pixel 8 Pro running the latest debug APK and the Leaflet dashboard at <code class="bg-white border border-navy/5 px-1.5 py-0.5 rounded text-xs">localhost:8090</code>. Not stock photos.</p>
+    </div>
+
+    <h3 class="text-xl font-semibold mb-6 text-navy/70 fade-in">Web dashboard (PWA)</h3>
+    <div class="grid md:grid-cols-3 gap-4 mb-12 fade-in">
+      <a href="screenshots/pwa-dashboard-desktop.png" target="_blank" class="block group">
+        <img src="screenshots/pwa-dashboard-desktop.png" alt="PWA dashboard with live map" class="w-full rounded-lg border border-navy/10 group-hover:border-emerald/40 transition" loading="lazy"/>
+        <p class="text-center text-sm text-navy/50 mt-2">Live map dashboard</p>
+      </a>
+      <a href="screenshots/pwa-places-desktop.png" target="_blank" class="block group">
+        <img src="screenshots/pwa-places-desktop.png" alt="PWA safety places editor" class="w-full rounded-lg border border-navy/10 group-hover:border-emerald/40 transition" loading="lazy"/>
+        <p class="text-center text-sm text-navy/50 mt-2">Safety places (geofences)</p>
+      </a>
+      <a href="screenshots/pwa-download-desktop.png" target="_blank" class="block group">
+        <img src="screenshots/pwa-download-desktop.png" alt="PWA download page" class="w-full rounded-lg border border-navy/10 group-hover:border-emerald/40 transition" loading="lazy"/>
+        <p class="text-center text-sm text-navy/50 mt-2">App download page with QR</p>
+      </a>
+      <a href="screenshots/pwa-chat-desktop.png" target="_blank" class="block group">
+        <img src="screenshots/pwa-chat-desktop.png" alt="PWA family chat" class="w-full rounded-lg border border-navy/10 group-hover:border-emerald/40 transition" loading="lazy"/>
+        <p class="text-center text-sm text-navy/50 mt-2">Family chat</p>
+      </a>
+      <a href="screenshots/pwa-settings-desktop.png" target="_blank" class="block group">
+        <img src="screenshots/pwa-settings-desktop.png" alt="PWA settings" class="w-full rounded-lg border border-navy/10 group-hover:border-emerald/40 transition" loading="lazy"/>
+        <p class="text-center text-sm text-navy/50 mt-2">Admin settings &amp; invites</p>
+      </a>
+      <a href="screenshots/pwa-how-it-works-desktop.png" target="_blank" class="block group">
+        <img src="screenshots/pwa-how-it-works-desktop.png" alt="PWA how it works page" class="w-full rounded-lg border border-navy/10 group-hover:border-emerald/40 transition" loading="lazy"/>
+        <p class="text-center text-sm text-navy/50 mt-2">How it works</p>
+      </a>
+    </div>
+
+    <h3 class="text-xl font-semibold mb-6 text-navy/70 fade-in">Android app (Pixel 8 Pro)</h3>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12 fade-in">
+      <a href="screenshots/android-01-map.png" target="_blank" class="block group">
+        <img src="screenshots/android-01-map.png" alt="Android map screen" class="w-full rounded-lg border border-navy/10 group-hover:border-emerald/40 transition" loading="lazy"/>
+        <p class="text-center text-xs text-navy/50 mt-2">Map &amp; live location</p>
+      </a>
+      <a href="screenshots/android-02-members.png" target="_blank" class="block group">
+        <img src="screenshots/android-02-members.png" alt="Android members list" class="w-full rounded-lg border border-navy/10 group-hover:border-emerald/40 transition" loading="lazy"/>
+        <p class="text-center text-xs text-navy/50 mt-2">Circle members</p>
+      </a>
+      <a href="screenshots/android-03-chat.png" target="_blank" class="block group">
+        <img src="screenshots/android-03-chat.png" alt="Android family chat" class="w-full rounded-lg border border-navy/10 group-hover:border-emerald/40 transition" loading="lazy"/>
+        <p class="text-center text-xs text-navy/50 mt-2">Family chat</p>
+      </a>
+      <a href="screenshots/android-04-places.png" target="_blank" class="block group">
+        <img src="screenshots/android-04-places.png" alt="Android safety places" class="w-full rounded-lg border border-navy/10 group-hover:border-emerald/40 transition" loading="lazy"/>
+        <p class="text-center text-xs text-navy/50 mt-2">Safety places</p>
+      </a>
+      <a href="screenshots/android-05-about.png" target="_blank" class="block group">
+        <img src="screenshots/android-05-about.png" alt="Android about page" class="w-full rounded-lg border border-navy/10 group-hover:border-emerald/40 transition" loading="lazy"/>
+        <p class="text-center text-xs text-navy/50 mt-2">About / version</p>
+      </a>
+      <a href="screenshots/android-06-checkin-dialog.png" target="_blank" class="block group">
+        <img src="screenshots/android-06-checkin-dialog.png" alt="Android check-in dialog" class="w-full rounded-lg border border-navy/10 group-hover:border-emerald/40 transition" loading="lazy"/>
+        <p class="text-center text-xs text-navy/50 mt-2">Check-in dialog</p>
+      </a>
+      <a href="screenshots/android-07-sos-confirm.png" target="_blank" class="block group">
+        <img src="screenshots/android-07-sos-confirm.png" alt="Android SOS confirm dialog" class="w-full rounded-lg border border-navy/10 group-hover:border-emerald/40 transition" loading="lazy"/>
+        <p class="text-center text-xs text-navy/50 mt-2">SOS confirm</p>
+      </a>
+      <a href="screenshots/pwa-dashboard-mobile.png" target="_blank" class="block group">
+        <img src="screenshots/pwa-dashboard-mobile.png" alt="PWA on iOS-sized viewport" class="w-full rounded-lg border border-navy/10 group-hover:border-emerald/40 transition" loading="lazy"/>
+        <p class="text-center text-xs text-navy/50 mt-2">PWA on iPhone-sized viewport</p>
+      </a>
+    </div>
+  </div>
+</section>
+
 <!-- How it works -->
-<section id="how-it-works" class="py-24 bg-surface">
+<section id="how-it-works" class="py-24 bg-white">
   <div class="max-w-6xl mx-auto px-6">
     <div class="text-center mb-16 fade-in">
       <h2 class="text-3xl font-bold mb-4">Get started in minutes</h2>
@@ -224,7 +299,7 @@ html { scroll-behavior: smooth; }
 </section>
 
 <!-- Download -->
-<section id="download" class="py-24 bg-white">
+<section id="download" class="py-24 bg-surface">
   <div class="max-w-6xl mx-auto px-6">
     <div class="text-center mb-16 fade-in">
       <h2 class="text-3xl font-bold mb-4">Pick your client</h2>
@@ -254,10 +329,10 @@ html { scroll-behavior: smooth; }
         <div class="w-12 h-12 bg-sky/10 rounded-xl flex items-center justify-center mb-5">
           <span class="material-symbols-outlined text-sky">phone_iphone</span>
         </div>
-        <h3 class="font-bold text-lg mb-2">iOS (sideloaded)</h3>
-        <p class="text-navy/50 text-sm leading-relaxed mb-6 flex-1">Expo / React Native, built unsigned in CI on macOS runners. Sign and install on Windows or macOS with Sideloadly or AltStore using a free Apple ID.</p>
+        <h3 class="font-bold text-lg mb-2">iOS (sideloaded IPA)</h3>
+        <p class="text-navy/50 text-sm leading-relaxed mb-6 flex-1">Download the unsigned IPA from the latest release. Sign and install on Windows with <strong>Sideloadly</strong> or macOS with <strong>AltStore</strong> using a free Apple ID. No Xcode, no Mac required for Windows users.</p>
         <ul class="text-xs text-navy/60 space-y-1.5 mb-6">
-          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-emerald text-base">check</span> Background GPS</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-emerald text-base">check</span> Real background GPS</li>
           <li class="flex items-center gap-2"><span class="material-symbols-outlined text-emerald text-base">check</span> Free Apple ID OK</li>
           <li class="flex items-center gap-2"><span class="material-symbols-outlined text-amber-600 text-base">schedule</span> Re-sign every 7 days</li>
         </ul>
@@ -266,6 +341,7 @@ html { scroll-behavior: smooth; }
           Download IPA
         </a>
         <a href="ios-native-sideloading.html" class="text-xs text-navy/50 hover:text-navy text-center mt-3">Sideloading guide &rarr;</a>
+        <a href="ios-build-from-source.html" class="text-xs text-navy/50 hover:text-navy text-center mt-1">Or build from source &rarr;</a>
       </div>
 
       <!-- iOS PWA / any browser -->

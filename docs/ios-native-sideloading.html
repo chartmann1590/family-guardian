@@ -1,15 +1,59 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>iOS Native Sideloading</title><style>body{font-family:system-ui,sans-serif;max-width:860px;margin:0 auto;padding:32px 18px;line-height:1.55;color:#071b24}code,pre{background:#eef7f0;border-radius:8px;padding:2px 6px}li{margin:.5rem 0}.warn{background:#fff4d8;border:1px solid #f1c36d;border-radius:16px;padding:14px}</style></head><body>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>iOS Native Sideloading</title><style>body{font-family:system-ui,sans-serif;max-width:860px;margin:0 auto;padding:32px 18px;line-height:1.55;color:#071b24}code,pre{background:#eef7f0;border-radius:8px;padding:2px 6px}li{margin:.5rem 0}.warn{background:#fff4d8;border:1px solid #f1c36d;border-radius:16px;padding:14px}nav{margin-bottom:2rem;padding-bottom:1rem;border-bottom:1px solid #d8e2e7}nav a{margin-right:1rem;color:#0a5fff;text-decoration:none}nav a:hover{text-decoration:underline}</style></head><body>
+<nav>
+<a href="index.html">Home</a>
+<a href="ios-pwa.html">iOS PWA</a>
+<a href="ios-native-sideloading.html"><strong>iOS Sideload (IPA)</strong></a>
+<a href="ios-build-from-source.html">iOS Build from source</a>
+<a href="privacy.html">Privacy</a>
+</nav>
 <h1>Native iOS sideloading</h1>
-<p>Family Guardian can build an unsigned iOS IPA in GitHub Actions. You do not need a Mac locally. A stock iPhone still requires Apple signing at install time, so use a free Apple ID with Sideloadly or AltStore on Windows.</p>
-<div class="warn"><strong>Free Apple ID limitation:</strong> free sideloaded apps usually need to be refreshed or reinstalled every 7 days. A paid Apple Developer Program account improves distribution, but is not required for this free path.</div>
-<h2>Build the IPA</h2>
-<ol><li>Open the repository on GitHub.</li><li>Go to <strong>Actions</strong> -> <strong>iOS Unsigned IPA</strong>.</li><li>Run the workflow manually, or let it run on changes under <code>ios-app/</code>.</li><li>Download the <code>FamilyGuardian-unsigned-ipa</code> artifact.</li></ol>
-<h2>Install from Windows</h2>
-<ol><li>Install Sideloadly or AltStore.</li><li>Connect the iPhone over USB and trust the computer.</li><li>Select <code>FamilyGuardian-unsigned.ipa</code>.</li><li>Sign with your free Apple ID and install.</li><li>On the iPhone, trust the developer profile if iOS asks.</li></ol>
-<h2>Testing</h2>
-<ol><li>Run the Family Guardian server on your LAN with <code>docker compose up --build</code>.</li><li>Open the iOS app and set the server URL to <code>http://YOUR-LAN-IP:8080</code>.</li><li>Sign in or join with an invite code.</li><li>Grant location permissions. Choose <strong>Always</strong> for background location testing.</li><li>Verify the iPhone marker appears in the dashboard and Android app.</li></ol>
+<p>Family Guardian publishes an <strong>unsigned iOS IPA</strong> with every release. You do <em>not</em> need a Mac. You do <em>not</em> need an Apple Developer Program account ($99/year). All you need is a Windows PC (or Mac), an iPhone with a USB cable, and a free Apple ID.</p>
+<div class="warn"><strong>How Apple signing works:</strong> iOS refuses to install any app that is not signed. The IPA in releases is intentionally unsigned, because each user signs it themselves at install time with their own Apple ID. Sideloadly and AltStore do this for you in one click. The signature is then valid for <strong>7 days on a free Apple ID</strong>, or <strong>1 year on a paid Apple Developer Program account</strong>. When it expires, plug your phone back into your computer and click "refresh" in Sideloadly/AltStore - your app data is preserved.</div>
+<h2>Step 1 - download the IPA from Releases</h2>
+<ol>
+  <li>Go to <a href="https://github.com/chartmann1590/family-guardian/releases/latest" target="_blank">github.com/chartmann1590/family-guardian/releases/latest</a>.</li>
+  <li>Under <strong>Assets</strong>, download <code>FamilyGuardian-&lt;version&gt;-unsigned.ipa</code>.</li>
+  <li>Save it somewhere you can find again (Desktop is fine).</li>
+</ol>
+<p><em>Alternative if you'd rather build it yourself in CI:</em> open the repo's <strong>Actions</strong> tab, run the <strong>iOS Unsigned IPA</strong> workflow, and download the <code>FamilyGuardian-unsigned-ipa</code> artifact instead. This is identical to the IPA on Releases - just a fresher build off whatever commit you trigger.</p>
+<h2>Step 2 - install Sideloadly (Windows) or AltStore (macOS)</h2>
+<ul>
+  <li><strong>Windows:</strong> <a href="https://sideloadly.io/" target="_blank">Sideloadly</a> - download and install. Also install iTunes from Apple if you don't have it (Sideloadly needs Apple's device driver).</li>
+  <li><strong>macOS:</strong> <a href="https://altstore.io/" target="_blank">AltStore</a> works without iTunes. Sideloadly also has a Mac build if you prefer.</li>
+</ul>
+<h2>Step 3 - sign and install</h2>
+<ol>
+  <li>Plug your iPhone into your computer with a USB cable. Tap <strong>Trust</strong> on the iPhone when asked.</li>
+  <li>Open Sideloadly (or AltStore).</li>
+  <li>Drag the IPA file into the app.</li>
+  <li>Enter your Apple ID and password. Sideloadly uses these only to sign the app locally - they are not sent anywhere else.</li>
+  <li>Click <strong>Start</strong>. Sideloadly will sign the IPA and push it to your iPhone (~30 seconds).</li>
+  <li>On the iPhone, open <strong>Settings -> General -> VPN &amp; Device Management</strong>, tap your Apple ID profile, and tap <strong>Trust</strong>. (iOS only asks this the first time.)</li>
+  <li>Open Family Guardian from the home screen.</li>
+</ol>
+<h2>Step 4 - first-run configuration</h2>
+<ol>
+  <li>Run the Family Guardian server on your LAN: <code>docker compose up -d</code>.</li>
+  <li>Open the iOS app. Enter the server URL: <code>http://YOUR-LAN-IP:8080</code> (e.g. <code>http://10.0.0.110:8080</code>).</li>
+  <li>Sign in with your bootstrap admin credentials, or join with an invite code from the admin.</li>
+  <li>Grant location permissions. Choose <strong>Always</strong> if you want background location reporting.</li>
+  <li>Grant notification permissions so SOS / geofence alerts can wake the device.</li>
+  <li>Verify the iPhone marker appears in the web dashboard and any Android apps within ~30 seconds.</li>
+</ol>
+<h2>Refreshing the signature</h2>
+<ol>
+  <li>Plug the iPhone back into your computer.</li>
+  <li>Open Sideloadly (or AltStore).</li>
+  <li>Click <strong>Refresh</strong>. The app is re-signed with another 7 days, your data is preserved.</li>
+</ol>
+<p>If you forget and the signature expires, the app icon stays on your home screen but iOS refuses to open it. Just re-sign with the same IPA - no need to re-download.</p>
 <h2>Known limits</h2>
-<ul><li>No APNs remote push in v1. The app uses local notifications for WebSocket events while running.</li><li>Background GPS depends on iOS permission and power management.</li><li>The unsigned IPA is not installable directly; Sideloadly/AltStore signs it during install.</li></ul>
+<ul>
+  <li>No APNs remote push in v1. The app uses local notifications for WebSocket events while running.</li>
+  <li>Background GPS depends on iOS permission and power management. Keep <strong>Background App Refresh</strong> on for Family Guardian.</li>
+  <li>Free Apple IDs are capped at <strong>3 sideloaded apps and 7-day signing</strong>. Paid developer accounts get 1 year and no app limit.</li>
+  <li>If you want to skip the 7-day refresh entirely, see <a href="ios-build-from-source.html">building from source</a> with a paid developer account.</li>
+</ul>
 </body></html>
 

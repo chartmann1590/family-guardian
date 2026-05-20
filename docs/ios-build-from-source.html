@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>iOS - Build from source</title><style>body{font-family:system-ui,sans-serif;max-width:860px;margin:0 auto;padding:32px 18px;line-height:1.55;color:#071b24}code,pre{background:#eef7f0;border-radius:8px;padding:2px 6px}pre{padding:12px;overflow-x:auto}li{margin:.5rem 0}.warn{background:#fff4d8;border:1px solid #f1c36d;border-radius:16px;padding:14px;margin:1rem 0}.tip{background:#e9f3ff;border:1px solid #8db8ea;border-radius:16px;padding:14px;margin:1rem 0}nav{margin-bottom:2rem;padding-bottom:1rem;border-bottom:1px solid #d8e2e7}nav a{margin-right:1rem;color:#0a5fff;text-decoration:none}nav a:hover{text-decoration:underline}</style></head><body>
+<nav>
+<a href="index.html">Home</a>
+<a href="ios-pwa.html">iOS PWA</a>
+<a href="ios-native-sideloading.html">iOS Sideload (IPA)</a>
+<a href="ios-build-from-source.html"><strong>iOS Build from source</strong></a>
+<a href="privacy.html">Privacy</a>
+</nav>
+<h1>Build the iOS app from source</h1>
+<p>Use this path when you want to tweak the app, sign with your own Apple Developer account for a year-long install, or just don't want to trust a CI-built IPA. You need a Mac with Xcode 15 or newer, an Apple ID, and an iPhone running iOS 16+.</p>
+
+<h2>Prerequisites</h2>
+<ul>
+  <li>macOS with <strong>Xcode 15+</strong> installed from the App Store.</li>
+  <li>Command-line tools: <code>xcode-select --install</code>.</li>
+  <li><strong>Node.js 20+</strong> (use <a href="https://github.com/nvm-sh/nvm">nvm</a> or <a href="https://brew.sh">brew</a>).</li>
+  <li><strong>CocoaPods</strong>: <code>sudo gem install cocoapods</code> (or via brew).</li>
+  <li>A <strong>free Apple ID</strong> (7-day signing) or a <strong>paid Apple Developer Program</strong> account (1-year signing).</li>
+  <li>An iPhone with <strong>Developer Mode enabled</strong>: Settings -> Privacy &amp; Security -> Developer Mode.</li>
+</ul>
+
+<h2>Step 1 - clone and install dependencies</h2>
+<pre>git clone https://github.com/chartmann1590/family-guardian.git
+cd family-guardian/ios-app
+npm install</pre>
+
+<h2>Step 2 - Expo prebuild</h2>
+<p>The repo keeps the Expo "managed" layout; the native <code>ios/</code> folder is generated on demand. Run prebuild to materialise the Xcode project:</p>
+<pre>npx expo prebuild --platform ios --clean</pre>
+<p>This creates <code>ios/FamilyGuardian.xcworkspace</code>, the Podfile, and an Info.plist with the right background-modes / location-usage strings already filled in. Re-run with <code>--clean</code> any time you change <code>app.json</code> or add a native module.</p>
+
+<h2>Step 3 - install CocoaPods</h2>
+<pre>cd ios
+pod install
+cd ..</pre>
+<p>Subsequent prebuilds run <code>pod install</code> automatically; the first one usually doesn't.</p>
+
+<h2>Step 4 - open in Xcode and sign</h2>
+<pre>open ios/FamilyGuardian.xcworkspace</pre>
+<p>In Xcode:</p>
+<ol>
+  <li>Select the <strong>FamilyGuardian</strong> target.</li>
+  <li>Open <strong>Signing &amp; Capabilities</strong>.</li>
+  <li>Tick <strong>Automatically manage signing</strong>.</li>
+  <li>Pick your <strong>Team</strong>. Free Apple IDs appear here once you add them under Xcode -> Settings -> Accounts.</li>
+  <li>If you see a <em>"Failed to register bundle identifier"</em> error, change <strong>Bundle Identifier</strong> to something unique to you (e.g. <code>com.&lt;yourname&gt;.familyguardian</code>). Free Apple IDs cannot reuse a bundle ID already claimed by someone else.</li>
+</ol>
+
+<h2>Step 5 - install on the iPhone</h2>
+<ol>
+  <li>Plug your iPhone in over USB and tap <strong>Trust</strong> when prompted.</li>
+  <li>In Xcode's top toolbar, pick your phone from the device dropdown.</li>
+  <li>Hit the <strong>Run</strong> button (or Cmd+R). Xcode builds, signs, and installs the app.</li>
+  <li>The first launch fails with "Untrusted Developer". On the iPhone, go to <strong>Settings -> General -> VPN &amp; Device Management</strong>, tap your developer profile, and tap <strong>Trust</strong>. Re-open the app.</li>
+</ol>
+
+<div class="tip"><strong>Tip:</strong> for wireless deploys, in Xcode go to <strong>Window -> Devices and Simulators</strong>, pick your iPhone, and tick <strong>Connect via network</strong>. After the first wired pair, you can build and install over Wi-Fi.</div>
+
+<h2>Step 6 - first-run configuration</h2>
+<ol>
+  <li>Open Family Guardian on the iPhone.</li>
+  <li>Enter the server URL: <code>http://YOUR-LAN-IP:8080</code> (replace with the LAN IP of the box running <code>docker compose</code>).</li>
+  <li>Sign in with the credentials you bootstrapped on the server, or join with an invite code from the admin.</li>
+  <li>Grant location permissions. Pick <strong>Always</strong> if you want background reporting.</li>
+  <li>Grant notification permission so SOS / geofence alerts can wake the device.</li>
+</ol>
+
+<h2>Re-signing cadence</h2>
+<div class="warn"><strong>Signature expiry:</strong>
+<ul>
+  <li><strong>Free Apple ID:</strong> the install certificate is valid for <strong>7 days</strong>. After that, iOS refuses to open the app. Rebuild and re-run from Xcode (Cmd+R) to refresh.</li>
+  <li><strong>Paid Apple Developer Program ($99/yr):</strong> certificates last <strong>1 year</strong>. You can also distribute via TestFlight if you want over-the-air updates.</li>
+</ul>
+</div>
+
+<h2>Updating to a new release</h2>
+<pre>cd family-guardian
+git pull
+cd ios-app
+npm install
+npx expo prebuild --platform ios --clean
+cd ios &amp;&amp; pod install &amp;&amp; cd ..
+open ios/FamilyGuardian.xcworkspace
+# Cmd+R in Xcode</pre>
+
+<h2>Troubleshooting</h2>
+<ul>
+  <li><strong>"Multiple commands produce..."</strong> - run <code>npx expo prebuild --platform ios --clean</code> to start from a clean ios/ folder.</li>
+  <li><strong>"Sandbox: rsync deny"</strong> - in Xcode, Build Settings -> User Script Sandboxing -> set to <strong>No</strong>.</li>
+  <li><strong>App won't connect to the LAN server</strong> - by default iOS allows cleartext HTTP for local networks, but check <code>ios-app/app.json</code> -> <code>ios.infoPlist.NSAppTransportSecurity</code> is preserved across prebuilds.</li>
+  <li><strong>Background GPS stops after a few hours</strong> - iOS aggressively suspends apps. Make sure <strong>Location -> Always</strong> is granted and <strong>Background App Refresh</strong> is on for Family Guardian.</li>
+</ul>
+
+<h2>What you get</h2>
+<p>The build-from-source path produces the same binary as the unsigned-IPA path (same Expo app, same React Native runtime, same features) but signed with your own identity. You get:</p>
+<ul>
+  <li>Real background GPS via <code>expo-location</code>.</li>
+  <li>Local notifications for SOS, geofence, speeding, low-battery, and offline alerts.</li>
+  <li>Real-time WebSocket updates while the app is open.</li>
+  <li>Map view, member list, chat, places, check-ins, and the SOS button.</li>
+</ul>
+
+<p><a href="index.html">&larr; Back to overview</a></p>
+</body></html>

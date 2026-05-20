@@ -1,8 +1,20 @@
 # Family Guardian / GuardianMesh
 
-Self-hosted family safety platform — a Docker-deployed web dashboard plus a native Android app. The server runs on infrastructure you control; location data never leaves your box.
+Self-hosted family safety platform — a Docker-deployed server, a native Kotlin **Android** app, an Expo **iOS** app (sideloadable IPA or build-from-source), and a fully-featured **PWA** for any browser. The server runs on infrastructure you control; location data never leaves your box.
 
-> **Status:** walking skeleton. End-to-end flow works (Android reports GPS → server stores it → web map shows the marker move live). Many screens from the design prototypes are not yet wired up; see "What's next" below.
+📖 **Website:** <https://chartmann1590.github.io/family-guardian/> · 📦 **Releases:** [latest APK + IPA](https://github.com/chartmann1590/family-guardian/releases/latest)
+
+> **Status:** walking skeleton with all core features shipped. End-to-end flow works (Android/iOS report GPS → server stores it → web map shows the marker move live). See "What's next" below for the roadmap.
+
+## Screenshots
+
+| Web dashboard | Android map | Android members |
+| :---: | :---: | :---: |
+| ![PWA dashboard](docs/screenshots/pwa-dashboard-desktop.png) | ![Android map](docs/screenshots/android-01-map.png) | ![Android members](docs/screenshots/android-02-members.png) |
+| **Android SOS** | **Android check-in** | **PWA places** |
+| ![Android SOS](docs/screenshots/android-07-sos-confirm.png) | ![Android check-in](docs/screenshots/android-06-checkin-dialog.png) | ![PWA places](docs/screenshots/pwa-places-desktop.png) |
+
+More screenshots in [`docs/screenshots/`](docs/screenshots/) and on the [project website](https://chartmann1590.github.io/family-guardian/).
 
 ```
 +---------------------------+              +-------------------------+
@@ -45,16 +57,31 @@ to install. Allow "Install from unknown sources" for your browser/file manager.
 
 **Option B — sideload a pre-built debug APK from your server**:
 
+Use the one-shot build script — it assembles the Android debug APK, copies it into the server
+build context, and rebuilds the Docker image:
+
 ```bash
-# From the repo root, before `docker compose build`:
-cd android && ./gradlew assembleDebug && cd ..
-cp android/app/build/outputs/apk/debug/app-debug.apk server/downloads/family-guardian.apk
-docker compose up --build
+node scripts/build-image.mjs
+docker compose up -d
 ```
 
 Then on the device's browser, open `http://<server-host>:8080/download` and install the APK
 (allow "Install from unknown sources" for your browser). The image bakes the APK in at build
-time; the server exposes it at `/download/family-guardian.apk`.
+time; the server exposes it at `/download/family-guardian.apk` (with a QR code on the page).
+
+**Sideload via ADB** (developer / homelab path — same APK, no browser):
+
+```bash
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb shell pm grant com.familyguardian android.permission.ACCESS_FINE_LOCATION
+adb shell pm grant com.familyguardian android.permission.ACCESS_BACKGROUND_LOCATION
+adb shell pm grant com.familyguardian android.permission.POST_NOTIFICATIONS
+adb shell pm grant com.familyguardian android.permission.ACTIVITY_RECOGNITION
+adb shell am start -n com.familyguardian/.MainActivity
+```
+
+Tested on a Pixel 8 Pro running Android 15. The foreground `LocationService` should appear in
+`adb shell dumpsys activity services com.familyguardian` within a couple of seconds.
 
 **Option C — build and run from Android Studio**:
 
@@ -70,23 +97,57 @@ The foreground service starts; within ~30s your marker appears on the web dashbo
 
 ## Quickstart — iPhone clients
 
-Family Guardian has two iPhone paths:
+Family Guardian has **three** iPhone paths, from "no build" to "full Xcode":
 
-**PWA (no build, no signing):** open `http://<server-host>:8080/app` in Safari,
-sign in, then Share → Add to Home Screen. The web app gives you full feature
-parity (map, members, chat, places, alerts, SOS, check-ins). The only
-limitation iOS imposes is **no reliable background GPS** — location only
-reports while the PWA is open. Great for parents/admins; use the native app
-for users who need background tracking. See
-[`docs/ios-pwa.html`](docs/ios-pwa.html).
+### Option A — PWA (zero install, works in 30 seconds)
 
-**Native sideload (real background GPS):** download the latest
-`FamilyGuardian-<version>-unsigned.ipa` from
-[Releases](https://github.com/chartmann1590/family-guardian/releases/latest),
-then sign and install it on Windows or macOS with **Sideloadly** or **AltStore**
-using a free Apple ID. The free-Apple-ID signature expires after 7 days — just
-re-sign when iOS prompts you. See
-[`docs/ios-native-sideloading.html`](docs/ios-native-sideloading.html).
+Open `http://<server-host>:8080/app` in Safari on the iPhone, sign in, then
+**Share → Add to Home Screen**. The web app gives you full feature parity
+(map, members, chat, places, alerts, SOS, check-ins). The only limitation iOS
+imposes is **no reliable background GPS** — location only reports while the
+PWA is open in the foreground. Great for parents/admins; use Option B or C
+for users who need background tracking. Full guide:
+[`docs/ios-pwa.html`](docs/ios-pwa.html) (also published at
+<https://chartmann1590.github.io/family-guardian/ios-pwa.html>).
+
+### Option B — Sideload the pre-built unsigned IPA (real background GPS, no Xcode)
+
+1. Download the latest `FamilyGuardian-<version>-unsigned.ipa` from
+   [Releases](https://github.com/chartmann1590/family-guardian/releases/latest).
+2. Sign and install it on **Windows** with [Sideloadly](https://sideloadly.io/)
+   or on **macOS** with [AltStore](https://altstore.io/) using a free Apple ID.
+3. iOS trusts the signature for **7 days** with a free Apple ID — re-sign when
+   prompted (Sideloadly and AltStore both have a one-click refresh). With a
+   paid Apple Developer account the signature lasts a year.
+4. On first launch, point the app at `http://<server-host>:8080`, sign in, and
+   grant **Always** location + notification permissions.
+
+Full guide with screenshots: [`docs/ios-native-sideloading.html`](docs/ios-native-sideloading.html)
+(also at <https://chartmann1590.github.io/family-guardian/ios-native-sideloading.html>).
+
+### Option C — Build from source (requires a Mac + Xcode)
+
+If you'd rather build the IPA yourself — useful if you want to tweak features,
+swap signing identities, or sign with your own Apple Developer Program account
+for a year-long install:
+
+```bash
+# On a Mac with Xcode 15+ installed
+cd ios-app
+npm install
+npx expo prebuild --platform ios --clean
+cd ios
+pod install        # only the first time
+open FamilyGuardian.xcworkspace
+```
+
+In Xcode: **Signing & Capabilities → Team** → pick your free Apple ID or paid
+team. Plug your iPhone in, select it as the run destination, and hit ▶. Xcode
+installs the app directly via the device's developer mode (Settings → Privacy &
+Security → Developer Mode on iOS 16+). Re-sign cadence is the same as Option B:
+7 days for free Apple ID, 1 year for a paid Apple Developer Program account.
+
+Full guide: [`docs/ios-build-from-source.html`](docs/ios-build-from-source.html).
 
 ## Downloads
 
