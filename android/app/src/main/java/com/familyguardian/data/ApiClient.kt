@@ -143,6 +143,25 @@ interface GuardianApi {
         @Url url: String,
         @Header("Authorization") auth: String,
     ): AlertsResponse
+
+    @GET
+    suspend fun getPauseState(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): PauseState
+
+    @POST
+    suspend fun setPause(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: PauseBody,
+    ): PauseState
+
+    @DELETE
+    suspend fun clearPause(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): PauseState
 }
 
 object ApiClient {

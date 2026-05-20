@@ -120,6 +120,24 @@
             </div>
         </section>
 
+        <!-- Pause sharing -->
+        <section class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="font-headline-md text-headline-md text-on-surface">Pause sharing</h2>
+                    <p class="text-sm text-on-surface-variant mt-1">Your last-known location stays frozen until you resume. The circle sees a pause badge, not your live location.</p>
+                </div>
+                <span id="pause-status" class="text-sm text-on-surface-variant"></span>
+            </div>
+            <div id="pause-actions" class="flex flex-wrap gap-2">
+                <button class="pause-opt bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-primary/90" data-minutes="15">15 min</button>
+                <button class="pause-opt bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-primary/90" data-minutes="60">1 hour</button>
+                <button class="pause-opt bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-primary/90" data-minutes="240">4 hours</button>
+                <button id="pause-until-tonight" class="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-primary/90">Until 8 PM</button>
+                <button id="pause-unpause" class="hidden bg-error text-on-primary px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-error/90">Resume now</button>
+            </div>
+        </section>
+
         <!-- Members -->
         <section class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">
             <div class="flex items-center justify-between mb-4">

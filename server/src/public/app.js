@@ -53,9 +53,15 @@
                 iconAnchor: [18, 18],
             });
         }
-        const border = active ? '#006c49' : '#76777d';
+        const paused = member.paused;
+        const border = paused ? '#943700' : (active ? '#006c49' : '#76777d');
+        const grayscale = paused ? 'filter:grayscale(0.7);opacity:0.85;' : '';
+        const badge = paused
+            ? `<div style="position:absolute;bottom:-4px;right:-4px;background:#943700;color:#fff;border-radius:9999px;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:11px;border:1.5px solid #f8f9ff;z-index:2">⏸</div>`
+            : '';
         const html = `
-            <div style="
+            <div style="position:relative">
+              <div style="
                 position:relative;overflow:hidden;
                 background:#f8f9ff;
                 border:2px solid ${border};
@@ -65,13 +71,25 @@
                 font-family:Inter,sans-serif;font-weight:700;font-size:12px;
                 color:#0b1c30;
                 box-shadow:0 4px 12px rgba(15,23,42,0.2);
-            ">${avatarInner(member)}</div>`;
+                ${grayscale}
+              ">${avatarInner(member)}</div>
+              ${badge}
+            </div>`;
         return L.divIcon({
             html,
             className: 'fg-marker',
             iconSize: [36, 36],
             iconAnchor: [18, 18],
         });
+    }
+
+    function formatPauseUntil(ms) {
+        if (!ms) return '';
+        const date = new Date(ms);
+        const today = new Date();
+        const sameDay = date.toDateString() === today.toDateString();
+        const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        return sameDay ? time : `${date.toLocaleDateString()} ${time}`;
     }
 
     function isActive(recordedAt) {
@@ -157,11 +175,16 @@
                                 <span class="font-status-number text-status-number" style="color:#0b1c30">${escapeHtml(label)}</span>
                             </div>`;
                         })()}
-                        ${liveNow ? '' : `
+                        ${m.paused ? `
+                            <div class="flex items-center gap-1 px-2 py-0.5 rounded-full" style="background:#ffdbcd66">
+                                <span class="material-symbols-outlined text-[14px]" style="color:#943700">pause_circle</span>
+                                <span class="font-status-number text-status-number" style="color:#943700">Paused${m.pausedUntil ? ' until ' + escapeHtml(formatPauseUntil(m.pausedUntil)) : ''}</span>
+                            </div>` : ''}
+                        ${(!m.paused && !liveNow) ? `
                             <div class="flex items-center gap-1 bg-surface-container px-2 py-0.5 rounded-full">
                                 <span class="material-symbols-outlined text-[14px] text-outline">wifi_off</span>
                                 <span class="font-status-number text-status-number text-outline">Idle</span>
-                            </div>`}
+                            </div>` : ''}
                     </div>
                 </div>`;
             card.addEventListener('click', () => {
@@ -448,6 +471,24 @@
                 renderMemberList();
                 const ciLabel = checkinLabel(msg.status);
                 if (ciLabel) toast(`${msg.displayName}: ${ciLabel.text}`, 'enter');
+            } else if (msg.type === 'pause_changed') {
+                const existing = members.get(msg.userId);
+                if (existing) {
+                    const wasPaused = !!existing.paused;
+                    existing.paused = !!msg.pausedUntil;
+                    existing.pausedUntil = msg.pausedUntil ?? null;
+                    existing.pauseReason = msg.reason ?? null;
+                    members.set(msg.userId, existing);
+                    upsertMarker(existing);
+                    renderMemberList();
+                    if (msg.userId !== state.me.userId) {
+                        if (existing.paused && !wasPaused) {
+                            toast(`${existing.displayName || 'A member'} paused sharing`, 'exit');
+                        } else if (!existing.paused && wasPaused) {
+                            toast(`${existing.displayName || 'A member'} resumed sharing`, 'enter');
+                        }
+                    }
+                }
             }
         });
         ws.addEventListener('close', () => {

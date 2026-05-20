@@ -122,10 +122,13 @@ export default async function webRoutes(fastify, { db }) {
             return reply.code(500).send('User has no circle. Re-signup needed.');
         }
 
+        const now = Date.now();
         const members = db
             .prepare(
                 `SELECT u.id AS userId, u.display_name AS displayName,
                         u.photo_path AS photoPath,
+                        u.paused_until AS pausedUntil,
+                        u.pause_reason AS pauseReason,
                         l.lat, l.lng, l.speed_mps AS speedMps, l.battery_pct AS batteryPct,
                         l.activity AS activity, l.activity_confidence AS activityConfidence,
                         l.bearing AS bearing, l.recorded_at AS recordedAt,
@@ -137,10 +140,16 @@ export default async function webRoutes(fastify, { db }) {
                  ORDER BY u.display_name COLLATE NOCASE ASC`
             )
             .all(circleRow.circleId)
-            .map(({ photoPath, ...m }) => ({
-                ...m,
-                photoUrl: photoPath ? `/api/users/${m.userId}/photo` : null,
-            }));
+            .map(({ photoPath, pausedUntil, pauseReason, ...m }) => {
+                const paused = !!(pausedUntil && pausedUntil > now);
+                return {
+                    ...m,
+                    photoUrl: photoPath ? `/api/users/${m.userId}/photo` : null,
+                    paused,
+                    pausedUntil: paused ? pausedUntil : null,
+                    pauseReason: paused ? pauseReason : null,
+                };
+            });
 
         const places = db
             .prepare(
@@ -210,10 +219,13 @@ export default async function webRoutes(fastify, { db }) {
             .get(session.userId);
         if (!circleRow) return reply.code(500).send('User has no circle.');
 
+        const now = Date.now();
         const members = db
             .prepare(
                 `SELECT u.id AS userId, u.display_name AS displayName,
                         u.photo_path AS photoPath,
+                        u.paused_until AS pausedUntil,
+                        u.pause_reason AS pauseReason,
                         cm.role AS role,
                         l.lat, l.lng, l.accuracy_m AS accuracyM,
                         l.speed_mps AS speedMps, l.battery_pct AS batteryPct,
@@ -227,10 +239,16 @@ export default async function webRoutes(fastify, { db }) {
                  ORDER BY cm.role DESC, u.display_name COLLATE NOCASE ASC`
             )
             .all(circleRow.circleId)
-            .map(({ photoPath, ...m }) => ({
-                ...m,
-                photoUrl: photoPath ? `/api/users/${m.userId}/photo` : null,
-            }));
+            .map(({ photoPath, pausedUntil, pauseReason, ...m }) => {
+                const paused = !!(pausedUntil && pausedUntil > now);
+                return {
+                    ...m,
+                    photoUrl: photoPath ? `/api/users/${m.userId}/photo` : null,
+                    paused,
+                    pausedUntil: paused ? pausedUntil : null,
+                    pauseReason: paused ? pauseReason : null,
+                };
+            });
 
         const places = db
             .prepare(

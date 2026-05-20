@@ -4,6 +4,7 @@
 
   const api = {
     async json(path, options = {}) {
+      if (typeof path !== 'string' || !path.startsWith('/')) throw new Error('Invalid API path');
       const res = await fetch(path, {
         credentials: 'same-origin',
         headers: { 'Accept': 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) },
@@ -50,7 +51,7 @@
     setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 350); }, 3600);
   }
   function avatarHtml(m) {
-    if (m.photoUrl) return `<img src="${escapeHtml(m.photoUrl)}" alt="" onerror="this.replaceWith(document.createTextNode('${escapeHtml(initials(m.displayName))}'))">`;
+    if (m.photoUrl) return `<img src="${escapeHtml(m.photoUrl)}" alt="${escapeHtml(initials(m.displayName))}">`;
     return `<span>${escapeHtml(initials(m.displayName))}</span>`;
   }
   function markerIcon(m) {
@@ -85,6 +86,13 @@
     if (pts.length === 1) map.setView(pts[0], 14);
     if (pts.length > 1) map.fitBounds(pts, { padding: [50, 80] });
   }
+  function fmtPauseUntil(ms) {
+    if (!ms) return '';
+    const d = new Date(ms);
+    const sameDay = d.toDateString() === new Date().toDateString();
+    const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return sameDay ? time : `${d.toLocaleDateString()} ${time}`;
+  }
   function renderMembers() {
     let active = 0;
     const list = $('member-list');
@@ -94,7 +102,8 @@
       upsertMarker(m);
       const div = document.createElement('button');
       div.className = 'card member-card';
-      div.innerHTML = `<div class="avatar">${avatarHtml(m)}</div><div style="text-align:left;min-width:0"><strong>${escapeHtml(m.displayName)}</strong><div class="meta">${escapeHtml(m.address || (m.lat != null ? `${m.lat.toFixed(4)}, ${m.lng.toFixed(4)}` : 'No location yet'))}</div><div class="meta">${rel(m.recordedAt)}${m.batteryPct != null ? ` · ${m.batteryPct}%` : ''}</div></div>`;
+      const pauseLine = m.paused ? `<div class="meta" style="color:#943700">⏸ Paused${m.pausedUntil ? ' until ' + escapeHtml(fmtPauseUntil(m.pausedUntil)) : ''}</div>` : '';
+      div.innerHTML = `<div class="avatar">${avatarHtml(m)}</div><div style="text-align:left;min-width:0"><strong>${escapeHtml(m.displayName)}</strong><div class="meta">${escapeHtml(m.address || (m.lat != null ? `${m.lat.toFixed(4)}, ${m.lng.toFixed(4)}` : 'No location yet'))}</div><div class="meta">${rel(m.recordedAt)}${m.batteryPct != null ? ` · ${m.batteryPct}%` : ''}</div>${pauseLine}</div>`;
       div.addEventListener('click', () => openMember(m.userId));
       list.appendChild(div);
     }
@@ -216,6 +225,15 @@
       if (ev.type === 'sos_active') { sosByUser.set(ev.userId, ev); renderMembers(); toast(`SOS active: ${ev.displayName || 'Member'}`); }
       if (ev.type === 'sos_resolved') { for (const [uid, sos] of sosByUser) if (sos.id === ev.id) sosByUser.delete(uid); renderMembers(); toast('SOS resolved'); }
       if (ev.type === 'check_in') { checkins.set(ev.userId, ev); toast(`${ev.displayName || 'Member'} checked in`); }
+      if (ev.type === 'pause_changed') {
+        const existing = members.get(ev.userId) || { userId: ev.userId };
+        existing.paused = !!ev.pausedUntil;
+        existing.pausedUntil = ev.pausedUntil ?? null;
+        existing.pauseReason = ev.reason ?? null;
+        members.set(ev.userId, existing);
+        renderMembers();
+        if (ev.userId === state.me.userId) renderPauseStateMobile(ev.pausedUntil);
+      }
       if (ev.type && ev.type.includes('alert')) toast(`${ev.displayName || 'Member'}: ${ev.type.replaceAll('_', ' ')}`);
       if (ev.type === 'geofence_enter' || ev.type === 'geofence_exit') toast(`${ev.displayName || 'Member'} ${ev.type.endsWith('enter') ? 'arrived at' : 'left'} ${ev.placeName}`);
     };
@@ -262,6 +280,45 @@
     await api.json('/api/users/me/alert-prefs', { method: 'PATCH', body: JSON.stringify({ speedingEnabled: $('speeding-enabled').checked, speedingThresholdMps: Number($('speeding-threshold').value) / 2.23694, lowBatteryEnabled: $('battery-enabled').checked, lowBatteryThreshold: Number($('battery-threshold').value), offlineEnabled: $('offline-enabled').checked, offlineMinutes: Number($('offline-minutes').value) }) });
     toast('Alert settings saved.');
   };
+
+  function renderPauseStateMobile(pausedUntil) {
+    const status = $('pause-status-mobile');
+    const unpauseBtn = $('pause-unpause-mobile');
+    if (pausedUntil && pausedUntil > Date.now()) {
+      status.textContent = `Paused until ${fmtPauseUntil(pausedUntil)}`;
+      status.style.color = '#943700';
+      unpauseBtn.classList.remove('hidden');
+    } else {
+      status.textContent = 'Sharing is on.';
+      status.style.color = '';
+      unpauseBtn.classList.add('hidden');
+    }
+  }
+  async function setPauseMobile(minutes) {
+    try {
+      const data = await api.json('/api/users/me/pause', { method: 'POST', body: JSON.stringify({ durationMinutes: minutes }) });
+      renderPauseStateMobile(data.pausedUntil);
+      toast(`Paused until ${fmtPauseUntil(data.pausedUntil)}`);
+    } catch (err) { toast(`Pause failed: ${err.message}`); }
+  }
+  async function unpauseMobile() {
+    try {
+      await api.json('/api/users/me/pause', { method: 'DELETE' });
+      renderPauseStateMobile(null);
+      toast('Sharing resumed');
+    } catch (err) { toast(`Resume failed: ${err.message}`); }
+  }
+  function minutesUntilTonight() {
+    const now = new Date();
+    const t = new Date(now);
+    t.setHours(20, 0, 0, 0);
+    if (t <= now) t.setDate(t.getDate() + 1);
+    return Math.max(1, Math.min(1440, Math.round((t - now) / 60000)));
+  }
+  document.querySelectorAll('.pause-opt-mobile').forEach((btn) => btn.addEventListener('click', () => setPauseMobile(Number(btn.dataset.minutes))));
+  $('pause-tonight-mobile').addEventListener('click', () => setPauseMobile(minutesUntilTonight()));
+  $('pause-unpause-mobile').addEventListener('click', unpauseMobile);
+  api.json('/api/users/me/pause').then((d) => renderPauseStateMobile(d.pausedUntil)).catch(() => {});
 
   for (const p of places.values()) drawPlace(p);
   renderMembers(); renderPlaces(); fitMap(); connectWs();

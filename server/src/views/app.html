@@ -89,6 +89,17 @@
       <section id="more-view" class="screen panel-screen">
         <h2>More</h2>
         <div class="card stack">
+          <strong>Pause sharing</strong>
+          <p class="meta" id="pause-status-mobile">Sharing is on.</p>
+          <div class="row" style="gap:8px;flex-wrap:wrap">
+            <button class="soft pause-opt-mobile" data-minutes="15">15 min</button>
+            <button class="soft pause-opt-mobile" data-minutes="60">1 hour</button>
+            <button class="soft pause-opt-mobile" data-minutes="240">4 hours</button>
+            <button class="soft" id="pause-tonight-mobile">Until 8 PM</button>
+            <button class="danger hidden" id="pause-unpause-mobile">Resume now</button>
+          </div>
+        </div>
+        <div class="card stack">
           <p><strong>iPhone PWA mode:</strong> GPS reports while this app is open. iOS may pause web apps in the background.</p>
           <a class="primary link-button" href="/docs/ios-pwa.html">PWA instructions</a>
           <a class="soft link-button" href="/docs/ios-native-sideloading.html">Native sideload instructions</a>

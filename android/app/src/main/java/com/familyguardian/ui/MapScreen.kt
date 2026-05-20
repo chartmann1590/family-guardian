@@ -30,6 +30,8 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Sos
@@ -63,6 +65,8 @@ import com.familyguardian.data.ApiClient
 import com.familyguardian.data.AuthRepo
 import com.familyguardian.data.CheckinRepo
 import com.familyguardian.data.CircleMember
+import com.familyguardian.data.PauseRepo
+import com.familyguardian.data.PauseState
 import com.familyguardian.data.Prefs
 import com.familyguardian.data.SosEvent
 import com.familyguardian.data.SosRepo
@@ -93,6 +97,30 @@ private fun initials(name: String?): String {
 
 private fun memberActive(recordedAt: Long?): Boolean {
     return recordedAt != null && (System.currentTimeMillis() - recordedAt) < 5 * 60_000L
+}
+
+private fun minutesUntilTonight(): Int {
+    val now = java.util.Calendar.getInstance()
+    val target = java.util.Calendar.getInstance().apply {
+        set(java.util.Calendar.HOUR_OF_DAY, 20)
+        set(java.util.Calendar.MINUTE, 0)
+        set(java.util.Calendar.SECOND, 0)
+        set(java.util.Calendar.MILLISECOND, 0)
+        if (timeInMillis <= now.timeInMillis) add(java.util.Calendar.DAY_OF_MONTH, 1)
+    }
+    val mins = ((target.timeInMillis - now.timeInMillis) / 60_000L).toInt()
+    return mins.coerceIn(1, 1440)
+}
+
+private fun formatPauseUntil(ms: Long?): String {
+    if (ms == null) return ""
+    val cal = java.util.Calendar.getInstance().apply { timeInMillis = ms }
+    val now = java.util.Calendar.getInstance()
+    val sameDay = cal.get(java.util.Calendar.YEAR) == now.get(java.util.Calendar.YEAR) &&
+        cal.get(java.util.Calendar.DAY_OF_YEAR) == now.get(java.util.Calendar.DAY_OF_YEAR)
+    val fmt = if (sameDay) java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault())
+              else java.text.SimpleDateFormat("MMM d, h:mm a", java.util.Locale.getDefault())
+    return fmt.format(cal.time)
 }
 
 private fun relativeTimeString(ms: Long): String {
@@ -156,6 +184,7 @@ fun MapScreen(
     val repo = remember { AuthRepo(prefs) }
     val sosRepo = remember { SosRepo(prefs) }
     val checkinRepo = remember { CheckinRepo(prefs) }
+    val pauseRepo = remember { PauseRepo(prefs) }
     val scope = rememberCoroutineScope()
 
     val displayName by prefs.displayName.collectAsStateWithLifecycle(initialValue = null)
@@ -173,6 +202,10 @@ fun MapScreen(
     var membersError by remember { mutableStateOf<String?>(null) }
     var activeSosList by remember { mutableStateOf<List<SosEvent>>(emptyList()) }
     var resolveInFlight by remember { mutableStateOf(false) }
+    var pauseDialogOpen by remember { mutableStateOf(false) }
+    var pauseInFlight by remember { mutableStateOf(false) }
+    var pauseState by remember { mutableStateOf(PauseState()) }
+    var pauseMessage by remember { mutableStateOf<String?>(null) }
     val wsState by EventBus.wsState.collectAsStateWithLifecycle(
         initialValue = EventStreamClient.ConnectionState.DISCONNECTED
     )
@@ -326,6 +359,9 @@ fun MapScreen(
             val cid = snap.circleId
             if (cid != null) activeSosList = sosRepo.listActive(cid)
         } catch (_: Throwable) { }
+        try {
+            pauseState = pauseRepo.current()
+        } catch (_: Throwable) { }
     }
 
     LaunchedEffect(members) {
@@ -366,6 +402,20 @@ fun MapScreen(
                         ))
                 } else if (event is GuardianEvent.SosResolved) {
                     activeSosList = activeSosList.filter { it.id != event.id }
+                } else if (event is GuardianEvent.PauseChanged) {
+                    val meId = prefs.snapshotBlocking().userId
+                    if (event.userId == meId) {
+                        pauseState = PauseState(pausedUntil = event.pausedUntil, reason = event.reason)
+                    }
+                    members = members.map { m ->
+                        if (m.userId == event.userId) {
+                            m.copy(
+                                paused = event.pausedUntil != null,
+                                pausedUntil = event.pausedUntil,
+                                pauseReason = event.reason,
+                            )
+                        } else m
+                    }
                 }
             }
         }
@@ -409,6 +459,86 @@ fun MapScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { checkinDialogOpen = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (pauseDialogOpen) {
+        val isPaused = (pauseState.pausedUntil ?: 0L) > System.currentTimeMillis()
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pauseDialogOpen = false },
+            title = { Text(if (isPaused) "Sharing is paused" else "Pause sharing", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (isPaused) {
+                        Text(
+                            "Your last-known location is frozen on the circle's map until ${formatPauseUntil(pauseState.pausedUntil)}. Resume now to share live again.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    } else {
+                        Text(
+                            "Freeze your last-known location on the map. Your circle will see a pause badge instead of your live position.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        val opts = listOf(
+                            "15 min" to 15,
+                            "1 hour" to 60,
+                            "4 hours" to 240,
+                            "Until 8 PM" to minutesUntilTonight(),
+                        )
+                        for ((label, minutes) in opts) {
+                            Button(
+                                onClick = {
+                                    pauseDialogOpen = false
+                                    pauseInFlight = true
+                                    pauseMessage = null
+                                    scope.launch {
+                                        try {
+                                            pauseState = pauseRepo.pause(minutes)
+                                            pauseMessage = "Paused until ${formatPauseUntil(pauseState.pausedUntil)}"
+                                        } catch (t: Throwable) {
+                                            pauseMessage = "Pause failed: ${t.message ?: t::class.simpleName}"
+                                        } finally {
+                                            pauseInFlight = false
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                enabled = !pauseInFlight,
+                            ) { Text(label) }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (isPaused) {
+                    Button(
+                        onClick = {
+                            pauseDialogOpen = false
+                            pauseInFlight = true
+                            pauseMessage = null
+                            scope.launch {
+                                try {
+                                    pauseState = pauseRepo.unpause()
+                                    pauseMessage = "Sharing resumed."
+                                } catch (t: Throwable) {
+                                    pauseMessage = "Resume failed: ${t.message ?: t::class.simpleName}"
+                                } finally {
+                                    pauseInFlight = false
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError,
+                        ),
+                        enabled = !pauseInFlight,
+                    ) { Text("Resume now") }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pauseDialogOpen = false }) { Text("Cancel") }
             },
         )
     }
@@ -486,7 +616,13 @@ fun MapScreen(
                                     )
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(m.displayName, style = MaterialTheme.typography.bodyLarge)
-                                        if (m.lat != null && m.lng != null) {
+                                        if (m.paused) {
+                                            Text(
+                                                "⏸ Paused${m.pausedUntil?.let { " until " + formatPauseUntil(it) } ?: ""}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.error,
+                                            )
+                                        } else if (m.lat != null && m.lng != null) {
                                             Text(
                                                 "%.4f, %.4f".format(m.lat, m.lng),
                                                 style = MaterialTheme.typography.bodySmall,
@@ -559,6 +695,17 @@ fun MapScreen(
                         Row {
                             IconButton(onClick = onOpenAbout, modifier = Modifier.size(40.dp)) {
                                 Icon(Icons.Filled.Info, contentDescription = "About", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            val isPausedNow = (pauseState.pausedUntil ?: 0L) > System.currentTimeMillis()
+                            IconButton(
+                                onClick = { pauseDialogOpen = true },
+                                modifier = Modifier.size(40.dp),
+                            ) {
+                                Icon(
+                                    if (isPausedNow) Icons.Filled.PauseCircle else Icons.Filled.Pause,
+                                    contentDescription = if (isPausedNow) "Sharing paused" else "Pause sharing",
+                                    tint = if (isPausedNow) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                             TextButton(onClick = {
                                 showMembers = true
@@ -806,6 +953,14 @@ fun MapScreen(
                 }
 
                 sosMessage?.let { msg ->
+                    Text(
+                        text = msg,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+
+                pauseMessage?.let { msg ->
                     Text(
                         text = msg,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

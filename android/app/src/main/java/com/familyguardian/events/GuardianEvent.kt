@@ -157,6 +157,14 @@ sealed interface GuardianEvent {
     ) : GuardianEvent
 
     @Serializable
+    @SerialName("pause_changed")
+    data class PauseChanged(
+        val userId: Long,
+        val pausedUntil: Long? = null,
+        val reason: String? = null,
+    ) : GuardianEvent
+
+    @Serializable
     @SerialName("error")
     data class Error(val error: String) : GuardianEvent
 }

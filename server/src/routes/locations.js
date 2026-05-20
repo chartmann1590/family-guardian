@@ -38,31 +38,38 @@ export default async function locationRoutes(fastify, { db }) {
             .prepare('SELECT battery_pct AS batteryPct FROM locations WHERE user_id = ?')
             .get(userId)?.batteryPct ?? null;
 
+        const pauseRow = db
+            .prepare('SELECT paused_until AS pausedUntil FROM users WHERE id = ?')
+            .get(userId);
+        const isPaused = !!(pauseRow?.pausedUntil && pauseRow.pausedUntil > Date.now());
+
         const cachedAddress = getCachedLabel(db, lat, lng);
 
         const writeLocation = db.transaction(() => {
-            db.prepare(
-                `INSERT INTO locations
-                    (user_id, lat, lng, accuracy_m, speed_mps, battery_pct, recorded_at,
-                     bearing, altitude_m, activity, activity_confidence, address)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT(user_id) DO UPDATE SET
-                    lat = excluded.lat,
-                    lng = excluded.lng,
-                    accuracy_m = excluded.accuracy_m,
-                    speed_mps = excluded.speed_mps,
-                    battery_pct = excluded.battery_pct,
-                    recorded_at = excluded.recorded_at,
-                    bearing = excluded.bearing,
-                    altitude_m = excluded.altitude_m,
-                    activity = excluded.activity,
-                    activity_confidence = excluded.activity_confidence,
-                    address = excluded.address`
-            ).run(
-                userId, lat, lng, accuracyM ?? null, speedMps ?? null, batteryPct ?? null, recordedAt,
-                bearing ?? null, altitudeM ?? null, activity ?? null, activityConfidence ?? null,
-                cachedAddress,
-            );
+            if (!isPaused) {
+                db.prepare(
+                    `INSERT INTO locations
+                        (user_id, lat, lng, accuracy_m, speed_mps, battery_pct, recorded_at,
+                         bearing, altitude_m, activity, activity_confidence, address)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     ON CONFLICT(user_id) DO UPDATE SET
+                        lat = excluded.lat,
+                        lng = excluded.lng,
+                        accuracy_m = excluded.accuracy_m,
+                        speed_mps = excluded.speed_mps,
+                        battery_pct = excluded.battery_pct,
+                        recorded_at = excluded.recorded_at,
+                        bearing = excluded.bearing,
+                        altitude_m = excluded.altitude_m,
+                        activity = excluded.activity,
+                        activity_confidence = excluded.activity_confidence,
+                        address = excluded.address`
+                ).run(
+                    userId, lat, lng, accuracyM ?? null, speedMps ?? null, batteryPct ?? null, recordedAt,
+                    bearing ?? null, altitudeM ?? null, activity ?? null, activityConfidence ?? null,
+                    cachedAddress,
+                );
+            }
 
             db.prepare(
                 `INSERT INTO locations_history
@@ -75,6 +82,10 @@ export default async function locationRoutes(fastify, { db }) {
             );
         });
         writeLocation();
+
+        if (isPaused) {
+            return { ok: true, paused: true };
+        }
 
         const circleId = getUserCircleId(db, userId);
         if (circleId) {
@@ -155,10 +166,13 @@ export default async function locationRoutes(fastify, { db }) {
             .get(circleId, req.auth.userId);
         if (!membership) return reply.code(403).send({ error: 'not_a_member' });
 
+        const now = Date.now();
         const rows = db
             .prepare(
                 `SELECT u.id AS userId, u.display_name AS displayName, u.email,
                         u.photo_path AS photoPath,
+                        u.paused_until AS pausedUntil,
+                        u.pause_reason AS pauseReason,
                         cm.role AS role,
                         l.lat AS lat, l.lng AS lng,
                         l.accuracy_m AS accuracyM,
@@ -177,10 +191,16 @@ export default async function locationRoutes(fastify, { db }) {
                  ORDER BY cm.role DESC, u.display_name COLLATE NOCASE ASC`
             )
             .all(circleId)
-            .map(({ photoPath, ...m }) => ({
-                ...m,
-                photoUrl: photoPath ? `/api/users/${m.userId}/photo` : null,
-            }));
+            .map(({ photoPath, pausedUntil, pauseReason, ...m }) => {
+                const paused = !!(pausedUntil && pausedUntil > now);
+                return {
+                    ...m,
+                    photoUrl: photoPath ? `/api/users/${m.userId}/photo` : null,
+                    paused,
+                    pausedUntil: paused ? pausedUntil : null,
+                    pauseReason: paused ? pauseReason : null,
+                };
+            });
         return { members: rows };
     });
 

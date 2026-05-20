@@ -59,6 +59,21 @@ data class CircleMember(
     val recordedAt: Long? = null,
     val photoUrl: String? = null,
     val address: String? = null,
+    val paused: Boolean = false,
+    val pausedUntil: Long? = null,
+    val pauseReason: String? = null,
+)
+
+@Serializable
+data class PauseBody(
+    val durationMinutes: Int,
+    val reason: String? = null,
+)
+
+@Serializable
+data class PauseState(
+    val pausedUntil: Long? = null,
+    val reason: String? = null,
 )
 
 @Serializable

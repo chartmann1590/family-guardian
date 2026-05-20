@@ -4,13 +4,13 @@ import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import * as TaskManager from 'expo-task-manager';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 type Session = { serverUrl: string; token: string; userId: number; circleId: number; displayName: string; email: string };
-type Member = { userId: number; displayName: string; email?: string; role?: string; lat?: number; lng?: number; accuracyM?: number; speedMps?: number; batteryPct?: number; bearing?: number; altitudeM?: number; activity?: string; activityConfidence?: number; recordedAt?: number; photoUrl?: string; address?: string };
+type Member = { userId: number; displayName: string; email?: string; role?: string; lat?: number; lng?: number; accuracyM?: number; speedMps?: number; batteryPct?: number; bearing?: number; altitudeM?: number; activity?: string; activityConfidence?: number; recordedAt?: number; photoUrl?: string; address?: string; paused?: boolean; pausedUntil?: number | null; pauseReason?: string | null };
 type Place = { id: number; circleId: number; name: string; address?: string | null; lat: number; lng: number; radiusM: number; alertsOnEnter: boolean; alertsOnExit: boolean };
 type Message = { id: number; circleId?: number; userId: number; displayName?: string; body: string; createdAt: number };
 type AlertEvent = { id: number; userId: number; displayName?: string; circleId: number; type: string; value?: number; createdAt: number };
@@ -84,6 +84,20 @@ function inferActivity(speed?: number | null) {
   if (speed < 2.5) return 'walking';
   if (speed < 7) return 'running';
   return 'driving';
+}
+function formatPauseUntil(ms?: number | null) {
+  if (!ms) return '';
+  const d = new Date(ms);
+  const sameDay = d.toDateString() === new Date().toDateString();
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return sameDay ? time : `${d.toLocaleDateString()} ${time}`;
+}
+function minutesUntilTonight() {
+  const now = new Date();
+  const t = new Date(now);
+  t.setHours(20, 0, 0, 0);
+  if (t <= now) t.setDate(t.getDate() + 1);
+  return Math.max(1, Math.min(1440, Math.round((t.getTime() - now.getTime()) / 60000)));
 }
 function rel(ms?: number) {
   if (!ms) return 'no fix';
@@ -178,8 +192,7 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
 
   useEffect(() => { load().catch((e) => Alert.alert('Load failed', e.message)); }, [load]);
   useEffect(() => {
-    const NativeWebSocket = WebSocket as any;
-    const ws = new NativeWebSocket(wsUrl(session.serverUrl), undefined, { headers: { Authorization: `Bearer ${session.token}` } });
+    const ws = new WebSocket(`${wsUrl(session.serverUrl)}?token=${encodeURIComponent(session.token)}`);
     ws.onopen = () => setWsState('live');
     ws.onclose = () => setWsState('offline');
     ws.onerror = () => setWsState('offline');
@@ -188,6 +201,11 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
       if (msg.type === 'location_update') setMembers((cur) => upsertMember(cur, msg));
       if (msg.type === 'chat_message') setMessages((cur) => [...cur, msg]);
       if (msg.type === 'sos_active') await notify('SOS active', `${msg.displayName || 'A member'} triggered SOS`);
+      if (msg.type === 'pause_changed') {
+        setMembers((cur) => cur.map((m) => m.userId === msg.userId
+          ? { ...m, paused: !!msg.pausedUntil, pausedUntil: msg.pausedUntil, pauseReason: msg.reason }
+          : m));
+      }
       if (msg.type?.includes('alert') || msg.type?.startsWith('geofence')) await notify('Family Guardian', `${msg.displayName || 'Member'}: ${msg.type.replaceAll('_', ' ')}`);
     };
     return () => ws.close();
@@ -237,16 +255,68 @@ async function notify(title: string, body: string) { await Notifications.request
 
 function MapTab({ members, places, mapRef, onMember, onShare, sharing, onSos, onCheckIn }: any) {
   const first = members.find((m: Member) => m.lat && m.lng);
-  return <View style={styles.flex}><MapView ref={mapRef} style={styles.map} initialRegion={{ latitude: first?.lat || 37.7749, longitude: first?.lng || -122.4194, latitudeDelta: 0.08, longitudeDelta: 0.08 }}>{places.map((p: Place) => <Circle key={p.id} center={{ latitude: p.lat, longitude: p.lng }} radius={p.radiusM} strokeColor="#006c49" fillColor="rgba(0,108,73,.10)" />)}{members.filter((m: Member) => m.lat && m.lng).map((m: Member) => <Marker key={m.userId} coordinate={{ latitude: m.lat!, longitude: m.lng! }} title={m.displayName} description={rel(m.recordedAt)} onPress={() => onMember(m)} />)}</MapView><View style={styles.floating}><Text style={styles.cardTitle}>{members.length} members</Text><View style={styles.row}><Pressable style={styles.primaryButton} onPress={onShare}><Text style={styles.buttonText}>{sharing ? 'Stop GPS' : 'Share GPS'}</Text></Pressable><Pressable style={styles.dangerButton} onPress={onSos}><Text style={styles.buttonText}>SOS</Text></Pressable></View><View style={styles.row}><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('safe_home')}><Text>Safe home</Text></Pressable><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('heading_home')}><Text>Heading home</Text></Pressable></View></View></View>;
+  return <View style={styles.flex}><MapView ref={mapRef} style={styles.map} initialRegion={{ latitude: first?.lat || 37.7749, longitude: first?.lng || -122.4194, latitudeDelta: 0.08, longitudeDelta: 0.08 }}>{places.map((p: Place) => <Circle key={p.id} center={{ latitude: p.lat, longitude: p.lng }} radius={p.radiusM} strokeColor="#006c49" fillColor="rgba(0,108,73,.10)" />)}{members.filter((m: Member) => m.lat && m.lng).map((m: Member) => <Marker key={m.userId} coordinate={{ latitude: m.lat!, longitude: m.lng! }} title={m.displayName + (m.paused ? ' (paused)' : '')} description={m.paused ? `Paused${m.pausedUntil ? ' until ' + formatPauseUntil(m.pausedUntil) : ''}` : rel(m.recordedAt)} pinColor={m.paused ? 'gray' : 'red'} opacity={m.paused ? 0.7 : 1} onPress={() => onMember(m)} />)}</MapView><View style={styles.floating}><Text style={styles.cardTitle}>{members.length} members</Text><View style={styles.row}><Pressable style={styles.primaryButton} onPress={onShare}><Text style={styles.buttonText}>{sharing ? 'Stop GPS' : 'Share GPS'}</Text></Pressable><Pressable style={styles.dangerButton} onPress={onSos}><Text style={styles.buttonText}>SOS</Text></Pressable></View><View style={styles.row}><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('safe_home')}><Text>Safe home</Text></Pressable><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('heading_home')}><Text>Heading home</Text></Pressable></View></View></View>;
 }
 function MembersTab({ session, members, selected, setSelected, history, setHistory }: any) {
   async function open(m: Member) { setSelected(m); const to = Date.now(); const from = to - 86400000 * 7; const data = await api<{ points: LocationPoint[] }>(session, `/api/circles/${session.circleId}/members/${m.userId}/history?from=${from}&to=${to}&limit=500`); setHistory(data.points); }
-  return <ScrollView style={styles.content}>{members.map((m: Member) => <Pressable key={m.userId} style={styles.card} onPress={() => open(m)}><Text style={styles.cardTitle}>{m.displayName}</Text><Text style={styles.meta}>{m.address || (m.lat ? `${m.lat.toFixed(4)}, ${m.lng?.toFixed(4)}` : 'No location yet')}</Text><Text style={styles.meta}>{rel(m.recordedAt)} {m.batteryPct != null ? `· ${m.batteryPct}%` : ''}</Text></Pressable>)}{selected && <View style={styles.card}><Text style={styles.cardTitle}>{selected.displayName} history</Text><Text style={styles.meta}>{history.length} points in the last 7 days</Text>{history.length > 1 && <MapView style={styles.smallMap} initialRegion={{ latitude: history[0].lat, longitude: history[0].lng, latitudeDelta: .08, longitudeDelta: .08 }}><Polyline coordinates={history.map((p: LocationPoint) => ({ latitude: p.lat, longitude: p.lng }))} strokeColor="#006c49" strokeWidth={4} /></MapView>}</View>}</ScrollView>;
+  return <ScrollView style={styles.content}>{members.map((m: Member) => <Pressable key={m.userId} style={styles.card} onPress={() => open(m)}><Text style={styles.cardTitle}>{m.displayName}</Text>{m.paused ? <Text style={[styles.meta, { color: '#943700' }]}>⏸ Paused{m.pausedUntil ? ` until ${formatPauseUntil(m.pausedUntil)}` : ''}</Text> : <Text style={styles.meta}>{m.address || (m.lat ? `${m.lat.toFixed(4)}, ${m.lng?.toFixed(4)}` : 'No location yet')}</Text>}<Text style={styles.meta}>{rel(m.recordedAt)} {m.batteryPct != null ? `· ${m.batteryPct}%` : ''}</Text></Pressable>)}{selected && <View style={styles.card}><Text style={styles.cardTitle}>{selected.displayName} history</Text><Text style={styles.meta}>{history.length} points in the last 7 days</Text>{history.length > 1 && <MapView style={styles.smallMap} initialRegion={{ latitude: history[0].lat, longitude: history[0].lng, latitudeDelta: .08, longitudeDelta: .08 }}><Polyline coordinates={history.map((p: LocationPoint) => ({ latitude: p.lat, longitude: p.lng }))} strokeColor="#006c49" strokeWidth={4} /></MapView>}</View>}</ScrollView>;
 }
 function ChatTab({ session, messages, setMessages, loadMessages }: any) { const [body, setBody] = useState(''); useEffect(() => { loadMessages().catch(() => {}); }, []); async function send() { if (!body.trim()) return; const msg = await api<Message>(session, `/api/circles/${session.circleId}/messages`, { method: 'POST', body: JSON.stringify({ body: body.trim() }) }); setMessages((cur: Message[]) => [...cur, msg]); setBody(''); } return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><FlatList style={styles.content} data={messages} keyExtractor={(m) => String(m.id)} renderItem={({ item }) => <View style={[styles.message, item.userId === session.userId && styles.mine]}><Text style={styles.meta}>{item.displayName || 'Member'}</Text><Text>{item.body}</Text></View>} /><View style={styles.composer}><TextInput style={styles.inputFlex} value={body} onChangeText={setBody} placeholder="Message" /><Pressable style={styles.primaryButton} onPress={send}><Text style={styles.buttonText}>Send</Text></Pressable></View></KeyboardAvoidingView>; }
 function PlacesTab({ session, places, setPlaces }: any) { const [name, setName] = useState(''); const [lat, setLat] = useState(''); const [lng, setLng] = useState(''); const [radius, setRadius] = useState('150'); async function save() { const p = await api<Place>(session, `/api/circles/${session.circleId}/places`, { method: 'POST', body: JSON.stringify({ name, lat: Number(lat), lng: Number(lng), radiusM: Number(radius), alertsOnEnter: true, alertsOnExit: true }) }); setPlaces((cur: Place[]) => [...cur, p]); setName(''); } return <ScrollView style={styles.content}><View style={styles.card}><TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Place name" /><TextInput style={styles.input} value={lat} onChangeText={setLat} placeholder="Latitude" keyboardType="decimal-pad" /><TextInput style={styles.input} value={lng} onChangeText={setLng} placeholder="Longitude" keyboardType="decimal-pad" /><TextInput style={styles.input} value={radius} onChangeText={setRadius} placeholder="Radius meters" keyboardType="decimal-pad" /><Pressable style={styles.primaryButton} onPress={save}><Text style={styles.buttonText}>Save place</Text></Pressable></View>{places.map((p: Place) => <View style={styles.card} key={p.id}><Text style={styles.cardTitle}>{p.name}</Text><Text style={styles.meta}>{p.address || `${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}`} · {Math.round(p.radiusM)}m</Text></View>)}</ScrollView>; }
 function AlertsTab({ alerts, loadAlerts }: any) { useEffect(() => { loadAlerts().catch(() => {}); }, []); return <ScrollView style={styles.content}>{alerts.map((a: AlertEvent) => <View style={styles.card} key={a.id}><Text style={styles.cardTitle}>{a.displayName || 'Member'}</Text><Text style={styles.meta}>{a.type} {a.value != null ? `· ${a.value}` : ''} · {rel(a.createdAt)}</Text></View>)}</ScrollView>; }
-function MoreTab({ session, onLogout, onRefresh }: any) { return <ScrollView style={styles.content}><View style={styles.card}><Text style={styles.cardTitle}>Server</Text><Text style={styles.meta}>{session.serverUrl}</Text><Pressable style={styles.secondaryButton} onPress={onRefresh}><Text>Refresh data</Text></Pressable><Pressable style={styles.dangerButton} onPress={onLogout}><Text style={styles.buttonText}>Log out</Text></Pressable></View><View style={styles.card}><Text style={styles.cardTitle}>Sideload build</Text><Text style={styles.meta}>This app is built as an unsigned IPA in GitHub Actions, then signed on Windows with Sideloadly or AltStore using a free Apple ID.</Text></View></ScrollView>; }
+function MoreTab({ session, onLogout, onRefresh }: any) {
+  const [pauseUntil, setPauseUntil] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    api<{ pausedUntil: number | null }>(session, '/api/users/me/pause')
+      .then((d) => setPauseUntil(d.pausedUntil))
+      .catch(() => {});
+  }, [session]);
+  const isPaused = !!(pauseUntil && pauseUntil > Date.now());
+  async function setPause(minutes: number) {
+    setBusy(true);
+    try {
+      const d = await api<{ pausedUntil: number | null }>(session, '/api/users/me/pause', { method: 'POST', body: JSON.stringify({ durationMinutes: minutes }) });
+      setPauseUntil(d.pausedUntil);
+      Alert.alert('Paused', `Sharing paused until ${formatPauseUntil(d.pausedUntil)}`);
+    } catch (e: any) { Alert.alert('Pause failed', e.message); } finally { setBusy(false); }
+  }
+  async function clearPause() {
+    setBusy(true);
+    try {
+      await api(session, '/api/users/me/pause', { method: 'DELETE' });
+      setPauseUntil(null);
+    } catch (e: any) { Alert.alert('Resume failed', e.message); } finally { setBusy(false); }
+  }
+  return <ScrollView style={styles.content}>
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Pause sharing</Text>
+      <Text style={[styles.meta, isPaused && { color: '#943700' }]}>{isPaused ? `Paused until ${formatPauseUntil(pauseUntil)}` : 'Sharing is on.'}</Text>
+      {isPaused
+        ? <Pressable style={styles.dangerButton} disabled={busy} onPress={clearPause}><Text style={styles.buttonText}>Resume now</Text></Pressable>
+        : <View style={{ gap: 8 }}>
+            <View style={styles.row}>
+              <Pressable style={styles.secondaryButton} disabled={busy} onPress={() => setPause(15)}><Text>15 min</Text></Pressable>
+              <Pressable style={styles.secondaryButton} disabled={busy} onPress={() => setPause(60)}><Text>1 hour</Text></Pressable>
+            </View>
+            <View style={styles.row}>
+              <Pressable style={styles.secondaryButton} disabled={busy} onPress={() => setPause(240)}><Text>4 hours</Text></Pressable>
+              <Pressable style={styles.secondaryButton} disabled={busy} onPress={() => setPause(minutesUntilTonight())}><Text>Until 8 PM</Text></Pressable>
+            </View>
+          </View>}
+    </View>
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Server</Text>
+      <Text style={styles.meta}>{session.serverUrl}</Text>
+      <Pressable style={styles.secondaryButton} onPress={onRefresh}><Text>Refresh data</Text></Pressable>
+      <Pressable style={styles.dangerButton} onPress={onLogout}><Text style={styles.buttonText}>Log out</Text></Pressable>
+    </View>
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Sideload build</Text>
+      <Text style={styles.meta}>This app is built as an unsigned IPA in GitHub Actions, then signed on Windows with Sideloadly or AltStore using a free Apple ID.</Text>
+    </View>
+  </ScrollView>;
+}
 
 const styles = StyleSheet.create({
   flex: { flex: 1 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' }, app: { flex: 1, backgroundColor: '#eef7f0' }, auth: { flex: 1, padding: 22, justifyContent: 'center', backgroundColor: '#eef7f0' }, brand: { fontSize: 44, fontWeight: '900', letterSpacing: -2, color: '#061b16' }, subtitle: { color: '#53616b', marginVertical: 14, fontSize: 16 }, header: { paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, eyebrow: { color: '#66737f', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.4, fontWeight: '800' }, title: { fontSize: 24, fontWeight: '900', letterSpacing: -1.2 }, badge: { backgroundColor: '#dff2e9', color: '#006c49', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, overflow: 'hidden', fontWeight: '800' }, map: { flex: 1 }, floating: { position: 'absolute', left: 14, right: 14, bottom: 16, backgroundColor: 'rgba(255,255,255,.92)', borderRadius: 26, padding: 14, gap: 10 }, row: { flexDirection: 'row', gap: 10, alignItems: 'center' }, content: { flex: 1, paddingHorizontal: 14 }, card: { backgroundColor: 'white', borderRadius: 22, padding: 14, marginBottom: 10, gap: 8, shadowColor: '#071b24', shadowOpacity: .08, shadowRadius: 12 }, cardTitle: { fontSize: 18, fontWeight: '900' }, meta: { color: '#66737f', lineHeight: 20 }, input: { backgroundColor: 'white', borderRadius: 16, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(7,27,36,.12)' }, inputFlex: { flex: 1, backgroundColor: 'white', borderRadius: 16, padding: 13, borderWidth: 1, borderColor: 'rgba(7,27,36,.12)' }, primaryButton: { backgroundColor: '#006c49', padding: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flex: 1 }, dangerButton: { backgroundColor: '#ba1a1a', padding: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flex: 1 }, secondaryButton: { backgroundColor: '#dff2e9', padding: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flex: 1 }, buttonText: { color: 'white', fontWeight: '900' }, secondaryText: { color: '#006c49', fontWeight: '900' }, tabs: { flexDirection: 'row', padding: 8, gap: 4, backgroundColor: 'rgba(255,255,255,.94)' }, tab: { flex: 1, paddingVertical: 10, borderRadius: 14, alignItems: 'center' }, activeTab: { backgroundColor: '#dff2e9' }, tabText: { color: '#66737f', fontSize: 11, fontWeight: '800' }, activeTabText: { color: '#006c49' }, smallMap: { height: 220, borderRadius: 18 }, composer: { flexDirection: 'row', gap: 8, padding: 10 }, message: { maxWidth: '84%', backgroundColor: 'white', borderRadius: 18, padding: 10, marginBottom: 8 }, mine: { alignSelf: 'flex-end', backgroundColor: '#dff2e9' },

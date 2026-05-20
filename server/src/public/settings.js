@@ -33,6 +33,15 @@
         return text + `<img src="${esc(m.photoUrl)}" alt="" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:9999px;object-fit:cover;z-index:1">`;
     }
 
+    function formatPauseUntil(ms) {
+        if (!ms) return '';
+        const date = new Date(ms);
+        const today = new Date();
+        const sameDay = date.toDateString() === today.toDateString();
+        const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        return sameDay ? time : `${date.toLocaleDateString()} ${time}`;
+    }
+
     function renderMembers() {
         memberCount.textContent = `${state.members.length} member${state.members.length === 1 ? '' : 's'}`;
         memberList.innerHTML = '';
@@ -40,15 +49,19 @@
             const row = document.createElement('div');
             row.className = 'flex items-center gap-3 py-3';
             const isMe = m.userId === state.me.userId;
+            const pauseBadge = m.paused
+                ? `<span class="text-xs bg-surface-container px-2 py-0.5 rounded-full text-on-surface-variant inline-flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">pause_circle</span>Paused until ${esc(formatPauseUntil(m.pausedUntil))}</span>`
+                : '';
             row.innerHTML = `
                 <div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface font-bold" style="position:relative;overflow:hidden">
                     ${avatarInner(m)}
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
                         <span class="font-headline-md text-on-surface text-base">${esc(m.displayName)}</span>
                         ${isMe ? '<span class="text-xs bg-surface-container px-2 py-0.5 rounded-full text-on-surface-variant">You</span>' : ''}
                         ${m.role === 'admin' ? '<span class="text-xs bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded-full">Admin</span>' : ''}
+                        ${pauseBadge}
                     </div>
                     <span class="text-sm text-on-surface-variant">${esc(m.email)}</span>
                 </div>`;
@@ -174,9 +187,95 @@
         }
     }
 
+    function renderPauseState(pausedUntil) {
+        const status = $('pause-status');
+        const unpauseBtn = $('pause-unpause');
+        if (pausedUntil && pausedUntil > Date.now()) {
+            status.textContent = `Paused until ${formatPauseUntil(pausedUntil)}`;
+            status.classList.add('text-error');
+            status.classList.remove('text-on-surface-variant');
+            unpauseBtn.classList.remove('hidden');
+        } else {
+            status.textContent = 'Sharing is on';
+            status.classList.remove('text-error');
+            status.classList.add('text-on-surface-variant');
+            unpauseBtn.classList.add('hidden');
+        }
+    }
+
+    async function fetchPause() {
+        try {
+            const res = await fetch('/api/users/me/pause', { credentials: 'same-origin' });
+            if (!res.ok) return;
+            const data = await res.json();
+            renderPauseState(data.pausedUntil);
+        } catch { /* ignore */ }
+    }
+
+    async function setPause(minutes) {
+        try {
+            const res = await fetch('/api/users/me/pause', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ durationMinutes: minutes }),
+            });
+            if (!res.ok) {
+                const e = await res.json().catch(() => ({}));
+                throw new Error(e.error || ('HTTP ' + res.status));
+            }
+            const data = await res.json();
+            renderPauseState(data.pausedUntil);
+            toast(`Paused until ${formatPauseUntil(data.pausedUntil)}`, 'success');
+            for (const m of state.members) {
+                if (m.userId === state.me.userId) {
+                    m.paused = true;
+                    m.pausedUntil = data.pausedUntil;
+                }
+            }
+            renderMembers();
+        } catch (err) {
+            toast('Pause failed: ' + err.message, 'error');
+        }
+    }
+
+    async function unpause() {
+        try {
+            const res = await fetch('/api/users/me/pause', {
+                method: 'DELETE', credentials: 'same-origin',
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            renderPauseState(null);
+            toast('Sharing resumed', 'success');
+            for (const m of state.members) {
+                if (m.userId === state.me.userId) {
+                    m.paused = false;
+                    m.pausedUntil = null;
+                }
+            }
+            renderMembers();
+        } catch (err) {
+            toast('Resume failed: ' + err.message, 'error');
+        }
+    }
+
+    function minutesUntilTonight() {
+        const now = new Date();
+        const target = new Date(now);
+        target.setHours(20, 0, 0, 0);
+        if (target <= now) target.setDate(target.getDate() + 1);
+        return Math.max(1, Math.min(1440, Math.round((target - now) / 60000)));
+    }
+
     // Boot
     renderMembers();
     renderMyAvatar();
+    fetchPause();
+    for (const btn of document.querySelectorAll('.pause-opt')) {
+        btn.addEventListener('click', () => setPause(Number(btn.dataset.minutes)));
+    }
+    $('pause-until-tonight').addEventListener('click', () => setPause(minutesUntilTonight()));
+    $('pause-unpause').addEventListener('click', unpause);
     $('photo-input').addEventListener('change', async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
