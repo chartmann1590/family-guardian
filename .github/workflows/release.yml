@@ -160,6 +160,120 @@ jobs:
           print(f"Patched {file}")
           PY
 
+      - name: Patch Expo root view factory for React Native 0.81
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              "node_modules/expo/ios/AppDelegates/EXReactRootViewFactory.h": [
+                  (
+                      "#if TARGET_OS_IOS || TARGET_OS_TV\n"
+                      "- (UIView *)superViewWithModuleName:(NSString *)moduleName\n"
+                      "                  initialProperties:(nullable NSDictionary *)initialProperties\n"
+                      "                      launchOptions:(nullable NSDictionary *)launchOptions\n"
+                      "               devMenuConfiguration:(nullable RCTDevMenuConfiguration *)devMenuConfiguration;\n"
+                      "#else\n"
+                      "- (UIView *)superViewWithModuleName:(NSString *)moduleName\n"
+                      "                  initialProperties:(nullable NSDictionary *)initialProperties\n"
+                      "                      launchOptions:(nullable NSDictionary *)launchOptions;\n"
+                      "#endif\n",
+                      "- (UIView *)superViewWithModuleName:(NSString *)moduleName\n"
+                      "                  initialProperties:(nullable NSDictionary *)initialProperties\n"
+                      "                      launchOptions:(nullable NSDictionary *)launchOptions;\n",
+                  ),
+              ],
+              "node_modules/expo/ios/AppDelegates/EXReactRootViewFactory.mm": [
+                  ("#import <React/RCTDevMenu.h>\n", ""),
+                  (
+                      "#if TARGET_OS_IOS || TARGET_OS_TV\n"
+                      "- (UIView *)viewWithModuleName:(NSString *)moduleName\n"
+                      "             initialProperties:(nullable NSDictionary *)initialProperties\n"
+                      "                 launchOptions:(nullable NSDictionary *)launchOptions\n"
+                      "          devMenuConfiguration:(RCTDevMenuConfiguration *)devMenuConfiguration\n"
+                      "{\n"
+                      "  if (self.reactDelegate != nil) {\n"
+                      "    return [((id<EXReactDelegateProtocol>)self.reactDelegate) createReactRootViewWithModuleName:moduleName initialProperties:initialProperties launchOptions:launchOptions];\n"
+                      "  }\n"
+                      "  return [super viewWithModuleName:moduleName initialProperties:initialProperties launchOptions:launchOptions devMenuConfiguration:devMenuConfiguration];\n"
+                      "}\n\n"
+                      "- (UIView *)superViewWithModuleName:(NSString *)moduleName\n"
+                      "                  initialProperties:(nullable NSDictionary *)initialProperties\n"
+                      "                      launchOptions:(nullable NSDictionary *)launchOptions\n"
+                      "               devMenuConfiguration:(nullable RCTDevMenuConfiguration *)devMenuConfiguration\n"
+                      "{\n"
+                      "  if (devMenuConfiguration == nil) {\n"
+                      "    devMenuConfiguration = [RCTDevMenuConfiguration defaultConfiguration];\n"
+                      "  }\n\n"
+                      "  return [super viewWithModuleName:moduleName initialProperties:initialProperties launchOptions:launchOptions devMenuConfiguration:devMenuConfiguration];\n"
+                      "}\n"
+                      "#else\n",
+                      "",
+                  ),
+                  ("#endif\n\n- (NSURL *)bundleURL\n", "- (NSURL *)bundleURL\n"),
+              ],
+              "node_modules/expo/ios/AppDelegates/ExpoReactNativeFactory.swift": [
+                  (
+                      "      // RCTDevMenuConfiguration is only available in react-native 0.83+\n"
+                      "#if os(iOS) || os(tvOS)\n"
+                      "      // When calling `recreateRootViewWithBundleURL:` from `EXReactRootViewFactory`,\n"
+                      "      // we don't want to loop the ReactDelegate again. Otherwise, it will be an infinite loop.\n"
+                      "      rootView = factory.superView(\n"
+                      "        withModuleName: moduleName ?? defaultModuleName,\n"
+                      "        initialProperties: initialProps,\n"
+                      "        launchOptions: launchOptions ?? [:],\n"
+                      "        devMenuConfiguration: self.devMenuConfiguration\n"
+                      "      )\n"
+                      "#else\n"
+                      "      rootView = factory.superView(\n"
+                      "        withModuleName: moduleName ?? defaultModuleName,\n"
+                      "        initialProperties: initialProps,\n"
+                      "        launchOptions: launchOptions ?? [:]\n"
+                      "      )\n"
+                      "#endif\n",
+                      "      // When calling `recreateRootViewWithBundleURL:` from `EXReactRootViewFactory`,\n"
+                      "      // we don't want to loop the ReactDelegate again. Otherwise, it will be an infinite loop.\n"
+                      "      rootView = factory.superView(\n"
+                      "        withModuleName: moduleName ?? defaultModuleName,\n"
+                      "        initialProperties: initialProps,\n"
+                      "        launchOptions: launchOptions ?? [:]\n"
+                      "      )\n",
+                  ),
+                  (
+                      "#if os(iOS) || os(tvOS)\n"
+                      "      rootView = rootViewFactory.view(\n"
+                      "        withModuleName: moduleName ?? defaultModuleName,\n"
+                      "        initialProperties: initialProps,\n"
+                      "        launchOptions: launchOptions,\n"
+                      "        devMenuConfiguration: self.devMenuConfiguration\n"
+                      "      )\n"
+                      "#else\n"
+                      "      rootView = rootViewFactory.view(\n"
+                      "        withModuleName: moduleName ?? defaultModuleName,\n"
+                      "        initialProperties: initialProps,\n"
+                      "        launchOptions: launchOptions\n"
+                      "      )\n"
+                      "#endif\n",
+                      "      rootView = rootViewFactory.view(\n"
+                      "        withModuleName: moduleName ?? defaultModuleName,\n"
+                      "        initialProperties: initialProps,\n"
+                      "        launchOptions: launchOptions\n"
+                      "      )\n",
+                  ),
+              ],
+          }
+
+          for file, edits in replacements.items():
+              path = Path(file)
+              text = path.read_text()
+              for old, new in edits:
+                  if old not in text:
+                      raise SystemExit(f"Expected text not found in {file}")
+                  text = text.replace(old, new, 1)
+              path.write_text(text)
+              print(f"Patched {file}")
+          PY
+
       - name: Typecheck
         run: npm run typecheck
 
