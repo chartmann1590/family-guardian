@@ -6,8 +6,8 @@
   const api = {
     async json(path, options = {}) {
       const url = new URL(path, API_BASE);
-      if (url.origin !== API_BASE) throw new Error('Invalid API path');
-      const res = await fetch(url.pathname + url.search, {
+      if (url.origin !== API_BASE || !url.pathname.startsWith('/api/')) throw new Error('Invalid API path');
+      const res = await fetch(url.toString(), {
         credentials: 'same-origin',
         headers: { 'Accept': 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) },
         ...options,
@@ -96,7 +96,7 @@
     return sameDay ? time : `${d.toLocaleDateString()} ${time}`;
   }
   function appendAvatar(container, m) {
-    if (m.photoUrl) {
+    if (m.photoUrl && m.photoUrl.startsWith('/')) {
       const img = document.createElement('img');
       img.src = m.photoUrl;
       img.alt = initials(m.displayName);
