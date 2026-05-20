@@ -62,6 +62,25 @@ jobs:
               print(f"Patched {file}")
           PY
 
+      - name: Patch expo-notifications unsupported DateComponents field
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          file = "node_modules/expo-notifications/ios/ExpoNotifications/Notifications/DateComponentsSerializer.swift"
+          path = Path(file)
+          text = path.read_text()
+          old = (
+              '    if #available(iOS 26.0, *) {\n'
+              '      serializedComponents["isRepeatedDay"] = dateComponents.isRepeatedDay ?? false\n'
+              '    }\n\n'
+          )
+          if old not in text:
+              raise SystemExit(f"Expected unsupported isRepeatedDay block not found in {file}")
+          path.write_text(text.replace(old, "", 1))
+          print(f"Patched {file}")
+          PY
+
       - name: Typecheck
         run: npm run typecheck
 
