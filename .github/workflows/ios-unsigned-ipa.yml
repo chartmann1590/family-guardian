@@ -81,6 +81,7 @@ jobs:
           echo "Using workspace=$WORKSPACE scheme=$SCHEME"
           set +e
           xcodebuild \
+            -quiet \
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -configuration Release \
@@ -94,7 +95,7 @@ jobs:
           set -e
           if [ "$STATUS" -ne 0 ]; then
             echo "::group::xcodebuild error lines"
-            grep -nE "error:|fatal error:|warning:.*error|\*\* BUILD FAILED|The following build commands failed" xcodebuild.log || true
+            grep -nE "error:|fatal error:|warning:.*error|\*\* BUILD FAILED" xcodebuild.log || true
             echo "::endgroup::"
             echo "::group::Swift diagnostic files"
             find build -name '*.dia' 2>/dev/null | while read d; do
@@ -103,9 +104,6 @@ jobs:
                 strings "$d" 2>/dev/null | grep -E "error:|warning:|note:" | head -40
               fi
             done
-            echo "::endgroup::"
-            echo "::group::Last 200 lines of build log"
-            tail -n 200 xcodebuild.log
             echo "::endgroup::"
             exit "$STATUS"
           fi
