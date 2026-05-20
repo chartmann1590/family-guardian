@@ -10,7 +10,7 @@ data class SignupRequest(
     val email: String,
     val password: String,
     val displayName: String,
-    val inviteCode: String,
+    val inviteCode: String? = null,
 )
 
 @Serializable
@@ -254,3 +254,18 @@ data class CheckinResponse(
     val note: String? = null,
     val createdAt: Long,
 )
+
+@Serializable
+data class ViewLogEntry(
+    val resource: String,
+    val viewedAt: Long,
+    val viewerId: Long,
+    val viewerName: String,
+    val viewerPhotoUrl: String? = null,
+)
+
+@Serializable
+data class ViewLogResponse(val views: List<ViewLogEntry>)
+
+@Serializable
+data class DeleteAccountBody(val password: String)

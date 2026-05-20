@@ -1,5 +1,6 @@
 import { requireAuth } from '../auth.js';
 import { getCachedLabel, enqueueGeocode } from '../geocoder.js';
+import { logView } from '../audit.js';
 
 function assertMember(db, circleId, userId, reply) {
     const m = db
@@ -84,6 +85,7 @@ export default async function tripsRoutes(fastify, { db }) {
              LIMIT ?`,
         ).all(targetUserId, circleId, from, to, limit);
         enrichTripLabels(db, rows);
+        logView(db, req.auth.userId, targetUserId, 'trips');
         return { trips: rows.map(tripRowToJson) };
     });
 }

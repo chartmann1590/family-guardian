@@ -267,9 +267,14 @@ function AlertsTab({ alerts, loadAlerts }: any) { useEffect(() => { loadAlerts()
 function MoreTab({ session, onLogout, onRefresh }: any) {
   const [pauseUntil, setPauseUntil] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [views, setViews] = useState<any[]>([]);
+  const RESOURCE_LABELS: Record<string, string> = { history: 'Location history', visits: 'Visits', trips: 'Trips', member_page: 'Profile page' };
   useEffect(() => {
     api<{ pausedUntil: number | null }>(session, '/api/users/me/pause')
       .then((d) => setPauseUntil(d.pausedUntil))
+      .catch(() => {});
+    api<{ views: any[] }>(session, '/api/users/me/view-log?days=7')
+      .then((d) => setViews(d.views || []))
       .catch(() => {});
   }, [session]);
   const isPaused = !!(pauseUntil && pauseUntil > Date.now());
@@ -304,6 +309,48 @@ function MoreTab({ session, onLogout, onRefresh }: any) {
               <Pressable style={styles.secondaryButton} disabled={busy} onPress={() => setPause(minutesUntilTonight())}><Text>Until 8 PM</Text></Pressable>
             </View>
           </View>}
+    </View>
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Who viewed your history</Text>
+      {views.length === 0
+        ? <Text style={styles.meta}>Nobody has viewed your data recently.</Text>
+        : views.map((v: any, i: number) => <View key={i} style={{ paddingVertical: 6 }}><Text style={styles.cardTitle}>{v.viewerName}</Text><Text style={styles.meta}>{RESOURCE_LABELS[v.resource] || v.resource} · {rel(v.viewedAt)}</Text></View>)}
+    </View>
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Account</Text>
+      <Pressable style={styles.secondaryButton} onPress={async () => {
+        try {
+          const res = await fetch(`${session.serverUrl}/api/users/me/export`, { headers: { Authorization: `Bearer ${session.token}` } });
+          if (!res.ok) throw new Error('Export failed');
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          const match = res.headers.get('content-disposition')?.match(/filename="([^"]+)"/);
+          a.download = match ? match[1] : 'export.json';
+          a.click();
+          URL.revokeObjectURL(url);
+        } catch (e: any) { Alert.alert('Export failed', e.message); }
+      }}><Text>Export my data</Text></Pressable>
+      <Pressable style={styles.dangerButton} onPress={async () => {
+        Alert.prompt('Delete account', 'Enter your password to confirm deletion.', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: async (pwd?: string) => {
+            if (!pwd) return;
+            try {
+              const res = await fetch(`${session.serverUrl}/api/users/me`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${session.token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pwd }),
+              });
+              if (res.status === 409) { Alert.alert('Admin handoff required', 'Promote another member to admin first.'); return; }
+              if (res.status === 401) { Alert.alert('Wrong password'); return; }
+              if (!res.ok && res.status !== 204) throw new Error('Delete failed');
+              onLogout();
+            } catch (e: any) { Alert.alert('Failed', e.message); }
+          }},
+        ], 'secure-text');
+      }}><Text style={styles.buttonText}>Delete my account</Text></Pressable>
     </View>
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Server</Text>

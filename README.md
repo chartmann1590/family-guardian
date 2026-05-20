@@ -230,7 +230,14 @@ Without `FCM_SERVICE_ACCOUNT_PATH`, the server logs "FCM disabled" once and cont
 | GET    | `/api/users/me/alert-prefs`  | ✓    | Read the caller's alert thresholds          |
 | PATCH  | `/api/users/me/alert-prefs`  | ✓    | Update speeding/low-battery/offline alert prefs |
 | GET    | `/api/circles/:id/alerts`    | ✓    | Recent `alert_events` for the circle (speeding/low_battery/offline) |
-| GET    | `/ws`                         | ✓    | WebSocket upgrade (auth via cookie or `Authorization: Bearer`); emits `location_update`, `geofence_*`, `sos_active`, `sos_resolved`, `chat_message`, `check_in` |
+| GET    | `/api/users/me/pause`        | ✓    | Read caller's current pause state           |
+| POST   | `/api/users/me/pause`        | ✓    | Pause sharing for `{durationMinutes, reason?}` (1–1440 min) |
+| DELETE | `/api/users/me/pause`        | ✓    | Resume sharing immediately                  |
+| GET    | `/api/users/me/view-log`     | ✓    | List who recently viewed your history/visits/trips (`?days=` ≤ 30) |
+| GET    | `/api/users/me/export`       | ✓    | Download a JSON of all your data (1/day)    |
+| DELETE | `/api/users/me`              | ✓    | Delete account; body `{password}`; 409 if you're a sole admin with co-members |
+| POST   | `/api/circles/:id/admins/:userId` | ✓ | Admin-only; promote a member to admin (for handoff) |
+| GET    | `/ws`                         | ✓    | WebSocket upgrade (auth via cookie or `Authorization: Bearer`); emits `location_update`, `geofence_*`, `sos_active`, `sos_resolved`, `chat_message`, `check_in`, `pause_changed` |
 | GET    | `/member/:userId`             | cookie | Web member detail page with route history      |
 | GET    | `/welcome`                    | cookie | Post-signup wizard: display name + photo + first invite |
 | GET    | `/healthz`                    | —    | Liveness probe                                |
@@ -291,6 +298,11 @@ Recently added (movement + insights):
 - ✅ **Low-battery alert** — fires on the falling-edge crossing of the threshold (default 15%). WS event `low_battery_alert`.
 - ✅ **Offline / stale alert** — a 60s scheduler scans `locations` and fires `offline_alert` for users who haven't reported in `offline_minutes` (default 30).
 - ✅ **Per-user alert preferences** — every alert type can be toggled and its threshold tuned from the Android **Alert settings** screen (`PATCH /api/users/me/alert-prefs`).
+
+Recently added (Sprint 1 — privacy & control):
+- ✅ **Pause sharing (soft pause)** — Freeze your last-known location on the circle's map for 15 min / 1 hr / 4 hr / "Until 8 PM" / custom from the PWA Settings page, the Android map header, or the iOS More tab. The circle sees a ⏸ badge + the time you'll resume, never your live position. `locations_history` continues to record fixes so your own timeline stays intact; the in-process scheduler auto-expires pauses and broadcasts `pause_changed` over WS.
+- ✅ **Audit log of who viewed you** — every read of another member's history / visits / trips / member page is logged (5-minute debounce per (viewer, subject, resource)). `GET /api/users/me/view-log?days=N` returns rows where you are the subject — you can only see views *of you*, never others. Surfaced on the Android **Who viewed your history** screen and a section on the PWA Settings page.
+- ✅ **Data export + account deletion** — `GET /api/users/me/export` returns a JSON attachment with everything the server has on you (locations history, visits, trips, messages, check-ins, SOS, alerts, places, view audits; rate-limited 1/day). `DELETE /api/users/me` (with password re-confirm) wipes you; returns 409 with `requires_admin_handoff` if you are the sole admin with co-members, in which case `POST /api/circles/:id/admins/:userId` lets you promote a successor.
 
 Privacy notes:
 - Reverse geocoding hits the public OSM Nominatim service. Each lookup is rate-limited (≤1 req/sec) and cached in `geocode_cache`, but if you'd rather keep all addresses local set `NOMINATIM_DISABLED=1` (or point `NOMINATIM_URL` at your own Nominatim instance). When disabled, visits keep a `lat,lng` label only.

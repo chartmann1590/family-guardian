@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -14,7 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Lock
@@ -69,7 +70,8 @@ fun ServerConfigScreen(onLoggedIn: () -> Unit) {
     var inviteCode by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var joinMode by remember { mutableStateOf(false) }
+    // mode: 0 = sign in (existing user), 1 = sign up (first user), 2 = join with invite
+    var mode by remember { mutableStateOf(0) }
 
     LaunchedEffect(savedUrl, savedEmail) {
         if (serverUrl.isBlank() && !savedUrl.isNullOrBlank()) serverUrl = savedUrl!!
@@ -80,7 +82,7 @@ fun ServerConfigScreen(onLoggedIn: () -> Unit) {
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
     ) {
-        Box(modifier = Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxSize().imePadding().padding(20.dp), contentAlignment = Alignment.Center) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -130,19 +132,24 @@ fun ServerConfigScreen(onLoggedIn: () -> Unit) {
                     ) {
                         // Mode toggle
                         androidx.compose.material3.TabRow(
-                            selectedTabIndex = if (joinMode) 1 else 0,
+                            selectedTabIndex = mode,
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = MaterialTheme.colorScheme.primary,
                         ) {
                             androidx.compose.material3.Tab(
-                                selected = !joinMode,
-                                onClick = { joinMode = false; error = null },
+                                selected = mode == 0,
+                                onClick = { mode = 0; error = null },
                                 text = { Text("Sign in") },
                             )
                             androidx.compose.material3.Tab(
-                                selected = joinMode,
-                                onClick = { joinMode = true; error = null },
-                                text = { Text("Join with code") },
+                                selected = mode == 1,
+                                onClick = { mode = 1; error = null },
+                                text = { Text("Sign up") },
+                            )
+                            androidx.compose.material3.Tab(
+                                selected = mode == 2,
+                                onClick = { mode = 2; error = null },
+                                text = { Text("Join") },
                             )
                         }
 
@@ -153,7 +160,6 @@ fun ServerConfigScreen(onLoggedIn: () -> Unit) {
                             placeholder = { Text("https://fg.home.arpa") },
                             leadingIcon = { Icon(Icons.Filled.Dns, contentDescription = null) },
                             singleLine = true,
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Uri),
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             colors = TextFieldDefaults.colors(
@@ -162,7 +168,7 @@ fun ServerConfigScreen(onLoggedIn: () -> Unit) {
                             ),
                         )
 
-                        if (joinMode) {
+                        if (mode == 2) {
                             OutlinedTextField(
                                 value = inviteCode,
                                 onValueChange = { inviteCode = it.uppercase() },
@@ -177,6 +183,9 @@ fun ServerConfigScreen(onLoggedIn: () -> Unit) {
                                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                                 ),
                             )
+                        }
+
+                        if (mode != 0) {
                             OutlinedTextField(
                                 value = displayName,
                                 onValueChange = { displayName = it },
@@ -243,28 +252,44 @@ fun ServerConfigScreen(onLoggedIn: () -> Unit) {
                                     error = "Email and password are required."
                                     return@Button
                                 }
-                                if (joinMode && (inviteCode.isBlank() || displayName.isBlank())) {
-                                    error = "Invite code and display name are required."
+                                if (mode != 0 && displayName.isBlank()) {
+                                    error = "Display name is required."
+                                    return@Button
+                                }
+                                if (mode == 2 && inviteCode.isBlank()) {
+                                    error = "Invite code is required."
                                     return@Button
                                 }
                                 loading = true
                                 scope.launch {
                                     try {
-                                        if (joinMode) {
-                                            repo.joinWithInvite(
+                                        when (mode) {
+                                            0 -> repo.login(
+                                                serverUrl = url,
+                                                email = email.trim(),
+                                                password = password,
+                                            )
+                                            1 -> repo.signup(
+                                                serverUrl = url,
+                                                email = email.trim(),
+                                                password = password,
+                                                displayName = displayName.trim(),
+                                            )
+                                            else -> repo.joinWithInvite(
                                                 serverUrl = url,
                                                 email = email.trim(),
                                                 password = password,
                                                 displayName = displayName.trim(),
                                                 inviteCode = inviteCode.trim().uppercase(),
                                             )
-                                        } else {
-                                            repo.login(url, email.trim(), password)
                                         }
                                         onLoggedIn()
                                     } catch (t: Throwable) {
-                                        error = (if (joinMode) "Join failed: " else "Sign-in failed: ") +
-                                            (t.message ?: t::class.simpleName)
+                                        error = when (mode) {
+                                            0 -> "Sign-in failed: "
+                                            1 -> "Sign-up failed: "
+                                            else -> "Join failed: "
+                                        } + (t.message ?: t::class.simpleName)
                                     } finally {
                                         loading = false
                                     }
@@ -287,11 +312,15 @@ fun ServerConfigScreen(onLoggedIn: () -> Unit) {
                                 )
                             } else {
                                 Text(
-                                    if (joinMode) "Join circle" else "Connect to server",
+                                    when (mode) {
+                                        0 -> "Sign in"
+                                        1 -> "Create account"
+                                        else -> "Join circle"
+                                    },
                                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                                 )
                                 Icon(
-                                    Icons.Filled.ArrowForward,
+                                    Icons.AutoMirrored.Filled.ArrowForward,
                                     contentDescription = null,
                                     modifier = Modifier.padding(start = 8.dp),
                                 )

@@ -32,6 +32,8 @@ import com.familyguardian.ui.PlacesScreen
 import com.familyguardian.ui.ServerConfigScreen
 import com.familyguardian.ui.TripsScreen
 import com.familyguardian.ui.VisitsScreen
+import com.familyguardian.ui.ViewLogScreen
+import com.familyguardian.ui.AccountScreen
 import org.osmdroid.config.Configuration
 
 class MainActivity : ComponentActivity() {
@@ -115,6 +117,8 @@ private fun AppRoot() {
                 onOpenAlertSettings = { nav.navigate("alert-settings") },
                 onOpenAlertHistory = { nav.navigate("alert-history") },
                 onOpenAbout = { nav.navigate("about") },
+                onOpenViewLog = { nav.navigate("view-log") },
+                onOpenAccount = { nav.navigate("account") },
             )
         }
         composable("places") {
@@ -162,6 +166,22 @@ private fun AppRoot() {
         }
         composable("about") {
             AboutScreen(onBack = { nav.popBackStack() })
+        }
+        composable("view-log") {
+            ViewLogScreen(onBack = { nav.popBackStack() })
+        }
+        composable("account") {
+            val circleId by prefs.circleId.collectAsStateWithLifecycle(initialValue = null)
+            val cid = circleId ?: return@composable Box {}
+            AccountScreen(
+                circleId = cid,
+                onLoggedOut = {
+                    nav.navigate("login") {
+                        popUpTo("map") { inclusive = true }
+                    }
+                },
+                onBack = { nav.popBackStack() },
+            )
         }
     }
 }

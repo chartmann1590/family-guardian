@@ -35,6 +35,8 @@ import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Sos
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -177,6 +179,8 @@ fun MapScreen(
     onOpenAlertSettings: (() -> Unit)? = null,
     onOpenAlertHistory: (() -> Unit)? = null,
     onOpenAbout: () -> Unit = {},
+    onOpenViewLog: () -> Unit = {},
+    onOpenAccount: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val appCtx = context.applicationContext
@@ -695,6 +699,12 @@ fun MapScreen(
                         Row {
                             IconButton(onClick = onOpenAbout, modifier = Modifier.size(40.dp)) {
                                 Icon(Icons.Filled.Info, contentDescription = "About", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            IconButton(onClick = onOpenViewLog, modifier = Modifier.size(40.dp)) {
+                                Icon(Icons.Filled.Visibility, contentDescription = "Who viewed me", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            IconButton(onClick = onOpenAccount, modifier = Modifier.size(40.dp)) {
+                                Icon(Icons.Filled.Person, contentDescription = "Account", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             val isPausedNow = (pauseState.pausedUntil ?: 0L) > System.currentTimeMillis()
                             IconButton(

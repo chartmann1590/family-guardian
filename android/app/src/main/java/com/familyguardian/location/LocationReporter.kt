@@ -35,6 +35,9 @@ class LocationReporter(private val prefs: Prefs) {
             activity = activity,
             activityConfidence = activityConfidence,
         )
+        // Reporting continues even while paused — privacy is enforced server-side
+        // (history writes persist, but the live broadcast is suppressed) so the
+        // user's own timeline stays intact when they unpause.
         val url = ApiClient.endpoint(serverUrl, "/api/locations")
         var attempt = 0
         var delayMs = 1_000L

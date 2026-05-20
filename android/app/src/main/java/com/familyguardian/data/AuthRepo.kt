@@ -2,6 +2,20 @@ package com.familyguardian.data
 
 class AuthRepo(private val prefs: Prefs) {
 
+    suspend fun signup(serverUrl: String, email: String, password: String, displayName: String): LoginResponse {
+        val url = ApiClient.endpoint(serverUrl, "/api/auth/signup")
+        val body = SignupRequest(
+            email = email,
+            password = password,
+            displayName = displayName,
+            inviteCode = null,
+        )
+        val resp = ApiClient.api.signup(url, body)
+        persist(serverUrl, email, resp)
+        prefs.setOnboarded(false)
+        return resp
+    }
+
     suspend fun login(serverUrl: String, email: String, password: String): LoginResponse {
         val url = ApiClient.endpoint(serverUrl, "/api/auth/login")
         val resp = ApiClient.api.login(url, LoginRequest(email = email, password = password))
@@ -28,8 +42,6 @@ class AuthRepo(private val prefs: Prefs) {
         )
         val resp = ApiClient.api.signup(url, body)
         persist(serverUrl, email, resp)
-        // Fresh account → run the onboarding wizard so we can grab a photo
-        // and confirm the display name before landing on the map.
         prefs.setOnboarded(false)
         return resp
     }

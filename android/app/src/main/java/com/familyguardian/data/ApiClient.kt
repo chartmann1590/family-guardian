@@ -13,6 +13,7 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.PATCH
+import retrofit2.http.Streaming
 import retrofit2.http.Url
 import java.util.concurrent.TimeUnit
 
@@ -162,6 +163,32 @@ interface GuardianApi {
         @Url url: String,
         @Header("Authorization") auth: String,
     ): PauseState
+
+    @GET
+    suspend fun getViewLog(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): ViewLogResponse
+
+    @GET
+    @Streaming
+    suspend fun exportData(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): retrofit2.Response<okhttp3.ResponseBody>
+
+    @DELETE
+    suspend fun deleteAccount(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: DeleteAccountBody,
+    ): retrofit2.Response<Unit>
+
+    @POST
+    suspend fun promoteAdmin(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): OkResponse
 }
 
 object ApiClient {

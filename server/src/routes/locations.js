@@ -6,6 +6,7 @@ import { onLocationFix as visitsOnFix } from '../visits.js';
 import { onLocationFix as tripsOnFix } from '../trips.js';
 import { evaluateAlerts } from '../alerts.js';
 import { enqueueGeocode, getCachedLabel } from '../geocoder.js';
+import { logView } from '../audit.js';
 
 const ACTIVITY_VALUES = ['still', 'walking', 'running', 'cycling', 'driving', 'unknown'];
 
@@ -236,6 +237,7 @@ export default async function locationRoutes(fastify, { db }) {
              LIMIT ?`
         ).all(targetUserId, from, to, limit);
 
+        logView(db, req.auth.userId, targetUserId, 'history');
         return { points: rows };
     });
 }

@@ -133,6 +133,32 @@ export default async function profileRoutes(fastify, { db, uploadsDir }) {
         return reply.send(createReadStream(path));
     });
 
+    fastify.get('/api/users/me/view-log', { preHandler: requireAuth(db) }, async (req) => {
+        const days = Math.min(Number(req.query.days) || 7, 30);
+        const cutoff = Date.now() - days * 86_400_000;
+        const rows = db
+            .prepare(
+                `SELECT va.resource, va.created_at AS viewedAt,
+                        u.id AS viewerId, u.display_name AS viewerName,
+                        u.photo_path AS viewerPhotoPath
+                 FROM view_audits va
+                 JOIN users u ON u.id = va.viewer_id
+                 WHERE va.subject_id = ? AND va.created_at >= ?
+                 ORDER BY va.created_at DESC`,
+            )
+            .all(req.auth.userId, cutoff)
+            .map((r) => ({
+                resource: r.resource,
+                viewedAt: r.viewedAt,
+                viewerId: r.viewerId,
+                viewerName: r.viewerName,
+                viewerPhotoUrl: r.viewerPhotoPath
+                    ? `/api/users/${r.viewerId}/photo`
+                    : null,
+            }));
+        return { views: rows };
+    });
+
     fastify.post('/api/users/me/fcm-token', { preHandler: requireAuth(db) }, async (req, reply) => {
         const parsed = FcmTokenBody.safeParse(req.body);
         if (!parsed.success) {

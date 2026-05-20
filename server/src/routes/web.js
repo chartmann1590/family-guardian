@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { lookupSession, extractToken } from '../auth.js';
+import { logView } from '../audit.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const VIEWS_DIR = join(__dirname, '..', 'views');
@@ -475,6 +476,7 @@ export default async function webRoutes(fastify, { db }) {
             )
             .get(circleRow.circleId, targetUserId);
         if (!targetRow) return reply.code(404).send('Member not found in your circle.');
+        logView(db, session.userId, targetUserId, 'member_page');
         const { photoPath, ...targetMember } = targetRow;
         targetMember.photoUrl = photoPath ? `/api/users/${targetUserId}/photo` : null;
 

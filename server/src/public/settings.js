@@ -267,10 +267,162 @@
         return Math.max(1, Math.min(1440, Math.round((target - now) / 60000)));
     }
 
+    const RESOURCE_LABELS = {
+        history: 'Location history',
+        visits: 'Visits',
+        trips: 'Trips',
+        member_page: 'Profile page',
+    };
+
+    function formatViewLogTime(ms) {
+        const d = new Date(ms);
+        const now = new Date();
+        const sameDay = d.toDateString() === now.toDateString();
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const isYesterday = d.toDateString() === yesterday.toDateString();
+        const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        if (sameDay) return `Today at ${time}`;
+        if (isYesterday) return `Yesterday at ${time}`;
+        return `${d.toLocaleDateString()} ${time}`;
+    }
+
+    function renderViewLog(views) {
+        const container = $('view-log-list');
+        container.innerHTML = '';
+        if (views.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'py-4 text-sm text-on-surface-variant text-center';
+            empty.textContent = 'Nobody has viewed your data recently.';
+            container.appendChild(empty);
+            return;
+        }
+        for (const v of views) {
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-3 py-3';
+            const avatarHtml = v.viewerPhotoUrl
+                ? `<img src="${esc(v.viewerPhotoUrl)}" alt="" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;border-radius:9999px;object-fit:cover;z-index:1">` +
+                  `<span style="position:relative;z-index:0">${esc(initials(v.viewerName))}</span>`
+                : `<span>${esc(initials(v.viewerName))}</span>`;
+            row.innerHTML = `
+                <div class="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface font-bold text-sm" style="position:relative;overflow:hidden">
+                    ${avatarHtml}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-headline-md text-on-surface text-sm">${esc(v.viewerName)}</span>
+                        <span class="text-xs bg-surface-container px-2 py-0.5 rounded-full text-on-surface-variant">${esc(RESOURCE_LABELS[v.resource] || v.resource)}</span>
+                    </div>
+                    <span class="text-xs text-on-surface-variant">${esc(formatViewLogTime(v.viewedAt))}</span>
+                </div>`;
+            container.appendChild(row);
+        }
+    }
+
+    async function loadViewLog() {
+        try {
+            const res = await fetch('/api/users/me/view-log?days=7', { credentials: 'same-origin' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            renderViewLog(data.views || []);
+        } catch (err) {
+            const container = $('view-log-list');
+            container.innerHTML = `<div class="py-4 text-sm text-error text-center">Failed to load: ${esc(err.message)}</div>`;
+        }
+    }
+
+    async function exportData() {
+        try {
+            const res = await fetch('/api/users/me/export', { credentials: 'same-origin' });
+            if (!res.ok) {
+                const e = await res.json().catch(() => ({}));
+                throw new Error(e.error || ('HTTP ' + res.status));
+            }
+            const blob = await res.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            const match = res.headers.get('content-disposition')?.match(/filename="([^"]+)"/);
+            a.download = match ? match[1] : 'family-guardian-export.json';
+            a.click();
+            URL.revokeObjectURL(a.href);
+            toast('Export downloaded', 'success');
+        } catch (err) {
+            toast('Export failed: ' + err.message, 'error');
+        }
+    }
+
+    async function deleteAccount() {
+        const password = prompt('Enter your password to confirm account deletion:');
+        if (!password) return;
+        if (!confirm('This permanently deletes your account and all your data. Are you sure?')) return;
+        try {
+            const res = await fetch('/api/users/me', {
+                method: 'DELETE',
+                headers: { 'content-type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ password }),
+            });
+            if (res.status === 409) {
+                const e = await res.json();
+                if (e.error === 'requires_admin_handoff') {
+                    showPromoteSection();
+                    toast('You must promote another admin first.', 'error');
+                    return;
+                }
+            }
+            if (res.status === 401) {
+                toast('Wrong password.', 'error');
+                return;
+            }
+            if (!res.ok && res.status !== 204) {
+                const e = await res.json().catch(() => ({}));
+                throw new Error(e.error || ('HTTP ' + res.status));
+            }
+            window.location.href = '/';
+        } catch (err) {
+            toast('Delete failed: ' + err.message, 'error');
+        }
+    }
+
+    function showPromoteSection() {
+        const section = $('promote-section');
+        const list = $('promote-list');
+        const others = state.members.filter((m) => m.userId !== state.me.userId);
+        if (others.length === 0) {
+            list.innerHTML = '<p class="text-sm text-on-surface-variant">No other members to promote.</p>';
+        } else {
+            list.innerHTML = '';
+            for (const m of others) {
+                const btn = document.createElement('button');
+                btn.className = 'bg-secondary-container text-on-secondary px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-secondary-container/80';
+                btn.textContent = `Promote ${m.displayName}`;
+                btn.addEventListener('click', async () => {
+                    try {
+                        const res = await fetch(`/api/circles/${state.circleId}/admins/${m.userId}`, {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                        });
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
+                        toast(`${m.displayName} is now an admin. You can delete your account.`, 'success');
+                        section.classList.add('hidden');
+                    } catch (err) {
+                        toast('Promote failed: ' + err.message, 'error');
+                    }
+                });
+                list.appendChild(btn);
+            }
+        }
+        section.classList.remove('hidden');
+    }
+
     // Boot
     renderMembers();
     renderMyAvatar();
     fetchPause();
+    loadViewLog();
+    $('view-log-refresh').addEventListener('click', loadViewLog);
+    $('export-btn').addEventListener('click', exportData);
+    $('delete-btn').addEventListener('click', deleteAccount);
     for (const btn of document.querySelectorAll('.pause-opt')) {
         btn.addEventListener('click', () => setPause(Number(btn.dataset.minutes)));
     }
