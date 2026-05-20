@@ -101,7 +101,10 @@ export default async function accountRoutes(fastify, { db }) {
         return reply.send(JSON.stringify(payload, null, 2));
     });
 
-    fastify.delete('/api/users/me', { preHandler: requireAuth(db) }, async (req, reply) => {
+    fastify.delete('/api/users/me', {
+        preHandler: requireAuth(db),
+        config: { rateLimit: { max: 5, timeWindow: '1 hour' } },
+    }, async (req, reply) => {
         const parsed = DeleteBody.safeParse(req.body);
         if (!parsed.success) {
             return reply.code(400).send({ error: 'invalid_body', details: parsed.error.flatten() });
@@ -151,7 +154,10 @@ export default async function accountRoutes(fastify, { db }) {
         return reply.code(204).send();
     });
 
-    fastify.post('/api/circles/:id/admins/:userId', { preHandler: requireAuth(db) }, async (req, reply) => {
+    fastify.post('/api/circles/:id/admins/:userId', {
+        preHandler: requireAuth(db),
+        config: { rateLimit: { max: 20, timeWindow: '1 hour' } },
+    }, async (req, reply) => {
         const circleId = Number(req.params.id);
         const targetUserId = Number(req.params.userId);
         if (!Number.isInteger(circleId) || !Number.isInteger(targetUserId)) {
