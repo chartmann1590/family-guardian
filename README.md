@@ -217,11 +217,17 @@ Without `FCM_SERVICE_ACCOUNT_PATH`, the server logs "FCM disabled" once and cont
 | POST   | `/api/circles/:id/places`     | ✓    | Create a geofence                             |
 | PATCH  | `/api/places/:id`             | ✓    | Update a geofence                             |
 | DELETE | `/api/places/:id`             | ✓    | Delete a geofence                             |
+| GET    | `/api/circles/:id/place-subscriptions` | ✓ | Caller's per-(place, member) notification subscriptions |
+| POST   | `/api/circles/:id/place-subscriptions` | ✓ | Upsert subscription `{placeId, memberId?, onEnter, onExit, quietStart?, quietEnd?}`; `memberId: null` = "anyone" |
+| PATCH  | `/api/place-subscriptions/:id` | ✓   | Toggle enter/exit flags, set quiet-hours window |
+| DELETE | `/api/place-subscriptions/:id` | ✓   | Remove a subscription                         |
+| GET    | `/api/circles/:id/messages`   | ✓    | Family chat history (ASC), paginate via `before` + `limit`; includes `reactions` array per message |
+| POST   | `/api/circles/:id/messages`   | ✓    | Send a chat message; broadcasts over WS       |
+| POST   | `/api/messages/:id/reactions` | ✓    | Toggle on an emoji reaction (allowlist: 👍 ❤️ 😂 😮 😢 🙏); broadcasts `reaction_added` |
+| DELETE | `/api/messages/:id/reactions/:emoji` | ✓ | Remove your reaction; broadcasts `reaction_removed` |
 | POST   | `/api/sos/activate`           | ✓    | Trigger an SOS for the current user           |
 | POST   | `/api/sos/:id/resolve`        | ✓    | Owner or admin can resolve                    |
 | GET    | `/api/circles/:id/sos`        | ✓    | List active SOS events for the circle         |
-| GET    | `/api/circles/:id/messages`   | ✓    | Family chat history (ASC), paginate via `before` + `limit` |
-| POST   | `/api/circles/:id/messages`   | ✓    | Send a chat message; broadcasts over WS       |
 | POST   | `/api/checkins`              | ✓    | Submit a check-in (safe_home / out_safe / heading_home) |
 | GET    | `/api/circles/:id/checkins`  | ✓    | Latest check-ins for the circle             |
 | GET    | `/api/circles/:id/visits`    | ✓    | Recent visits (closed stays) across the circle, joined with place names |
@@ -237,7 +243,7 @@ Without `FCM_SERVICE_ACCOUNT_PATH`, the server logs "FCM disabled" once and cont
 | GET    | `/api/users/me/export`       | ✓    | Download a JSON of all your data (1/day)    |
 | DELETE | `/api/users/me`              | ✓    | Delete account; body `{password}`; 409 if you're a sole admin with co-members |
 | POST   | `/api/circles/:id/admins/:userId` | ✓ | Admin-only; promote a member to admin (for handoff) |
-| GET    | `/ws`                         | ✓    | WebSocket upgrade (auth via cookie or `Authorization: Bearer`); emits `location_update`, `geofence_*`, `sos_active`, `sos_resolved`, `chat_message`, `check_in`, `pause_changed` |
+| GET    | `/ws`                         | ✓    | WebSocket upgrade (auth via cookie or `Authorization: Bearer`); emits `location_update`, `geofence_*` (with `notifyUserIds` for targeted dispatch), `sos_active`, `sos_resolved`, `chat_message`, `reaction_added`, `reaction_removed`, `check_in`, `pause_changed` |
 | GET    | `/member/:userId`             | cookie | Web member detail page with route history      |
 | GET    | `/welcome`                    | cookie | Post-signup wizard: display name + photo + first invite |
 | GET    | `/healthz`                    | —    | Liveness probe                                |
@@ -253,23 +259,23 @@ server/         Node.js + Fastify backend (Docker image)
     db.js                 SQLite + migrations
     auth.js               argon2id + sessions
     hub.js                WebSocket pub/sub
-    geofence.js           haversine enter/exit detection
-    routes/               auth, checkins, circles, locations, messages, places, profile, sos, web, ws
+    geofence.js           haversine enter/exit detection + place subscriptions
+    routes/               auth, checkins, circles, locations, messages, places, placeSubscriptions, reactions, pause, sos, profile, web, ws
     views/                login.html, dashboard.html, chat.html, places.html, settings.html, member.html
     public/app.js         dashboard client (Leaflet + WS)
-    public/chat.js        chat client
-    public/places.js      places editor client
+    public/chat.js        chat client with reactions
+    public/places.js      places editor + subscription UI client
     public/settings.js    settings/invite client
     public/member.js      member detail + history client
-    migrations/001_init.sql through 007_checkins.sql
+    migrations/001_init.sql through 015_message_reactions.sql
 
 android/        Native Kotlin + Jetpack Compose app
   app/src/main/java/com/familyguardian/
     MainActivity.kt
-    ui/                   ServerConfigScreen, MapScreen, ChatScreen, PlacesScreen, MemberDetailScreen
-    data/                 Prefs, ApiClient, AuthRepo, ChatRepo, CheckinRepo, PlacesRepo, SosRepo, HistoryRepo, ProfileRepo, Models
+    ui/                   ServerConfigScreen, MapScreen, ChatScreen, PlacesScreen, MemberDetailScreen, AccountScreen
+    data/                 Prefs, ApiClient, AuthRepo, ChatRepo, CheckinRepo, PlacesRepo, PlaceSubscriptionsRepo, SosRepo, HistoryRepo, ProfileRepo, Models
     location/             LocationService (foreground), LocationReporter
-    events/               EventStreamClient, GuardianEvent, EventBus, Alerts
+    events/               EventStreamClient, GuardianEvent, EventBus, Alerts, FcmService
 
 mobile app/     Original HTML design prototypes (unchanged, reference)
 website/        Original HTML design prototypes (unchanged, reference)
@@ -304,6 +310,10 @@ Recently added (Sprint 1 — privacy & control):
 - ✅ **Audit log of who viewed you** — every read of another member's history / visits / trips / member page is logged (5-minute debounce per (viewer, subject, resource)). `GET /api/users/me/view-log?days=N` returns rows where you are the subject — you can only see views *of you*, never others. Surfaced on the Android **Who viewed your history** screen and a section on the PWA Settings page.
 - ✅ **Data export + account deletion** — `GET /api/users/me/export` returns a JSON attachment with everything the server has on you (locations history, visits, trips, messages, check-ins, SOS, alerts, places, view audits; rate-limited 1/day). `DELETE /api/users/me` (with password re-confirm) wipes you; returns 409 with `requires_admin_handoff` if you are the sole admin with co-members, in which case `POST /api/circles/:id/admins/:userId` lets you promote a successor.
 
+Recently added (Sprint 2 — smart notifications + reactions):
+- ✅ **Per-place, per-member notification subscriptions** — `place_subscriptions` table lets each user subscribe to arrival/departure events for a specific place + specific member (or "anyone"). Each subscription has independent `on_enter` / `on_exit` toggles and optional quiet-hours window (`quiet_start` / `quiet_end` in minutes-from-midnight). The geofence engine queries subscriptions at transition time and populates `notifyUserIds` (respecting quiet hours) for targeted FCM push and WS dispatch. Full CRUD via `/api/circles/:id/place-subscriptions`. Surfaced on the Android **Places** screen (per-place bell icon → subscription sheet) and the PWA **Places** editor.
+- ✅ **Message reactions** — `message_reactions` table with a 6-emoji allowlist (👍 ❤️ 😂 😮 😢 🙏). `POST /api/messages/:id/reactions` toggles a reaction on; `DELETE /api/messages/:id/reactions/:emoji` removes yours. Both broadcast `reaction_added` / `reaction_removed` WS events with the full emoji + userId payload. Chat history responses now include a `reactions` array per message grouped by emoji with `userIds`. Surfaced on Android (long-press → bottom-sheet picker) and PWA (hover/click → inline picker). 59 tests passing in vitest.
+
 Privacy notes:
 - Reverse geocoding hits the public OSM Nominatim service. Each lookup is rate-limited (≤1 req/sec) and cached in `geocode_cache`, but if you'd rather keep all addresses local set `NOMINATIM_DISABLED=1` (or point `NOMINATIM_URL` at your own Nominatim instance). When disabled, visits keep a `lat,lng` label only.
 - Android needs the `ACTIVITY_RECOGNITION` runtime permission for activity detection. Denial is non-fatal — the server falls back to inferring `walking / driving` from the GPS speed.
@@ -311,6 +321,7 @@ Privacy notes:
 Still on the table:
 - FCM push notifications (optional) — would allow notifications when the Android app is killed
 - HTTPS termination inside the container (optional)
+- Chat polish — voice notes, photo check-ins, typing/read indicators
 
 ---
 

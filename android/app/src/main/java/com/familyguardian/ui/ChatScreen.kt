@@ -1,6 +1,8 @@
 package com.familyguardian.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,13 +29,16 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -53,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.familyguardian.data.ChatMessage
 import com.familyguardian.data.ChatRepo
 import com.familyguardian.data.Prefs
+import com.familyguardian.data.Reaction
 import com.familyguardian.events.Alerts
 import com.familyguardian.events.EventBus
 import com.familyguardian.events.GuardianEvent
@@ -91,6 +97,9 @@ fun ChatScreen(onBack: () -> Unit) {
         }
     }
 
+    val EMOJIS = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
+    var reactionPickerMsg by remember { mutableStateOf<ChatMessage?>(null) }
+
     // Load history once we know the circleId.
     LaunchedEffect(circleId) {
         val cid = circleId ?: return@LaunchedEffect
@@ -121,10 +130,61 @@ fun ChatScreen(onBack: () -> Unit) {
                     ),
                 )
                 if (ev.userId != selfUserId) {
-                    // We're on-screen — clear any system notification for this sender.
                     Alerts.cancelChat(appCtx, ev.userId)
                 }
                 if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+            } else if (ev is GuardianEvent.ReactionAdded || ev is GuardianEvent.ReactionRemoved) {
+                val msgId = if (ev is GuardianEvent.ReactionAdded) ev.messageId else (ev as GuardianEvent.ReactionRemoved).messageId
+                val emoji = if (ev is GuardianEvent.ReactionAdded) ev.emoji else (ev as GuardianEvent.ReactionRemoved).emoji
+                val uid = if (ev is GuardianEvent.ReactionAdded) ev.userId else (ev as GuardianEvent.ReactionRemoved).userId
+                val isAdd = ev is GuardianEvent.ReactionAdded
+                val idx = messages.indexOfFirst { it.id == msgId }
+                if (idx >= 0) {
+                    val msg = messages[idx]
+                    val rxs = msg.reactions.toMutableList()
+                    val existing = rxs.find { it.emoji == emoji }
+                    if (isAdd) {
+                        if (existing != null) {
+                            if (uid !in existing.userIds) rxs[rxs.indexOf(existing)] = existing.copy(userIds = existing.userIds + uid)
+                        } else {
+                            rxs.add(Reaction(emoji, listOf(uid)))
+                        }
+                    } else {
+                        if (existing != null) {
+                            val updated = existing.userIds.filter { it != uid }
+                            if (updated.isEmpty()) rxs.remove(existing)
+                            else rxs[rxs.indexOf(existing)] = existing.copy(userIds = updated)
+                        }
+                    }
+                    messages[idx] = msg.copy(reactions = rxs)
+                }
+            }
+        }
+    }
+
+    reactionPickerMsg?.let { msg ->
+        ModalBottomSheet(
+            onDismissRequest = { reactionPickerMsg = null },
+            sheetState = rememberModalBottomSheetState(),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                for (emoji in EMOJIS) {
+                    TextButton(onClick = {
+                        val existing = msg.reactions.find { it.emoji == emoji && selfUserId in it.userIds }
+                        scope.launch {
+                            try {
+                                if (existing != null) repo.unreact(msg.id, emoji)
+                                else repo.react(msg.id, emoji)
+                            } catch (_: Throwable) {}
+                        }
+                        reactionPickerMsg = null
+                    }) {
+                        Text(emoji, style = MaterialTheme.typography.headlineMedium)
+                    }
+                }
             }
         }
     }
@@ -204,7 +264,20 @@ fun ChatScreen(onBack: () -> Unit) {
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    itemsWithDayHeaders(messages, selfUserId)
+                    itemsWithDayHeaders(
+                        messages = messages,
+                        selfUserId = selfUserId,
+                        onLongPress = { reactionPickerMsg = it },
+                        onReactionClick = { msg, emoji ->
+                            val existing = msg.reactions.find { it.emoji == emoji && selfUserId in it.userIds }
+                            scope.launch {
+                                try {
+                                    if (existing != null) repo.unreact(msg.id, emoji)
+                                    else repo.react(msg.id, emoji)
+                                } catch (_: Throwable) {}
+                            }
+                        },
+                    )
                 }
             }
             error?.let { msg ->
@@ -272,8 +345,16 @@ private fun Composer(value: String, onChange: (String) -> Unit, onSend: () -> Un
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MessageBubble(message: ChatMessage, mine: Boolean, showHeader: Boolean) {
+private fun MessageBubble(
+    message: ChatMessage,
+    mine: Boolean,
+    showHeader: Boolean,
+    onLongPress: () -> Unit = {},
+    onReactionClick: (emoji: String) -> Unit = {},
+    selfUserId: Long? = null,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
@@ -299,6 +380,10 @@ private fun MessageBubble(message: ChatMessage, mine: Boolean, showHeader: Boole
                     RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp),
                 color = if (mine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                 shadowElevation = 1.dp,
+                modifier = Modifier.combinedClickable(
+                    onClick = {},
+                    onLongClick = onLongPress,
+                ),
             ) {
                 Text(
                     message.body,
@@ -306,6 +391,27 @@ private fun MessageBubble(message: ChatMessage, mine: Boolean, showHeader: Boole
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                 )
+            }
+            if (message.reactions.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    for (rx in message.reactions) {
+                        val isMine = selfUserId != null && selfUserId in rx.userIds
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isMine) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                            onClick = { onReactionClick(rx.emoji) },
+                        ) {
+                            Text(
+                                "${rx.emoji} ${rx.userIds.size}",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                    }
+                }
             }
         }
         if (mine) {
@@ -353,6 +459,8 @@ private fun dayHeader(ts: Long): String {
 private fun androidx.compose.foundation.lazy.LazyListScope.itemsWithDayHeaders(
     messages: List<ChatMessage>,
     selfUserId: Long?,
+    onLongPress: (ChatMessage) -> Unit,
+    onReactionClick: (ChatMessage, String) -> Unit,
 ) {
     var lastDay: String? = null
     var lastAuthor: Long? = null
@@ -383,7 +491,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsWithDayHeaders(
         val showHeader = lastAuthor != m.userId
         lastAuthor = m.userId
         item(m.id) {
-            MessageBubble(message = m, mine = m.userId == selfUserId, showHeader = showHeader)
+            MessageBubble(
+                message = m,
+                mine = m.userId == selfUserId,
+                showHeader = showHeader,
+                onLongPress = { onLongPress(m) },
+                onReactionClick = { emoji -> onReactionClick(m, emoji) },
+                selfUserId = selfUserId,
+            )
         }
     }
 }

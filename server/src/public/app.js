@@ -456,9 +456,11 @@
                 const where = msg.label || (msg.lat ? `${msg.lat.toFixed(3)}, ${msg.lng.toFixed(3)}` : 'a location');
                 toast(`📍 ${msg.displayName} left ${where} after ${dur}`, 'enter');
             } else if (msg.type === 'geofence_enter') {
-                toast(`${msg.displayName} arrived at ${msg.placeName}`, 'enter');
+                if (!msg.notifyUserIds || msg.notifyUserIds.includes(state.me.userId))
+                    toast(`${msg.displayName} arrived at ${msg.placeName}`, 'enter');
             } else if (msg.type === 'geofence_exit') {
-                toast(`${msg.displayName} left ${msg.placeName}`, 'exit');
+                if (!msg.notifyUserIds || msg.notifyUserIds.includes(state.me.userId))
+                    toast(`${msg.displayName} left ${msg.placeName}`, 'exit');
             } else if (msg.type === 'sos_active' || msg.type === 'sos_resolved') {
                 applySosEvent(msg);
                 if (msg.type === 'sos_active') {

@@ -15,6 +15,7 @@
     const draftLayer = { circle: null, marker: null };
     let placingMode = false;
     let editingId = null;
+    const subs = new Map();     // key "placeId-memberId" -> sub object
 
     const $ = (id) => document.getElementById(id);
     const form = $('edit-form');
@@ -82,10 +83,27 @@
         });
     }
 
+    function subKey(placeId, memberId) {
+        return `${placeId}-${memberId ?? 'any'}`;
+    }
+
+    function fmtTime(mins) {
+        if (mins == null) return '';
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+        return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+    }
+
     function placeCard(p) {
         const li = document.createElement('div');
-        li.className = 'p-5 flex flex-col gap-3 hover:bg-surface-container-lowest';
-        li.innerHTML = `
+        li.className = 'flex flex-col';
+        li.dataset.placeId = p.id;
+
+        const card = document.createElement('div');
+        card.className = 'p-5 flex flex-col gap-3 hover:bg-surface-container-lowest';
+        card.innerHTML = `
             <div class="flex items-start gap-4">
                 <div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-primary shrink-0">
                     <span class="material-symbols-outlined">distance</span>
@@ -99,16 +117,73 @@
                     </div>
                 </div>
                 <div class="flex gap-2">
+                    <button class="notify-toggle text-on-surface-variant hover:text-secondary" title="Notifications"><span class="material-symbols-outlined">notifications</span></button>
                     <button class="edit text-on-surface-variant hover:text-primary" title="Edit"><span class="material-symbols-outlined">edit</span></button>
                     <button class="del text-on-surface-variant hover:text-error" title="Delete"><span class="material-symbols-outlined">delete</span></button>
                 </div>
             </div>`;
-        li.querySelector('.edit').addEventListener('click', () => startEdit(p));
-        li.querySelector('.del').addEventListener('click', () => deletePlace(p.id));
-        li.addEventListener('click', (ev) => {
+        card.querySelector('.edit').addEventListener('click', () => startEdit(p));
+        card.querySelector('.del').addEventListener('click', () => deletePlace(p.id));
+        card.addEventListener('click', (ev) => {
             if (ev.target.closest('button')) return;
             map.flyTo([p.lat, p.lng], 16);
         });
+        li.appendChild(card);
+
+        const notifyPanel = document.createElement('div');
+        notifyPanel.className = 'hidden border-t border-outline-variant/20 bg-surface-container-lowest px-5 py-4 flex flex-col gap-3';
+        notifyPanel.dataset.subPanel = p.id;
+
+        const members = state.members || [];
+        const allMembers = [{ userId: null, displayName: 'Anyone' }, ...members];
+
+        for (const m of allMembers) {
+            const k = subKey(p.id, m.userId);
+            const s = subs.get(k);
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-3 text-sm';
+            row.innerHTML = `
+                <span class="flex-1 text-on-surface font-medium">${escapeHtml(m.displayName)}</span>
+                <label class="flex items-center gap-1 text-xs text-on-surface-variant cursor-pointer">
+                    <input type="checkbox" class="sub-enter" ${s?.onEnter ? 'checked' : ''} /> Arrives
+                </label>
+                <label class="flex items-center gap-1 text-xs text-on-surface-variant cursor-pointer">
+                    <input type="checkbox" class="sub-exit" ${s?.onExit ? 'checked' : ''} /> Leaves
+                </label>`;
+            const enterCb = row.querySelector('.sub-enter');
+            const exitCb = row.querySelector('.sub-exit');
+
+            const sync = async () => {
+                const onEnter = enterCb.checked;
+                const onExit = exitCb.checked;
+                if (!onEnter && !onExit) {
+                    if (subs.has(k)) {
+                        await fetch(`/api/place-subscriptions/${subs.get(k).id}`, { method: 'DELETE', credentials: 'same-origin' });
+                        subs.delete(k);
+                    }
+                    return;
+                }
+                const res = await fetch(`/api/circles/${state.circleId}/place-subscriptions`, {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ placeId: p.id, memberId: m.userId, onEnter, onExit }),
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    subs.set(k, data);
+                }
+            };
+            enterCb.addEventListener('change', sync);
+            exitCb.addEventListener('change', sync);
+            notifyPanel.appendChild(row);
+        }
+
+        card.querySelector('.notify-toggle').addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            notifyPanel.classList.toggle('hidden');
+        });
+        li.appendChild(notifyPanel);
         return li;
     }
 
@@ -236,4 +311,17 @@
     }
     renderList();
     setTimeout(() => map.invalidateSize(), 100);
+
+    (async () => {
+        try {
+            const res = await fetch(`/api/circles/${state.circleId}/place-subscriptions`, { credentials: 'same-origin' });
+            if (res.ok) {
+                const data = await res.json();
+                for (const s of (data.subscriptions || [])) {
+                    subs.set(subKey(s.placeId, s.memberId), s);
+                }
+                renderList();
+            }
+        } catch {}
+    })();
 })();

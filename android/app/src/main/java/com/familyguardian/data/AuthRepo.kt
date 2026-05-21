@@ -58,6 +58,20 @@ class AuthRepo(private val prefs: Prefs) {
     }
 
     suspend fun logout() {
+        val snap = prefs.snapshot()
+        val server = snap.serverUrl
+        val token = snap.token
+        // Tell the server to drop the session first, but never block local
+        // sign-out on a network failure — the user expects the button to work
+        // even when offline.
+        if (!server.isNullOrBlank() && !token.isNullOrBlank()) {
+            try {
+                ApiClient.api.logout(
+                    ApiClient.endpoint(server, "/api/auth/logout"),
+                    "Bearer $token",
+                )
+            } catch (_: Throwable) { /* offline or server down — proceed */ }
+        }
         prefs.clearSession()
     }
 }

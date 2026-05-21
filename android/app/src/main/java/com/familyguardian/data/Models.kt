@@ -134,6 +134,12 @@ data class SosEvent(
 data class SosListResponse(val events: List<SosEvent>)
 
 @Serializable
+data class Reaction(
+    val emoji: String,
+    val userIds: List<Long> = emptyList(),
+)
+
+@Serializable
 data class ChatMessage(
     val id: Long,
     val circleId: Long,
@@ -141,6 +147,7 @@ data class ChatMessage(
     val displayName: String? = null,
     val body: String,
     val createdAt: Long,
+    val reactions: List<Reaction> = emptyList(),
 )
 
 @Serializable
@@ -269,3 +276,42 @@ data class ViewLogResponse(val views: List<ViewLogEntry>)
 
 @Serializable
 data class DeleteAccountBody(val password: String)
+
+@Serializable
+data class PlaceSubscription(
+    val id: Long,
+    val userId: Long,
+    val placeId: Long,
+    val memberId: Long? = null,
+    val placeName: String? = null,
+    val memberName: String? = null,
+    val onEnter: Boolean = true,
+    val onExit: Boolean = true,
+    val quietStart: Int? = null,
+    val quietEnd: Int? = null,
+    val createdAt: Long? = null,
+)
+
+@Serializable
+data class PlaceSubscriptionsResponse(val subscriptions: List<PlaceSubscription>)
+
+@Serializable
+data class PlaceSubBody(
+    val placeId: Long,
+    val memberId: Long? = null,
+    val onEnter: Boolean = true,
+    val onExit: Boolean = true,
+    val quietStart: Int? = null,
+    val quietEnd: Int? = null,
+)
+
+@Serializable
+data class PlaceSubPatch(
+    val onEnter: Boolean? = null,
+    val onExit: Boolean? = null,
+    val quietStart: Int? = null,
+    val quietEnd: Int? = null,
+)
+
+@Serializable
+data class AddReactionBody(val emoji: String)

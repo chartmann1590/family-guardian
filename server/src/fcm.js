@@ -71,3 +71,42 @@ export async function fanOut(circleId, payload, db, excludeUserId) {
         console.error(`FCM fanOut failed: ${err.message}`);
     }
 }
+
+export async function fanOutToUsers(userIds, payload, db) {
+    if (isFcmDisabled() || !userIds?.length) return;
+
+    const placeholders = userIds.map(() => '?').join(',');
+    const rows = db.prepare(
+        `SELECT token FROM fcm_tokens WHERE user_id IN (${placeholders})`
+    ).all(...userIds);
+
+    if (rows.length === 0) return;
+
+    const tokens = rows.map((r) => r.token);
+    const message = {
+        data: payload,
+        android: { priority: 'high' },
+        tokens,
+    };
+
+    try {
+        const response = await messaging.sendEachForMulticast(message);
+        if (response.failureCount > 0) {
+            const toDelete = [];
+            response.responses.forEach((resp, idx) => {
+                if (
+                    !resp.success &&
+                    resp.error?.code === 'messaging/registration-token-not-registered'
+                ) {
+                    toDelete.push(rows[idx].token);
+                }
+            });
+            if (toDelete.length > 0) {
+                const del = db.prepare('DELETE FROM fcm_tokens WHERE token = ?');
+                for (const t of toDelete) del.run(t);
+            }
+        }
+    } catch (err) {
+        console.error(`FCM fanOutToUsers failed: ${err.message}`);
+    }
+}

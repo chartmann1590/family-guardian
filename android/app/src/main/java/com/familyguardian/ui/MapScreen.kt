@@ -27,16 +27,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Sos
 import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -210,6 +212,7 @@ fun MapScreen(
     var pauseInFlight by remember { mutableStateOf(false) }
     var pauseState by remember { mutableStateOf(PauseState()) }
     var pauseMessage by remember { mutableStateOf<String?>(null) }
+    var overflowMenuOpen by remember { mutableStateOf(false) }
     val wsState by EventBus.wsState.collectAsStateWithLifecycle(
         initialValue = EventStreamClient.ConnectionState.DISCONNECTED
     )
@@ -696,15 +699,13 @@ fun MapScreen(
                         )
                     }
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                        Row {
-                            IconButton(onClick = onOpenAbout, modifier = Modifier.size(40.dp)) {
-                                Icon(Icons.Filled.Info, contentDescription = "About", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Three priority icons stay visible: Chat, Places, Pause.
+                            IconButton(onClick = onOpenChat, modifier = Modifier.size(40.dp)) {
+                                Icon(Icons.Filled.Forum, contentDescription = "Chat", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            IconButton(onClick = onOpenViewLog, modifier = Modifier.size(40.dp)) {
-                                Icon(Icons.Filled.Visibility, contentDescription = "Who viewed me", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            IconButton(onClick = onOpenAccount, modifier = Modifier.size(40.dp)) {
-                                Icon(Icons.Filled.Person, contentDescription = "Account", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            IconButton(onClick = onOpenPlaces, modifier = Modifier.size(40.dp)) {
+                                Icon(Icons.Filled.Place, contentDescription = "Safety places", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             val isPausedNow = (pauseState.pausedUntil ?: 0L) > System.currentTimeMillis()
                             IconButton(
@@ -717,40 +718,79 @@ fun MapScreen(
                                     tint = if (isPausedNow) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            TextButton(onClick = {
-                                showMembers = true
-                                scope.launch {
-                                    membersLoading = true
-                                    fetchMembers()
-                                    membersLoading = false
+                            // Everything else lives in a labeled overflow menu —
+                            // ten icon-only buttons in a non-scrolling Row used
+                            // to overflow off the right edge of the Pixel.
+                            Box {
+                                IconButton(
+                                    onClick = { overflowMenuOpen = true },
+                                    modifier = Modifier.size(40.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Filled.MoreVert,
+                                        contentDescription = "More",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                 }
-                            }) {
-                                Icon(Icons.Filled.People, contentDescription = "Members")
-                            }
-                            TextButton(onClick = onOpenChat) {
-                                Icon(Icons.Filled.Forum, contentDescription = "Chat")
-                            }
-                            TextButton(onClick = onOpenPlaces) {
-                                Icon(Icons.Filled.Place, contentDescription = "Safety places")
-                            }
-                            if (onOpenAlertSettings != null) {
-                                TextButton(onClick = onOpenAlertSettings) {
-                                    Icon(Icons.Filled.Notifications, contentDescription = "Alert settings")
+                                DropdownMenu(
+                                    expanded = overflowMenuOpen,
+                                    onDismissRequest = { overflowMenuOpen = false },
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Members") },
+                                        leadingIcon = { Icon(Icons.Filled.People, contentDescription = null) },
+                                        onClick = {
+                                            overflowMenuOpen = false
+                                            showMembers = true
+                                            scope.launch {
+                                                membersLoading = true
+                                                fetchMembers()
+                                                membersLoading = false
+                                            }
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Account") },
+                                        leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
+                                        onClick = { overflowMenuOpen = false; onOpenAccount() },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Who viewed me") },
+                                        leadingIcon = { Icon(Icons.Filled.Visibility, contentDescription = null) },
+                                        onClick = { overflowMenuOpen = false; onOpenViewLog() },
+                                    )
+                                    if (onOpenAlertSettings != null) {
+                                        DropdownMenuItem(
+                                            text = { Text("Alert settings") },
+                                            leadingIcon = { Icon(Icons.Filled.Notifications, contentDescription = null) },
+                                            onClick = { overflowMenuOpen = false; onOpenAlertSettings() },
+                                        )
+                                    }
+                                    if (onOpenAlertHistory != null) {
+                                        DropdownMenuItem(
+                                            text = { Text("Alert history") },
+                                            leadingIcon = { Icon(Icons.Filled.History, contentDescription = null) },
+                                            onClick = { overflowMenuOpen = false; onOpenAlertHistory() },
+                                        )
+                                    }
+                                    DropdownMenuItem(
+                                        text = { Text("About") },
+                                        leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) },
+                                        onClick = { overflowMenuOpen = false; onOpenAbout() },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Log out") },
+                                        leadingIcon = { Icon(Icons.Filled.Logout, contentDescription = null) },
+                                        onClick = {
+                                            overflowMenuOpen = false
+                                            scope.launch {
+                                                LocationService.stop(appCtx)
+                                                repo.logout()
+                                                onLoggedOut()
+                                            }
+                                        },
+                                    )
                                 }
-                            }
-                            if (onOpenAlertHistory != null) {
-                                TextButton(onClick = onOpenAlertHistory) {
-                                    Icon(Icons.Filled.History, contentDescription = "Alert history")
-                                }
-                            }
-                            TextButton(onClick = {
-                                scope.launch {
-                                    LocationService.stop(appCtx)
-                                    repo.logout()
-                                    onLoggedOut()
-                                }
-                            }) {
-                                Icon(Icons.Filled.Logout, contentDescription = "Log out")
                             }
                         }
                     }

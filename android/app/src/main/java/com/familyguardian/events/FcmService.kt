@@ -51,7 +51,14 @@ class FcmService : FirebaseMessagingService() {
             }
             "geofence_enter", "geofence_exit" -> {
                 if (userId != null) {
-                    Alerts.showGeofence(appCtx, userId, displayName, data["placeName"] ?: "", type == "geofence_enter")
+                    val notifyUserIds = data["notifyUserIds"]?.let { raw ->
+                        raw.trimStart('[').trimEnd(']').split(',').mapNotNull { it.trim().toLongOrNull() }
+                    } ?: emptyList()
+                    val prefs = Prefs(appCtx)
+                    val myId = prefs.snapshotBlocking().userId
+                    if (notifyUserIds.isEmpty() || myId == null || myId in notifyUserIds) {
+                        Alerts.showGeofence(appCtx, userId, displayName, data["placeName"] ?: "", type == "geofence_enter")
+                    }
                 }
             }
             "check_in" -> {

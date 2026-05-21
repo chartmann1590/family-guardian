@@ -1,6 +1,6 @@
 // Geofence enter/exit detection. Called from POST /api/locations.
 import { publish } from './hub.js';
-import { fanOut } from './fcm.js';
+import { fanOutToUsers } from './fcm.js';
 
 const EARTH_RADIUS_M = 6_371_000;
 
@@ -23,6 +23,15 @@ export function haversineMeters(lat1, lng1, lat2, lng2) {
  * the place's alert configuration. Used by the visit engine to track
  * arrivals/departures even when geofence alerts are disabled.
  */
+export function inQuietHours(start, end, nowMs) {
+    if (start == null || end == null) return false;
+    const d = new Date(nowMs);
+    const minute = d.getHours() * 60 + d.getMinutes();
+    return start <= end
+        ? (minute >= start && minute < end)
+        : (minute >= start || minute < end);
+}
+
 export function reconcileGeofences(db, { userId, circleId, displayName, lat, lng, recordedAt }, onTransition) {
     const places = db
         .prepare(
@@ -88,8 +97,23 @@ export function reconcileGeofences(db, { userId, circleId, displayName, lat, lng
     });
     reconcile();
 
+    const findSubs = db.prepare(`
+        SELECT ps.user_id, ps.quiet_start, ps.quiet_end
+        FROM place_subscriptions ps
+        WHERE ps.place_id = ?
+          AND (ps.member_id IS NULL OR ps.member_id = ?)
+          AND ((? = 'geofence_enter' AND ps.on_enter = 1)
+            OR (? = 'geofence_exit'  AND ps.on_exit  = 1))
+    `);
+    for (const ev of events) {
+        const subs = findSubs.all(ev.placeId, ev.userId, ev.type, ev.type);
+        ev.notifyUserIds = subs
+            .filter(s => !inQuietHours(s.quiet_start, s.quiet_end, recordedAt))
+            .map(s => s.user_id);
+    }
+
     for (const ev of events) publish(circleId, ev);
-    for (const ev of events) fanOut(circleId, ev, db, userId);
+    for (const ev of events) fanOutToUsers(ev.notifyUserIds, ev, db);
     if (typeof onTransition === 'function') {
         for (const t of transitions) onTransition(t);
     }

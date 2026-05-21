@@ -25,6 +25,12 @@ interface GuardianApi {
     suspend fun signup(@Url url: String, @Body body: SignupRequest): LoginResponse
 
     @POST
+    suspend fun logout(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): OkResponse
+
+    @POST
     suspend fun postLocation(
         @Url url: String,
         @Header("Authorization") auth: String,
@@ -189,6 +195,45 @@ interface GuardianApi {
         @Url url: String,
         @Header("Authorization") auth: String,
     ): OkResponse
+
+    @GET
+    suspend fun listPlaceSubscriptions(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): PlaceSubscriptionsResponse
+
+    @POST
+    suspend fun upsertPlaceSubscription(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: PlaceSubBody,
+    ): PlaceSubscription
+
+    @PATCH
+    suspend fun patchPlaceSubscription(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: PlaceSubPatch,
+    ): PlaceSubscription
+
+    @DELETE
+    suspend fun deletePlaceSubscription(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): OkResponse
+
+    @POST
+    suspend fun addReaction(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: AddReactionBody,
+    ): retrofit2.Response<Unit>
+
+    @DELETE
+    suspend fun removeReaction(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): retrofit2.Response<Unit>
 }
 
 object ApiClient {

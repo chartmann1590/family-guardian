@@ -73,12 +73,17 @@ class Prefs(private val context: Context) {
         if (userId != null) it[keyUserId] = userId else it.remove(keyUserId)
     }
 
+    /**
+     * Drop the active session but keep `serverUrl`, `email`, and `displayName`
+     * so the next sign-in form is pre-filled and the user only has to retype
+     * their password.
+     */
     suspend fun clearSession() = context.dataStore.edit { prefs ->
         prefs.remove(keyToken)
-        prefs.remove(keyEmail)
-        prefs.remove(keyDisplayName)
         prefs.remove(keyCircleId)
         prefs.remove(keyUserId)
+        prefs.remove(keyOnboarded)
+        prefs.remove(keyFcmToken)
     }
 
     data class Snapshot(

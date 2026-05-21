@@ -15,7 +15,7 @@ npm run dev                     # node --watch src/index.js (needs Node >= 20)
 # Open android/ in Android Studio (Hedgehog+). Let Gradle sync. Run on device/emulator.
 ```
 
-No test suite, no linter, no CI, no formatting config anywhere in the repo.
+No linter or formatting config. Test suite: `npm test` from `server/` (vitest, in-memory SQLite). CI: `.github/workflows/server-ci.yml`.
 
 ## Repo layout
 
@@ -26,10 +26,12 @@ server/             Fastify + SQLite backend (Docker image)
     db.js           SQLite + auto-run migrations from src/migrations/
     auth.js         argon2id hashing, session tokens, requireAuth hook
     hub.js          in-memory WebSocket pub/sub keyed by circleId
-    routes/         auth, circles, locations, ws, web
-    views/          login.html, dashboard.html (custom {{KEY}} template engine)
+    routes/         auth, circles, locations, messages, places, placeSubscriptions, reactions, pause, sos, checkins, visits, trips, alertPrefs, ws, web, account, download
+    views/          login.html, dashboard.html, chat.html, places.html, member.html, settings.html (custom {{KEY}} template engine)
     public/app.js   dashboard client (Leaflet + WebSocket)
-    migrations/001_init.sql
+    public/chat.js  chat client with reactions
+    public/places.js places client with subscription UI
+    migrations/     001_init.sql through 015_message_reactions.sql
 
 android/            Kotlin + Jetpack Compose app (minSdk 26, compileSdk 34)
   app/src/main/java/com/familyguardian/
@@ -45,7 +47,7 @@ website/            Static HTML design prototypes (Tailwind CDN) — reference o
 - **SQLite** via better-sqlite3. WAL mode + foreign keys on by default. DB file is auto-created at `DATABASE_PATH` (default `/data/guardian.db` inside container).
 - **Migrations** auto-run on startup from `server/src/migrations/`. New SQL files are applied in lexical order, tracked in `_migrations` table. Each runs in a transaction.
 - **Auth**: first user = bootstrap admin (auto-creates a circle). After that, joining requires an invite code. Passwords hashed with argon2id. Sessions are opaque random tokens stored in `sessions` table, served as `fg_session` HttpOnly cookie (web) or `Authorization: Bearer` header (Android).
-- **WebSocket** at `/ws?token=...` or uses cookie auth. Subscribes to one circle; receives `location_update` JSON events.
+- **WebSocket** at `/ws?token=...` or uses cookie auth. Subscribes to one circle; receives `location_update`, `geofence_enter`, `geofence_exit`, `chat_message`, `reaction_added`, `reaction_removed`, `sos_active`, `sos_resolved`, `check_in`, `pause_changed`, `visit_end`, `trip_end` JSON events.
 - **Views**: minimal `{{KEY}}` / `{{{KEY}}}` replacement (HTML-escaped / raw). Templates cached in memory after first read.
 - **Docker**: multi-stage Node 20 Alpine build. `argon2` needs `python3 make g++ libstdc++` at install time (already in Dockerfile). Volume at `/data` for the SQLite file.
 

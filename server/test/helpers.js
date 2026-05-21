@@ -43,3 +43,16 @@ export function seedUser(db, email = 'alice@test.com', displayName = 'Alice') {
     ).run(circleId, userId, 'admin', now);
     return { userId, circleId };
 }
+
+export function seedSecondUser(db, circleId, email = 'bob@test.com', displayName = 'Bob') {
+    const now = Date.now();
+    const hash = '$argon2id$v=19$m=65536,t=3,p=4$fakehash';
+    db.prepare(
+        'INSERT INTO users (email, password_hash, display_name, created_at) VALUES (?, ?, ?, ?)'
+    ).run(email, hash, displayName, now);
+    const userId = db.prepare('SELECT last_insert_rowid() AS id').get().id;
+    db.prepare(
+        'INSERT INTO circle_members (circle_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)'
+    ).run(circleId, userId, 'member', now);
+    return { userId, circleId };
+}

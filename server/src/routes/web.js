@@ -429,9 +429,23 @@ export default async function webRoutes(fastify, { db }) {
                 alertsOnExit: !!p.alertsOnExit,
             }));
 
+        const placeMembers = db
+            .prepare(
+                `SELECT u.id AS userId, u.display_name AS displayName
+                 FROM circle_members cm
+                 JOIN users u ON u.id = cm.user_id
+                 WHERE cm.circle_id = ?
+                 ORDER BY u.display_name COLLATE NOCASE ASC`
+            )
+            .all(circleRow.circleId);
+
         const initialState = {
             circleId: circleRow.circleId,
             circleName: circleRow.circleName,
+            me: {
+                userId: session.userId,
+            },
+            members: placeMembers,
             places,
         };
 

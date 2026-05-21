@@ -57,10 +57,31 @@
         return div;
     }
 
+    const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+    const reactionsMap = new Map(); // messageId -> [{emoji, userIds}]
+
+    function reactionsHtml(msg) {
+        const rxs = msg.reactions || reactionsMap.get(msg.id) || [];
+        if (rxs.length === 0) return '';
+        const chips = rxs.map(rx => {
+            const isMine = rx.userIds.includes(state.me.userId);
+            return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs cursor-pointer ${isMine ? 'bg-secondary-container text-on-secondary' : 'bg-surface-container text-on-surface-variant'}" data-msg-id="${msg.id}" data-emoji="${esc(rx.emoji)}" data-action="toggle-reaction">${rx.emoji} ${rx.userIds.length}</span>`;
+        }).join('');
+        return `<div class="flex flex-wrap gap-1 mt-1">${chips}</div>`;
+    }
+
+    function reactionPickerHtml(msgId) {
+        const btns = EMOJIS.map(e =>
+            `<button class="text-lg px-1 py-0.5 hover:bg-surface-container rounded" data-msg-id="${msgId}" data-emoji="${e}" data-action="react">${e}</button>`
+        ).join('');
+        return `<div class="hidden absolute bottom-full left-0 mb-1 bg-surface-container-lowest rounded-lg shadow-lg px-2 py-1 flex gap-1 z-10" data-picker="${msgId}">${btns}</div>`;
+    }
+
     function bubble(msg, mine) {
         const wrap = document.createElement('div');
         wrap.className = 'flex items-start gap-3 ' + (mine ? 'flex-row-reverse' : '');
         wrap.dataset.author = msg.userId;
+        wrap.dataset.msgId = msg.id;
         const showAvatar = lastAuthor !== msg.userId;
         const avatarWrap = `<div class="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center font-bold text-on-surface text-sm shrink-0 ${showAvatar ? '' : 'invisible'}" style="position:relative;overflow:hidden">${avatarHtml(msg.userId)}</div>`;
         wrap.innerHTML = `
@@ -71,10 +92,15 @@
                         <span class="font-semibold text-on-surface">${esc(msg.displayName || 'Member')}</span>
                         <span class="ml-2">${esc(timeLabel(msg.createdAt))}</span>
                     </div>` : ''}
-                <div class="${mine
-                    ? 'bg-primary text-on-primary rounded-2xl rounded-tr-md'
-                    : 'bg-surface-container-lowest text-on-surface rounded-2xl rounded-tl-md'} px-4 py-2.5 text-sm shadow-sm whitespace-pre-wrap break-words">
-                    ${esc(msg.body)}
+                <div class="relative group">
+                    <div class="${mine
+                        ? 'bg-primary text-on-primary rounded-2xl rounded-tr-md'
+                        : 'bg-surface-container-lowest text-on-surface rounded-2xl rounded-tl-md'} px-4 py-2.5 text-sm shadow-sm whitespace-pre-wrap break-words">
+                        ${esc(msg.body)}
+                    </div>
+                    <button class="absolute top-1 ${mine ? 'left-1' : 'right-1'} opacity-0 group-hover:opacity-100 text-xs text-on-surface-variant hover:text-primary w-6 h-6 flex items-center justify-center rounded-full hover:bg-surface-container" data-msg-id="${msg.id}" data-action="show-picker">+</button>
+                    ${reactionPickerHtml(msg.id)}
+                    ${reactionsHtml(msg)}
                 </div>
             </div>`;
         return wrap;
@@ -198,13 +224,16 @@
         ws.addEventListener('message', (ev) => {
             let msg;
             try { msg = JSON.parse(ev.data); } catch { return; }
-            if (msg.type !== 'chat_message') return;
-            appendMessage(msg);
-            if (msg.userId === state.me.userId || !userScrolledUp) {
-                scrollToBottom();
-                userScrolledUp = false;
-            } else {
-                showPill();
+            if (msg.type === 'chat_message') {
+                appendMessage(msg);
+                if (msg.userId === state.me.userId || !userScrolledUp) {
+                    scrollToBottom();
+                    userScrolledUp = false;
+                } else {
+                    showPill();
+                }
+            } else if (msg.type === 'reaction_added' || msg.type === 'reaction_removed') {
+                applyReactionEvent(msg);
             }
         });
         ws.addEventListener('close', () => {
@@ -213,6 +242,73 @@
         });
         ws.addEventListener('error', () => { try { ws.close(); } catch {} });
     }
+
+    function applyReactionEvent(ev) {
+        const el = list.querySelector(`[data-msg-id="${ev.messageId}"] .group`);
+        if (!el) return;
+        let rxs = reactionsMap.get(ev.messageId) || [];
+        if (ev.type === 'reaction_added') {
+            const existing = rxs.find(r => r.emoji === ev.emoji);
+            if (existing) {
+                if (!existing.userIds.includes(ev.userId)) existing.userIds.push(ev.userId);
+            } else {
+                rxs.push({ emoji: ev.emoji, userIds: [ev.userId] });
+            }
+        } else {
+            const existing = rxs.find(r => r.emoji === ev.emoji);
+            if (existing) {
+                existing.userIds = existing.userIds.filter(id => id !== ev.userId);
+                if (existing.userIds.length === 0) rxs = rxs.filter(r => r.emoji !== ev.emoji);
+            }
+        }
+        reactionsMap.set(ev.messageId, rxs);
+        const reactionsEl = el.querySelector('[data-action="toggle-reaction"]')?.parentElement;
+        if (reactionsEl) {
+            reactionsEl.innerHTML = reactionsHtml({ id: ev.messageId, reactions: rxs }).replace(/^<div[^>]*>|<\/div>$/g, '');
+        }
+    }
+
+    async function toggleReaction(messageId, emoji) {
+        const rxs = reactionsMap.get(messageId) || [];
+        const existing = rxs.find(r => r.emoji === emoji && r.userIds.includes(state.me.userId));
+        if (existing) {
+            await fetch(`/api/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, {
+                method: 'DELETE', credentials: 'same-origin',
+            });
+        } else {
+            await fetch(`/api/messages/${messageId}/reactions`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ emoji }),
+            });
+        }
+    }
+
+    list.addEventListener('click', (ev) => {
+        const target = ev.target.closest('[data-action]');
+        if (!target) return;
+        const action = target.dataset.action;
+        if (action === 'show-picker') {
+            const picker = target.parentElement.querySelector('[data-picker]');
+            if (picker) picker.classList.toggle('hidden');
+            return;
+        }
+        if (action === 'react') {
+            const msgId = Number(target.dataset.msgId);
+            const emoji = target.dataset.emoji;
+            toggleReaction(msgId, emoji);
+            const picker = target.closest('[data-picker]');
+            if (picker) picker.classList.add('hidden');
+            return;
+        }
+        if (action === 'toggle-reaction') {
+            const msgId = Number(target.dataset.msgId);
+            const emoji = target.dataset.emoji;
+            toggleReaction(msgId, emoji);
+            return;
+        }
+    });
 
     loadHistory().then(connectWs);
     input.focus();

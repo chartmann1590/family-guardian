@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -54,8 +55,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.familyguardian.data.CircleMember
 import com.familyguardian.data.Place
 import com.familyguardian.data.PlaceBody
+import com.familyguardian.data.PlaceSubBody
+import com.familyguardian.data.PlaceSubscription
+import com.familyguardian.data.PlaceSubscriptionsRepo
 import com.familyguardian.data.PlacesRepo
 import com.familyguardian.data.Prefs
 import kotlinx.coroutines.launch
@@ -66,10 +71,14 @@ fun PlacesScreen(onBack: () -> Unit) {
     val context = LocalContext.current.applicationContext
     val prefs = remember { Prefs(context) }
     val repo = remember { PlacesRepo(prefs) }
+    val subRepo = remember { PlaceSubscriptionsRepo(prefs) }
     val scope = rememberCoroutineScope()
 
     val circleId by prefs.circleId.collectAsStateWithLifecycle(initialValue = null)
+    val myUserId by prefs.userId.collectAsStateWithLifecycle(initialValue = null)
     var places by remember { mutableStateOf<List<Place>>(emptyList()) }
+    var members by remember { mutableStateOf<List<CircleMember>>(emptyList()) }
+    var subs by remember { mutableStateOf<List<PlaceSubscription>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -82,6 +91,14 @@ fun PlacesScreen(onBack: () -> Unit) {
         error = null
         try {
             places = repo.list(cid).sortedBy { it.name.lowercase() }
+            val membersResp = try {
+                com.familyguardian.data.ApiClient.api.listMembers(
+                    com.familyguardian.data.ApiClient.endpoint(prefs.snapshot().serverUrl!!, "/api/circles/$cid/members"),
+                    "Bearer ${prefs.snapshot().token!!}",
+                )
+            } catch (_: Throwable) { null }
+            members = membersResp?.members ?: emptyList()
+            subs = subRepo.list(cid)
         } catch (t: Throwable) {
             error = t.message ?: "Failed to load places"
         } finally {
@@ -142,12 +159,38 @@ fun PlacesScreen(onBack: () -> Unit) {
                     items(places, key = { it.id }) { p ->
                         PlaceCard(
                             place = p,
+                            members = members,
+                            subs = subs.filter { it.placeId == p.id },
+                            myUserId = myUserId ?: 0L,
                             onEdit = { editing = p },
                             onDelete = {
                                 scope.launch {
                                     try {
                                         repo.delete(p.id)
                                         places = places.filterNot { it.id == p.id }
+                                    } catch (t: Throwable) {
+                                        error = t.message
+                                    }
+                                }
+                            },
+                            onToggleSub = { memberId, onEnter, onExit ->
+                                val cid = circleId ?: return@PlaceCard
+                                scope.launch {
+                                    try {
+                                        val result = subRepo.upsert(cid, PlaceSubBody(
+                                            placeId = p.id, memberId = memberId, onEnter = onEnter, onExit = onExit,
+                                        ))
+                                        subs = subs.filterNot { it.placeId == p.id && it.memberId == memberId } + result
+                                    } catch (t: Throwable) {
+                                        error = t.message
+                                    }
+                                }
+                            },
+                            onDeleteSub = { subId ->
+                                scope.launch {
+                                    try {
+                                        subRepo.delete(subId)
+                                        subs = subs.filterNot { it.id == subId }
                                     } catch (t: Throwable) {
                                         error = t.message
                                     }
@@ -199,7 +242,18 @@ fun PlacesScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun PlaceCard(place: Place, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun PlaceCard(
+    place: Place,
+    members: List<CircleMember>,
+    subs: List<PlaceSubscription>,
+    myUserId: Long,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onToggleSub: (memberId: Long?, onEnter: Boolean, onExit: Boolean) -> Unit,
+    onDeleteSub: (subId: Long) -> Unit,
+) {
+    var showSubs by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -220,7 +274,7 @@ private fun PlaceCard(place: Place, onEdit: () -> Unit, onDelete: () -> Unit) {
                         )
                     }
                 }
-                Column(modifier = Modifier.padding(start = 12.dp).fillMaxWidth(0.7f)) {
+                Column(modifier = Modifier.padding(start = 12.dp).fillMaxWidth(0.6f)) {
                     Text(place.name, style = MaterialTheme.typography.headlineSmall)
                     Text(
                         place.address ?: "${"%.4f".format(place.lat)}, ${"%.4f".format(place.lng)}",
@@ -235,6 +289,13 @@ private fun PlaceCard(place: Place, onEdit: () -> Unit, onDelete: () -> Unit) {
                 }
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
                     Row {
+                        IconButton(onClick = { showSubs = !showSubs }) {
+                            Icon(
+                                Icons.Filled.Notifications,
+                                contentDescription = "Notifications",
+                                tint = if (subs.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "Edit") }
                         IconButton(onClick = onDelete) {
                             Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
@@ -257,6 +318,68 @@ private fun PlaceCard(place: Place, onEdit: () -> Unit, onDelete: () -> Unit) {
                     color = if (place.alertsOnExit) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline,
                     style = MaterialTheme.typography.labelLarge,
                 )
+            }
+
+            if (showSubs) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Notify me when…", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+
+                        val allTargets = listOf<Pair<Long?, String>>(null to "Anyone") + members.map { it.userId to it.displayName }
+
+                        for ((targetId, targetName) in allTargets) {
+                            val existing = subs.find { it.memberId == targetId }
+                            var enterOn by remember { mutableStateOf(existing?.onEnter ?: false) }
+                            var exitOn by remember { mutableStateOf(existing?.onExit ?: false) }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(targetName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.fillMaxWidth(0.3f))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Arrives", style = MaterialTheme.typography.labelMedium)
+                                    Switch(
+                                        checked = enterOn,
+                                        onCheckedChange = {
+                                            val newEnter = it
+                                            val newExit = exitOn
+                                            if (!newEnter && !newExit && existing != null) {
+                                                onDeleteSub(existing.id)
+                                            } else {
+                                                onToggleSub(targetId, newEnter, newExit)
+                                            }
+                                            enterOn = newEnter
+                                        },
+                                        modifier = Modifier.height(24.dp),
+                                    )
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Leaves", style = MaterialTheme.typography.labelMedium)
+                                    Switch(
+                                        checked = exitOn,
+                                        onCheckedChange = {
+                                            val newExit = it
+                                            val newEnter = enterOn
+                                            if (!newEnter && !newExit && existing != null) {
+                                                onDeleteSub(existing.id)
+                                            } else {
+                                                onToggleSub(targetId, newEnter, newExit)
+                                            }
+                                            exitOn = newExit
+                                        },
+                                        modifier = Modifier.height(24.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

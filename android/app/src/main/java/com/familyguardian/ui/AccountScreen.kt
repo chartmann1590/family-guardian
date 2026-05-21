@@ -46,9 +46,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.familyguardian.data.AccountRepo
 import com.familyguardian.data.ApiClient
+import com.familyguardian.data.AuthRepo
 import com.familyguardian.data.CircleMember
 import com.familyguardian.data.MembersResponse
 import com.familyguardian.data.Prefs
+import com.familyguardian.location.LocationService
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,8 +61,10 @@ fun AccountScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    val prefs = remember { Prefs(context.applicationContext) }
+    val appCtx = context.applicationContext
+    val prefs = remember { Prefs(appCtx) }
     val repo = remember { AccountRepo(prefs) }
+    val authRepo = remember { AuthRepo(prefs) }
     val scope = rememberCoroutineScope()
     var exporting by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -68,6 +72,12 @@ fun AccountScreen(
     var showPromoteDialog by remember { mutableStateOf(false) }
     var deletePassword by remember { mutableStateOf("") }
     var deleting by remember { mutableStateOf(false) }
+    var loggingOut by remember { mutableStateOf(false) }
+    var signedInAs by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        signedInAs = prefs.snapshot().email
+    }
 
     LaunchedEffect(Unit) {
         try {
@@ -97,6 +107,46 @@ fun AccountScreen(
         ) {
             item {
                 Spacer(Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text("Signed in", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            signedInAs ?: "",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    loggingOut = true
+                                    try {
+                                        LocationService.stop(appCtx)
+                                        authRepo.logout()
+                                        onLoggedOut()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Logout failed: ${e.message}", Toast.LENGTH_LONG).show()
+                                    } finally {
+                                        loggingOut = false
+                                    }
+                                }
+                            },
+                            enabled = !loggingOut,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                        ) {
+                            Text(if (loggingOut) "Logging out..." else "Log out")
+                        }
+                    }
+                }
+            }
+
+            item {
                 Text("Export your data", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
                     "Download a JSON file containing all your location history, messages, check-ins, and other data.",

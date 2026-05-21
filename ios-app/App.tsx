@@ -12,8 +12,9 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 type Session = { serverUrl: string; token: string; userId: number; circleId: number; displayName: string; email: string };
 type Member = { userId: number; displayName: string; email?: string; role?: string; lat?: number; lng?: number; accuracyM?: number; speedMps?: number; batteryPct?: number; bearing?: number; altitudeM?: number; activity?: string; activityConfidence?: number; recordedAt?: number; photoUrl?: string; address?: string; paused?: boolean; pausedUntil?: number | null; pauseReason?: string | null };
 type Place = { id: number; circleId: number; name: string; address?: string | null; lat: number; lng: number; radiusM: number; alertsOnEnter: boolean; alertsOnExit: boolean };
-type Message = { id: number; circleId?: number; userId: number; displayName?: string; body: string; createdAt: number };
+type Message = { id: number; circleId?: number; userId: number; displayName?: string; body: string; createdAt: number; reactions?: { emoji: string; userIds: number[] }[] };
 type AlertEvent = { id: number; userId: number; displayName?: string; circleId: number; type: string; value?: number; createdAt: number };
+type PlaceSubscription = { id: number; userId: number; placeId: number; memberId: number | null; placeName?: string; memberName?: string; onEnter: boolean; onExit: boolean; quietStart?: number | null; quietEnd?: number | null };
 type LocationPoint = { id: number; lat: number; lng: number; recordedAt: number; activity?: string; speedMps?: number };
 type Tab = 'map' | 'members' | 'chat' | 'places' | 'alerts' | 'more';
 
@@ -199,14 +200,34 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
     ws.onmessage = async (event: { data: string }) => {
       const msg = JSON.parse(event.data);
       if (msg.type === 'location_update') setMembers((cur) => upsertMember(cur, msg));
-      if (msg.type === 'chat_message') setMessages((cur) => [...cur, msg]);
+      if (msg.type === 'chat_message') {
+        setMessages((cur) => [...cur, { ...msg, reactions: msg.reactions || [] }]);
+      }
+      if (msg.type === 'reaction_added' || msg.type === 'reaction_removed') {
+        setMessages((cur: Message[]) => cur.map((m: Message) => {
+          if (m.id !== msg.messageId) return m;
+          const rxs = [...(m.reactions || [])];
+          if (msg.type === 'reaction_added') {
+            const existing = rxs.find((r: any) => r.emoji === msg.emoji);
+            if (existing) { if (!existing.userIds.includes(msg.userId)) existing.userIds = [...existing.userIds, msg.userId]; }
+            else rxs.push({ emoji: msg.emoji, userIds: [msg.userId] });
+          } else {
+            const existing = rxs.find((r: any) => r.emoji === msg.emoji);
+            if (existing) { existing.userIds = existing.userIds.filter((id: number) => id !== msg.userId); if (existing.userIds.length === 0) rxs.splice(rxs.indexOf(existing), 1); }
+          }
+          return { ...m, reactions: rxs };
+        }));
+      }
       if (msg.type === 'sos_active') await notify('SOS active', `${msg.displayName || 'A member'} triggered SOS`);
       if (msg.type === 'pause_changed') {
         setMembers((cur) => cur.map((m) => m.userId === msg.userId
           ? { ...m, paused: !!msg.pausedUntil, pausedUntil: msg.pausedUntil, pauseReason: msg.reason }
           : m));
       }
-      if (msg.type?.includes('alert') || msg.type?.startsWith('geofence')) await notify('Family Guardian', `${msg.displayName || 'Member'}: ${msg.type.replaceAll('_', ' ')}`);
+      if (msg.type?.includes('alert') || msg.type?.startsWith('geofence')) {
+        if (msg.type?.startsWith('geofence') && msg.notifyUserIds && Array.isArray(msg.notifyUserIds) && !msg.notifyUserIds.includes(session.userId)) return;
+        await notify('Family Guardian', `${msg.displayName || 'Member'}: ${msg.type.replaceAll('_', ' ')}`);
+      }
     };
     return () => ws.close();
   }, [session]);
@@ -261,8 +282,78 @@ function MembersTab({ session, members, selected, setSelected, history, setHisto
   async function open(m: Member) { setSelected(m); const to = Date.now(); const from = to - 86400000 * 7; const data = await api<{ points: LocationPoint[] }>(session, `/api/circles/${session.circleId}/members/${m.userId}/history?from=${from}&to=${to}&limit=500`); setHistory(data.points); }
   return <ScrollView style={styles.content}>{members.map((m: Member) => <Pressable key={m.userId} style={styles.card} onPress={() => open(m)}><Text style={styles.cardTitle}>{m.displayName}</Text>{m.paused ? <Text style={[styles.meta, { color: '#943700' }]}>⏸ Paused{m.pausedUntil ? ` until ${formatPauseUntil(m.pausedUntil)}` : ''}</Text> : <Text style={styles.meta}>{m.address || (m.lat ? `${m.lat.toFixed(4)}, ${m.lng?.toFixed(4)}` : 'No location yet')}</Text>}<Text style={styles.meta}>{rel(m.recordedAt)} {m.batteryPct != null ? `· ${m.batteryPct}%` : ''}</Text></Pressable>)}{selected && <View style={styles.card}><Text style={styles.cardTitle}>{selected.displayName} history</Text><Text style={styles.meta}>{history.length} points in the last 7 days</Text>{history.length > 1 && <MapView style={styles.smallMap} initialRegion={{ latitude: history[0].lat, longitude: history[0].lng, latitudeDelta: .08, longitudeDelta: .08 }}><Polyline coordinates={history.map((p: LocationPoint) => ({ latitude: p.lat, longitude: p.lng }))} strokeColor="#006c49" strokeWidth={4} /></MapView>}</View>}</ScrollView>;
 }
-function ChatTab({ session, messages, setMessages, loadMessages }: any) { const [body, setBody] = useState(''); useEffect(() => { loadMessages().catch(() => {}); }, []); async function send() { if (!body.trim()) return; const msg = await api<Message>(session, `/api/circles/${session.circleId}/messages`, { method: 'POST', body: JSON.stringify({ body: body.trim() }) }); setMessages((cur: Message[]) => [...cur, msg]); setBody(''); } return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><FlatList style={styles.content} data={messages} keyExtractor={(m) => String(m.id)} renderItem={({ item }) => <View style={[styles.message, item.userId === session.userId && styles.mine]}><Text style={styles.meta}>{item.displayName || 'Member'}</Text><Text>{item.body}</Text></View>} /><View style={styles.composer}><TextInput style={styles.inputFlex} value={body} onChangeText={setBody} placeholder="Message" /><Pressable style={styles.primaryButton} onPress={send}><Text style={styles.buttonText}>Send</Text></Pressable></View></KeyboardAvoidingView>; }
-function PlacesTab({ session, places, setPlaces }: any) { const [name, setName] = useState(''); const [lat, setLat] = useState(''); const [lng, setLng] = useState(''); const [radius, setRadius] = useState('150'); async function save() { const p = await api<Place>(session, `/api/circles/${session.circleId}/places`, { method: 'POST', body: JSON.stringify({ name, lat: Number(lat), lng: Number(lng), radiusM: Number(radius), alertsOnEnter: true, alertsOnExit: true }) }); setPlaces((cur: Place[]) => [...cur, p]); setName(''); } return <ScrollView style={styles.content}><View style={styles.card}><TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Place name" /><TextInput style={styles.input} value={lat} onChangeText={setLat} placeholder="Latitude" keyboardType="decimal-pad" /><TextInput style={styles.input} value={lng} onChangeText={setLng} placeholder="Longitude" keyboardType="decimal-pad" /><TextInput style={styles.input} value={radius} onChangeText={setRadius} placeholder="Radius meters" keyboardType="decimal-pad" /><Pressable style={styles.primaryButton} onPress={save}><Text style={styles.buttonText}>Save place</Text></Pressable></View>{places.map((p: Place) => <View style={styles.card} key={p.id}><Text style={styles.cardTitle}>{p.name}</Text><Text style={styles.meta}>{p.address || `${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}`} · {Math.round(p.radiusM)}m</Text></View>)}</ScrollView>; }
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+function ChatTab({ session, messages, setMessages, loadMessages }: any) { const [body, setBody] = useState(''); useEffect(() => { loadMessages().catch(() => {}); }, []); async function send() { if (!body.trim()) return; const msg = await api<Message>(session, `/api/circles/${session.circleId}/messages`, { method: 'POST', body: JSON.stringify({ body: body.trim() }) }); setMessages((cur: Message[]) => [...cur, msg]); setBody(''); }
+  async function toggleReaction(msgId: number, emoji: string) {
+    const msg = messages.find((m: Message) => m.id === msgId);
+    const existing = msg?.reactions?.find((r: any) => r.emoji === emoji && r.userIds.includes(session.userId));
+    if (existing) {
+      await api(session, `/api/messages/${msgId}/reactions/${encodeURIComponent(emoji)}`, { method: 'DELETE' });
+    } else {
+      await api(session, `/api/messages/${msgId}/reactions`, { method: 'POST', body: JSON.stringify({ emoji }) });
+    }
+  }
+  function showReactionPicker(msgId: number) {
+    Alert.alert('React', 'Choose a reaction', [
+      ...REACTION_EMOJIS.map((e) => ({ text: e, onPress: () => toggleReaction(msgId, e) })),
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><FlatList style={styles.content} data={messages} keyExtractor={(m) => String(m.id)} renderItem={({ item }: any) => <Pressable onLongPress={() => showReactionPicker(item.id)}><View style={[styles.message, item.userId === session.userId && styles.mine]}><Text style={styles.meta}>{item.displayName || 'Member'}</Text><Text>{item.body}</Text>{item.reactions?.length > 0 && <View style={{ flexDirection: 'row', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>{item.reactions.map((rx: any, i: number) => <Pressable key={i} style={[styles.chip, rx.userIds.includes(session.userId) && styles.chipActive]} onPress={() => toggleReaction(item.id, rx.emoji)}><Text style={{ fontSize: 12 }}>{rx.emoji} {rx.userIds.length}</Text></Pressable>)}</View>}</View></Pressable>} /><View style={styles.composer}><TextInput style={styles.inputFlex} value={body} onChangeText={setBody} placeholder="Message" /><Pressable style={styles.primaryButton} onPress={send}><Text style={styles.buttonText}>Send</Text></Pressable></View></KeyboardAvoidingView>; }
+function PlacesTab({ session, places, setPlaces }: any) {
+  const [name, setName] = useState('');
+  const [lat, setLat] = useState('');
+  const [lng, setLng] = useState('');
+  const [radius, setRadius] = useState('150');
+  const [members, setMembers] = useState<Member[]>([]);
+  const [subs, setSubs] = useState<PlaceSubscription[]>([]);
+  const [expandedPlace, setExpandedPlace] = useState<number | null>(null);
+
+  useEffect(() => {
+    api<{ members: Member[] }>(session, `/api/circles/${session.circleId}/members`)
+      .then((d) => setMembers(d.members)).catch(() => {});
+    api<{ subscriptions: PlaceSubscription[] }>(session, `/api/circles/${session.circleId}/place-subscriptions`)
+      .then((d) => setSubs(d.subscriptions || [])).catch(() => {});
+  }, [session]);
+
+  async function toggleSub(placeId: number, memberId: number | null, onEnter: boolean, onExit: boolean) {
+    if (!onEnter && !onExit) {
+      const existing = subs.find((s) => s.placeId === placeId && s.memberId === memberId);
+      if (existing) {
+        await api(session, `/api/place-subscriptions/${existing.id}`, { method: 'DELETE' });
+        setSubs((cur) => cur.filter((s) => s.id !== existing.id));
+      }
+      return;
+    }
+    const result = await api<PlaceSubscription>(session, `/api/circles/${session.circleId}/place-subscriptions`, {
+      method: 'POST', body: JSON.stringify({ placeId, memberId, onEnter, onExit }),
+    });
+    setSubs((cur) => {
+      const filtered = cur.filter((s) => !(s.placeId === placeId && s.memberId === memberId));
+      return [...filtered, result];
+    });
+  }
+
+  async function save() { const p = await api<Place>(session, `/api/circles/${session.circleId}/places`, { method: 'POST', body: JSON.stringify({ name, lat: Number(lat), lng: Number(lng), radiusM: Number(radius), alertsOnEnter: true, alertsOnExit: true }) }); setPlaces((cur: Place[]) => [...cur, p]); setName(''); }
+  return <ScrollView style={styles.content}><View style={styles.card}><TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Place name" /><TextInput style={styles.input} value={lat} onChangeText={setLat} placeholder="Latitude" keyboardType="decimal-pad" /><TextInput style={styles.input} value={lng} onChangeText={setLng} placeholder="Longitude" keyboardType="decimal-pad" /><TextInput style={styles.input} value={radius} onChangeText={setRadius} placeholder="Radius meters" keyboardType="decimal-pad" /><Pressable style={styles.primaryButton} onPress={save}><Text style={styles.buttonText}>Save place</Text></Pressable></View>{places.map((p: Place) => {
+    const placeSubs = subs.filter((s) => s.placeId === p.id);
+    const isExpanded = expandedPlace === p.id;
+    const allTargets: { id: number | null; name: string }[] = [{ id: null, name: 'Anyone' }, ...members.map((m) => ({ id: m.userId, name: m.displayName }))];
+    return <View style={styles.card} key={p.id}>
+      <Text style={styles.cardTitle}>{p.name}</Text>
+      <Text style={styles.meta}>{p.address || `${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}`} · {Math.round(p.radiusM)}m</Text>
+      <Pressable style={[styles.secondaryButton, { marginTop: 4 }]} onPress={() => setExpandedPlace(isExpanded ? null : p.id)}><Text>{isExpanded ? 'Hide notifications' : '🔔 Notify me when…'}</Text></Pressable>
+      {isExpanded && allTargets.map((t) => {
+        const sub = placeSubs.find((s) => s.memberId === t.id);
+        return <View key={t.id ?? 'any'} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 }}>
+          <Text style={{ flex: 1, fontWeight: '600' }}>{t.name}</Text>
+          <Pressable style={[styles.chip, sub?.onEnter && styles.chipActive]} onPress={() => toggleSub(p.id, t.id, !(sub?.onEnter ?? false), sub?.onExit ?? false)}><Text>{sub?.onEnter ? '✅' : '◻️'} Arrives</Text></Pressable>
+          <Pressable style={[styles.chip, sub?.onExit && styles.chipActive]} onPress={() => toggleSub(p.id, t.id, sub?.onEnter ?? false, !(sub?.onExit ?? false))}><Text>{sub?.onExit ? '✅' : '◻️'} Leaves</Text></Pressable>
+        </View>;
+      })}
+    </View>;
+  })}</ScrollView>;
+}
 function AlertsTab({ alerts, loadAlerts }: any) { useEffect(() => { loadAlerts().catch(() => {}); }, []); return <ScrollView style={styles.content}>{alerts.map((a: AlertEvent) => <View style={styles.card} key={a.id}><Text style={styles.cardTitle}>{a.displayName || 'Member'}</Text><Text style={styles.meta}>{a.type} {a.value != null ? `· ${a.value}` : ''} · {rel(a.createdAt)}</Text></View>)}</ScrollView>; }
 function MoreTab({ session, onLogout, onRefresh }: any) {
   const [pauseUntil, setPauseUntil] = useState<number | null>(null);
@@ -366,7 +457,7 @@ function MoreTab({ session, onLogout, onRefresh }: any) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' }, app: { flex: 1, backgroundColor: '#eef7f0' }, auth: { flex: 1, padding: 22, justifyContent: 'center', backgroundColor: '#eef7f0' }, brand: { fontSize: 44, fontWeight: '900', letterSpacing: -2, color: '#061b16' }, subtitle: { color: '#53616b', marginVertical: 14, fontSize: 16 }, header: { paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, eyebrow: { color: '#66737f', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.4, fontWeight: '800' }, title: { fontSize: 24, fontWeight: '900', letterSpacing: -1.2 }, badge: { backgroundColor: '#dff2e9', color: '#006c49', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, overflow: 'hidden', fontWeight: '800' }, map: { flex: 1 }, floating: { position: 'absolute', left: 14, right: 14, bottom: 16, backgroundColor: 'rgba(255,255,255,.92)', borderRadius: 26, padding: 14, gap: 10 }, row: { flexDirection: 'row', gap: 10, alignItems: 'center' }, content: { flex: 1, paddingHorizontal: 14 }, card: { backgroundColor: 'white', borderRadius: 22, padding: 14, marginBottom: 10, gap: 8, shadowColor: '#071b24', shadowOpacity: .08, shadowRadius: 12 }, cardTitle: { fontSize: 18, fontWeight: '900' }, meta: { color: '#66737f', lineHeight: 20 }, input: { backgroundColor: 'white', borderRadius: 16, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(7,27,36,.12)' }, inputFlex: { flex: 1, backgroundColor: 'white', borderRadius: 16, padding: 13, borderWidth: 1, borderColor: 'rgba(7,27,36,.12)' }, primaryButton: { backgroundColor: '#006c49', padding: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flex: 1 }, dangerButton: { backgroundColor: '#ba1a1a', padding: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flex: 1 }, secondaryButton: { backgroundColor: '#dff2e9', padding: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flex: 1 }, buttonText: { color: 'white', fontWeight: '900' }, secondaryText: { color: '#006c49', fontWeight: '900' }, tabs: { flexDirection: 'row', padding: 8, gap: 4, backgroundColor: 'rgba(255,255,255,.94)' }, tab: { flex: 1, paddingVertical: 10, borderRadius: 14, alignItems: 'center' }, activeTab: { backgroundColor: '#dff2e9' }, tabText: { color: '#66737f', fontSize: 11, fontWeight: '800' }, activeTabText: { color: '#006c49' }, smallMap: { height: 220, borderRadius: 18 }, composer: { flexDirection: 'row', gap: 8, padding: 10 }, message: { maxWidth: '84%', backgroundColor: 'white', borderRadius: 18, padding: 10, marginBottom: 8 }, mine: { alignSelf: 'flex-end', backgroundColor: '#dff2e9' },
+  flex: { flex: 1 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' }, app: { flex: 1, backgroundColor: '#eef7f0' }, auth: { flex: 1, padding: 22, justifyContent: 'center', backgroundColor: '#eef7f0' }, brand: { fontSize: 44, fontWeight: '900', letterSpacing: -2, color: '#061b16' }, subtitle: { color: '#53616b', marginVertical: 14, fontSize: 16 }, header: { paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, eyebrow: { color: '#66737f', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.4, fontWeight: '800' }, title: { fontSize: 24, fontWeight: '900', letterSpacing: -1.2 }, badge: { backgroundColor: '#dff2e9', color: '#006c49', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, overflow: 'hidden', fontWeight: '800' }, map: { flex: 1 }, floating: { position: 'absolute', left: 14, right: 14, bottom: 16, backgroundColor: 'rgba(255,255,255,.92)', borderRadius: 26, padding: 14, gap: 10 }, row: { flexDirection: 'row', gap: 10, alignItems: 'center' }, content: { flex: 1, paddingHorizontal: 14 }, card: { backgroundColor: 'white', borderRadius: 22, padding: 14, marginBottom: 10, gap: 8, shadowColor: '#071b24', shadowOpacity: .08, shadowRadius: 12 }, cardTitle: { fontSize: 18, fontWeight: '900' }, meta: { color: '#66737f', lineHeight: 20 }, input: { backgroundColor: 'white', borderRadius: 16, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(7,27,36,.12)' }, inputFlex: { flex: 1, backgroundColor: 'white', borderRadius: 16, padding: 13, borderWidth: 1, borderColor: 'rgba(7,27,36,.12)' }, primaryButton: { backgroundColor: '#006c49', padding: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flex: 1 }, dangerButton: { backgroundColor: '#ba1a1a', padding: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flex: 1 }, secondaryButton: { backgroundColor: '#dff2e9', padding: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flex: 1 }, chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: '#f0f0f0', marginLeft: 6 }, chipActive: { backgroundColor: '#dff2e9' }, buttonText: { color: 'white', fontWeight: '900' }, secondaryText: { color: '#006c49', fontWeight: '900' }, tabs: { flexDirection: 'row', padding: 8, gap: 4, backgroundColor: 'rgba(255,255,255,.94)' }, tab: { flex: 1, paddingVertical: 10, borderRadius: 14, alignItems: 'center' }, activeTab: { backgroundColor: '#dff2e9' }, tabText: { color: '#66737f', fontSize: 11, fontWeight: '800' }, activeTabText: { color: '#006c49' }, smallMap: { height: 220, borderRadius: 18 }, composer: { flexDirection: 'row', gap: 8, padding: 10 }, message: { maxWidth: '84%', backgroundColor: 'white', borderRadius: 18, padding: 10, marginBottom: 8 }, mine: { alignSelf: 'flex-end', backgroundColor: '#dff2e9' },
 });
 
 

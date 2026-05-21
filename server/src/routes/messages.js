@@ -7,6 +7,8 @@ const PostBody = z.object({
     body: z.string().min(1).max(2_000),
 });
 
+const ALLOWED_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
 function rowToMsg(r) {
     return {
         id: r.id,
@@ -15,6 +17,7 @@ function rowToMsg(r) {
         displayName: r.display_name,
         body: r.body,
         createdAt: r.created_at,
+        reactions: [],
     };
 }
 
@@ -67,7 +70,64 @@ export default async function messageRoutes(fastify, { db }) {
              ORDER BY m.created_at DESC LIMIT ?`
         ).all(circleId, before, limit);
 
-        // Return ASC (oldest first) for convenient append on the client.
-        return { messages: rows.map(rowToMsg).reverse() };
+        const messages = rows.map(rowToMsg).reverse();
+
+        const ids = messages.map((m) => m.id);
+        if (ids.length > 0) {
+            const placeholders = ids.map(() => '?').join(',');
+            const rxRows = db.prepare(
+                `SELECT message_id, user_id, emoji FROM message_reactions
+                 WHERE message_id IN (${placeholders})`
+            ).all(...ids);
+            const grouped = new Map();
+            for (const rx of rxRows) {
+                const key = `${rx.message_id}:${rx.emoji}`;
+                if (!grouped.has(key)) grouped.set(key, { emoji: rx.emoji, messageId: rx.message_id, userIds: [] });
+                grouped.get(key).userIds.push(rx.user_id);
+            }
+            for (const g of grouped.values()) {
+                const msg = messages.find((m) => m.id === g.messageId);
+                if (msg) msg.reactions.push({ emoji: g.emoji, userIds: g.userIds });
+            }
+        }
+
+        return { messages };
+    });
+
+    fastify.post('/api/messages/:id/reactions', { preHandler: requireAuth(db) }, async (req, reply) => {
+        const messageId = Number(req.params.id);
+        if (!Number.isInteger(messageId)) return reply.code(400).send({ error: 'invalid_message' });
+
+        const msg = db.prepare('SELECT circle_id FROM messages WHERE id = ?').get(messageId);
+        if (!msg) return reply.code(404).send({ error: 'not_found' });
+        if (!assertMember(db, msg.circle_id, req.auth.userId, reply)) return;
+
+        const emoji = req.body?.emoji;
+        if (typeof emoji !== 'string' || !ALLOWED_EMOJIS.includes(emoji)) {
+            return reply.code(400).send({ error: 'invalid_emoji', allowed: ALLOWED_EMOJIS });
+        }
+
+        db.prepare(
+            'INSERT OR IGNORE INTO message_reactions (message_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?)'
+        ).run(messageId, req.auth.userId, emoji, Date.now());
+
+        publish(msg.circle_id, { type: 'reaction_added', messageId, userId: req.auth.userId, emoji });
+        return reply.code(204).send();
+    });
+
+    fastify.delete('/api/messages/:id/reactions/:emoji', { preHandler: requireAuth(db) }, async (req, reply) => {
+        const messageId = Number(req.params.id);
+        if (!Number.isInteger(messageId)) return reply.code(400).send({ error: 'invalid_message' });
+        const emoji = decodeURIComponent(req.params.emoji);
+
+        const msg = db.prepare('SELECT circle_id FROM messages WHERE id = ?').get(messageId);
+        if (!msg) return reply.code(404).send({ error: 'not_found' });
+
+        db.prepare(
+            'DELETE FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?'
+        ).run(messageId, req.auth.userId, emoji);
+
+        publish(msg.circle_id, { type: 'reaction_removed', messageId, userId: req.auth.userId, emoji });
+        return reply.code(204).send();
     });
 }

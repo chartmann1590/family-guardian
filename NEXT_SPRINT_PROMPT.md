@@ -24,16 +24,24 @@ Repo conventions, dev-environment quirks, and "things that bit us last time" are
 
 | Sprint | Theme | Status |
 |---|---|---|
-| 1 | **Privacy & Control** — pause sharing, view-audit log, data export & account delete | **Active** |
-| 2 | Notify-on-arrival / -departure (per-place + per-member subscriptions) | Sketched |
-| 3 | Chat polish (voice notes, photo check-ins, reactions, typing/read) | Sketched |
+| 1 | **Privacy & Control** — pause sharing, view-audit log, data export & account delete | **Shipped** |
+| 2 | **Smart Notifications + Reactions** — per-place/per-member subscriptions, message reactions, test suite | **Shipped** |
+| 3 | Chat polish (voice notes, photo check-ins, typing/read) | Sketched |
 | 4 | Driving safety (crash detection auto-SOS + driving safety score) | Sketched |
 
 **Why privacy first.** Family Guardian's pitch is "self-hosted family safety — your box, your data." Shipping pause / audit / export *before* more tracking features is what defensibly separates it from "Life360 on a VPS." Trust foundation goes in first, the rest builds on top.
 
 ---
 
-## Sprint 1 — Privacy & Control (active, ~1–2 weeks)
+## Sprint 1 — Privacy & Control (SHIPPED)
+
+C1 (pause sharing), C2 (view audit log), C3 (data export + account delete) — all done.
+
+---
+
+## Sprint 2 — Smart Notifications + Reactions (SHIPPED)
+
+D1 (notify-on-arrival/departure with `place_subscriptions` table, `inQuietHours`, targeted `fanOutToUsers`), D2 (message reactions with `message_reactions` table, 6-emoji allowlist, WS events) — all done. 59 tests passing in vitest.
 
 Three features. Each touches **server + Android + iOS + PWA**. All four surfaces already have the structure to absorb the change without rewriting.
 

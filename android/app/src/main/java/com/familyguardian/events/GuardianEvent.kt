@@ -39,6 +39,7 @@ sealed interface GuardianEvent {
         val placeName: String,
         val distanceM: Double,
         val recordedAt: Long,
+        val notifyUserIds: List<Long> = emptyList(),
     ) : GuardianEvent
 
     @Serializable
@@ -50,6 +51,7 @@ sealed interface GuardianEvent {
         val placeName: String,
         val distanceM: Double,
         val recordedAt: Long,
+        val notifyUserIds: List<Long> = emptyList(),
     ) : GuardianEvent
 
     @Serializable
@@ -162,6 +164,22 @@ sealed interface GuardianEvent {
         val userId: Long,
         val pausedUntil: Long? = null,
         val reason: String? = null,
+    ) : GuardianEvent
+
+    @Serializable
+    @SerialName("reaction_added")
+    data class ReactionAdded(
+        val messageId: Long,
+        val userId: Long,
+        val emoji: String,
+    ) : GuardianEvent
+
+    @Serializable
+    @SerialName("reaction_removed")
+    data class ReactionRemoved(
+        val messageId: Long,
+        val userId: Long,
+        val emoji: String,
     ) : GuardianEvent
 
     @Serializable

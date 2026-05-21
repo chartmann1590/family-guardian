@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { haversineMeters, reconcileGeofences } from '../src/geofence.js';
-import { createTestDb, seedUser } from './helpers.js';
+import { haversineMeters, reconcileGeofences, inQuietHours } from '../src/geofence.js';
+import { createTestDb, seedUser, seedSecondUser } from './helpers.js';
 
 describe('geofence', () => {
     describe('haversineMeters', () => {
@@ -91,6 +91,75 @@ describe('geofence', () => {
             });
 
             expect(events).toHaveLength(0);
+        });
+
+        it('attaches notifyUserIds from subscriptions', () => {
+            const db = createTestDb();
+            const { userId: userA, circleId } = seedUser(db);
+            const { userId: userB } = seedSecondUser(db, circleId);
+
+            db.prepare(
+                'INSERT INTO places (circle_id, name, lat, lng, radius_m, alerts_on_enter, alerts_on_exit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            ).run(circleId, 'Home', 37.7749, -122.4194, 100, 1, 1, Date.now());
+
+            db.prepare(
+                'INSERT INTO place_subscriptions (user_id, place_id, member_id, on_enter, on_exit, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+            ).run(userB, 1, userA, 1, 1, Date.now());
+
+            const events = reconcileGeofences(db, {
+                userId: userA, circleId, displayName: 'Alice',
+                lat: 37.7749, lng: -122.4194, recordedAt: Date.now(),
+            });
+
+            expect(events).toHaveLength(1);
+            expect(events[0].notifyUserIds).toContain(userB);
+        });
+
+        it('filters out subscribers in quiet hours', () => {
+            const db = createTestDb();
+            const { userId: userA, circleId } = seedUser(db);
+            const { userId: userB } = seedSecondUser(db, circleId);
+
+            db.prepare(
+                'INSERT INTO places (circle_id, name, lat, lng, radius_m, alerts_on_enter, alerts_on_exit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            ).run(circleId, 'Home', 37.7749, -122.4194, 100, 1, 1, Date.now());
+
+            const now = new Date(2026, 0, 1, 23, 30);
+            db.prepare(
+                'INSERT INTO place_subscriptions (user_id, place_id, member_id, on_enter, on_exit, quiet_start, quiet_end, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            ).run(userB, 1, userA, 1, 1, 22 * 60, 7 * 60, Date.now());
+
+            const events = reconcileGeofences(db, {
+                userId: userA, circleId, displayName: 'Alice',
+                lat: 37.7749, lng: -122.4194, recordedAt: now.getTime(),
+            });
+
+            expect(events).toHaveLength(1);
+            expect(events[0].notifyUserIds).toHaveLength(0);
+        });
+
+        it('excludes subscriber when on_exit is 0', () => {
+            const db = createTestDb();
+            const { userId: userA, circleId } = seedUser(db);
+            const { userId: userB } = seedSecondUser(db, circleId);
+
+            db.prepare(
+                'INSERT INTO places (circle_id, name, lat, lng, radius_m, alerts_on_enter, alerts_on_exit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            ).run(circleId, 'Home', 37.7749, -122.4194, 100, 1, 1, Date.now());
+            db.prepare('INSERT INTO place_presence (user_id, place_id, entered_at) VALUES (?, ?, ?)').run(userA, 1, Date.now());
+
+            db.prepare(
+                'INSERT INTO place_subscriptions (user_id, place_id, member_id, on_enter, on_exit, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+            ).run(userB, 1, userA, 1, 0, Date.now());
+
+            const events = reconcileGeofences(db, {
+                userId: userA, circleId, displayName: 'Alice',
+                lat: 37.78, lng: -122.43, recordedAt: Date.now(),
+            });
+
+            expect(events).toHaveLength(1);
+            expect(events[0].type).toBe('geofence_exit');
+            expect(events[0].notifyUserIds).toHaveLength(0);
         });
     });
 });
