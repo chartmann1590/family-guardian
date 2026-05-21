@@ -98,7 +98,7 @@
                         : 'bg-surface-container-lowest text-on-surface rounded-2xl rounded-tl-md'} px-4 py-2.5 text-sm shadow-sm whitespace-pre-wrap break-words">
                         ${esc(msg.body)}
                     </div>
-                    <button class="absolute top-1 ${mine ? 'left-1' : 'right-1'} opacity-0 group-hover:opacity-100 text-xs text-on-surface-variant hover:text-primary w-6 h-6 flex items-center justify-center rounded-full hover:bg-surface-container" data-msg-id="${msg.id}" data-action="show-picker">+</button>
+                    <button class="absolute top-1 ${mine ? 'left-1' : 'right-1'} opacity-0 group-hover:opacity-100 text-xs text-on-surface-variant hover:text-primary w-6 h-6 flex items-center justify-center rounded-full hover:bg-surface-container" data-msg-id="${esc(msg.id)}" data-action="show-picker">+</button>
                     ${reactionPickerHtml(msg.id)}
                     ${reactionsHtml(msg)}
                 </div>
