@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { haversineMeters, reconcileGeofences, inQuietHours } from '../src/geofence.js';
+import { haversineMeters, reconcileGeofences } from '../src/geofence.js';
 import { createTestDb, seedUser, seedSecondUser } from './helpers.js';
 
 describe('geofence', () => {

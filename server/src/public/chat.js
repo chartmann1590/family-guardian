@@ -65,16 +65,16 @@
         if (rxs.length === 0) return '';
         const chips = rxs.map(rx => {
             const isMine = rx.userIds.includes(state.me.userId);
-            return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs cursor-pointer ${isMine ? 'bg-secondary-container text-on-secondary' : 'bg-surface-container text-on-surface-variant'}" data-msg-id="${msg.id}" data-emoji="${esc(rx.emoji)}" data-action="toggle-reaction">${rx.emoji} ${rx.userIds.length}</span>`;
+            return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs cursor-pointer ${isMine ? 'bg-secondary-container text-on-secondary' : 'bg-surface-container text-on-surface-variant'}" data-msg-id="${esc(msg.id)}" data-emoji="${esc(rx.emoji)}" data-action="toggle-reaction">${esc(rx.emoji)} ${esc(rx.userIds.length)}</span>`;
         }).join('');
         return `<div class="flex flex-wrap gap-1 mt-1">${chips}</div>`;
     }
 
     function reactionPickerHtml(msgId) {
         const btns = EMOJIS.map(e =>
-            `<button class="text-lg px-1 py-0.5 hover:bg-surface-container rounded" data-msg-id="${msgId}" data-emoji="${e}" data-action="react">${e}</button>`
+            `<button class="text-lg px-1 py-0.5 hover:bg-surface-container rounded" data-msg-id="${esc(msgId)}" data-emoji="${esc(e)}" data-action="react">${esc(e)}</button>`
         ).join('');
-        return `<div class="hidden absolute bottom-full left-0 mb-1 bg-surface-container-lowest rounded-lg shadow-lg px-2 py-1 flex gap-1 z-10" data-picker="${msgId}">${btns}</div>`;
+        return `<div class="hidden absolute bottom-full left-0 mb-1 bg-surface-container-lowest rounded-lg shadow-lg px-2 py-1 flex gap-1 z-10" data-picker="${esc(msgId)}">${btns}</div>`;
     }
 
     function bubble(msg, mine) {

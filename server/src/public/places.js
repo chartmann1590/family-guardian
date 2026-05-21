@@ -87,15 +87,6 @@
         return `${placeId}-${memberId ?? 'any'}`;
     }
 
-    function fmtTime(mins) {
-        if (mins == null) return '';
-        const h = Math.floor(mins / 60);
-        const m = mins % 60;
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-        return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
-    }
-
     function placeCard(p) {
         const li = document.createElement('div');
         li.className = 'flex flex-col';
