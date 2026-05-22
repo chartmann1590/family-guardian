@@ -1,6 +1,5 @@
 import { createReadStream, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { unlink } from 'node:fs/promises';
 import { z } from 'zod';
 import { requireAuth } from '../auth.js';
 import { publish } from '../hub.js';
@@ -135,6 +134,7 @@ export default async function messageRoutes(fastify, { db, uploadsDir }) {
 
     fastify.get('/api/messages/:id/attachment', {
         preHandler: requireAuth(db),
+        config: { rateLimit: { max: 240, timeWindow: '1 minute' } },
     }, async (req, reply) => {
         const msgId = Number(req.params.id);
         if (!Number.isInteger(msgId)) return reply.code(400).send({ error: 'invalid_message' });

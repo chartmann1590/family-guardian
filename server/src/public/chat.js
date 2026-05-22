@@ -90,7 +90,6 @@
     setInterval(updateTypingUI, 1000);
 
     const readQueue = [];
-    let readTimer = null;
     function flushReads() {
         if (readQueue.length === 0) return;
         const ids = readQueue.splice(0, 50);
@@ -101,6 +100,18 @@
             body: JSON.stringify({ messageIds: ids }),
         }).catch(() => {});
     }
+    const readObserver = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            const el = entry.target;
+            const msgId = Number(el.dataset.msgId);
+            const author = Number(el.dataset.author);
+            if (msgId && author !== state.me.userId && !readQueue.includes(msgId)) {
+                readQueue.push(msgId);
+            }
+            readObserver.unobserve(el);
+        }
+    }, { root: list, threshold: 0.5 });
 
     function reactionsHtml(msg) {
         const rxs = msg.reactions || reactionsMap.get(msg.id) || [];
@@ -170,7 +181,9 @@
             lastAuthor = null;
         }
         const mine = msg.userId === state.me.userId;
-        list.appendChild(bubble(msg, mine));
+        const wrap = bubble(msg, mine);
+        list.appendChild(wrap);
+        if (!mine) readObserver.observe(wrap);
         lastAuthor = msg.userId;
     }
 
@@ -497,17 +510,8 @@
     loadHistory().then(connectWs);
     input.focus();
 
-    const observer = new IntersectionObserver((entries) => {
-        for (const entry of entries) {
-            if (entry.isIntersecting) {
-                const msgId = Number(entry.target.dataset.msgId);
-                const author = Number(entry.target.dataset.author);
-                if (msgId && author !== state.me.userId && !readQueue.includes(msgId)) {
-                    readQueue.push(msgId);
-                }
-            }
-        }
-    }, { root: list, threshold: 0.5 });
-
-    readTimer = setInterval(flushReads, 2000);
+    setInterval(flushReads, 2000);
+    for (const el of list.querySelectorAll('[data-msg-id][data-author]')) {
+        if (Number(el.dataset.author) !== state.me.userId) readObserver.observe(el);
+    }
 })();

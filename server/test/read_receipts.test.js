@@ -132,7 +132,6 @@ describe('read_receipts_enabled column', () => {
         db.prepare(
             'INSERT INTO messages (circle_id, user_id, body, created_at) VALUES (?, ?, ?, ?)'
         ).run(circleId, userId, 'my msg', Date.now());
-        const msgId = db.prepare('SELECT last_insert_rowid() AS id').get().id;
 
         const count = db.prepare('SELECT COUNT(*) AS c FROM message_reads').get().c;
         expect(count).toBe(0);

@@ -128,6 +128,7 @@ export default async function checkinRoutes(fastify, { db, uploadsDir }) {
 
     fastify.get('/api/checkins/:id/photo', {
         preHandler: requireAuth(db),
+        config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
     }, async (req, reply) => {
         const checkinId = Number(req.params.id);
         if (!Number.isInteger(checkinId)) return reply.code(400).send({ error: 'invalid_id' });

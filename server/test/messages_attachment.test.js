@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createTestDb, seedUser, seedSecondUser } from './helpers.js';
+import { createTestDb, seedUser } from './helpers.js';
 import { stripJpegExif, stripImageMetadata, isAllowedImageMime, isAllowedAudioMime } from '../src/exifStrip.js';
 
 function makeJpegWithExif() {
