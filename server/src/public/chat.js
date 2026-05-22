@@ -10,11 +10,17 @@
     const input = $('composer-text');
     const sendBtn = $('composer-send');
     const newMsgPill = $('new-msg-pill');
+    const micBtn = $('composer-mic');
+    const imgBtn = $('composer-img');
+    const imgInput = $('composer-img-input');
 
     const seen = new Set();
     let lastAuthor = null;
     let userScrolledUp = false;
     let unreadCount = 0;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isRecording = false;
 
     const membersMap = new Map();
     for (const m of state.members || []) membersMap.set(m.userId, m);
@@ -58,7 +64,43 @@
     }
 
     const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
-    const reactionsMap = new Map(); // messageId -> [{emoji, userIds}]
+    const reactionsMap = new Map();
+
+    const typingUsers = new Map();
+    let typingLastSent = 0;
+    const typingLine = document.createElement('div');
+    typingLine.className = 'px-4 py-1 text-xs text-on-surface-variant italic';
+    typingLine.style.display = 'none';
+    const typingContainer = $('typing-line');
+    if (typingContainer) typingContainer.appendChild(typingLine);
+
+    function updateTypingUI() {
+        const now = Date.now();
+        for (const [k, v] of typingUsers) { if (v.expiresAt < now) typingUsers.delete(k); }
+        const names = Array.from(typingUsers.values()).map(v => v.displayName);
+        if (names.length > 0 && typingContainer) {
+            typingLine.textContent = names.join(', ') + ' typing…';
+            typingLine.style.display = '';
+            typingContainer.style.display = '';
+        } else if (typingContainer) {
+            typingLine.style.display = 'none';
+            typingContainer.style.display = 'none';
+        }
+    }
+    setInterval(updateTypingUI, 1000);
+
+    const readQueue = [];
+    let readTimer = null;
+    function flushReads() {
+        if (readQueue.length === 0) return;
+        const ids = readQueue.splice(0, 50);
+        fetch('/api/messages/read-batch', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ messageIds: ids }),
+        }).catch(() => {});
+    }
 
     function reactionsHtml(msg) {
         const rxs = msg.reactions || reactionsMap.get(msg.id) || [];
@@ -75,6 +117,17 @@
             `<button class="text-lg px-1 py-0.5 hover:bg-surface-container rounded" data-msg-id="${esc(msgId)}" data-emoji="${esc(e)}" data-action="react">${esc(e)}</button>`
         ).join('');
         return `<div class="hidden absolute bottom-full left-0 mb-1 bg-surface-container-lowest rounded-lg shadow-lg px-2 py-1 flex gap-1 z-10" data-picker="${esc(msgId)}">${btns}</div>`;
+    }
+
+    function attachmentHtml(msg) {
+        if (!msg.attachmentKind) return '';
+        if (msg.attachmentKind === 'image') {
+            return `<div class="mb-2"><img src="${esc(msg.attachmentUrl)}" alt="Photo" loading="lazy" class="rounded-lg max-w-xs max-h-64 object-cover cursor-pointer" data-action="view-image" data-src="${esc(msg.attachmentUrl)}"></div>`;
+        }
+        if (msg.attachmentKind === 'audio') {
+            return `<div class="mb-2"><audio controls preload="metadata" class="max-w-[240px] h-8" src="${esc(msg.attachmentUrl)}"></audio></div>`;
+        }
+        return '';
     }
 
     function bubble(msg, mine) {
@@ -96,7 +149,7 @@
                     <div class="${mine
                         ? 'bg-primary text-on-primary rounded-2xl rounded-tr-md'
                         : 'bg-surface-container-lowest text-on-surface rounded-2xl rounded-tl-md'} px-4 py-2.5 text-sm shadow-sm whitespace-pre-wrap break-words">
-                        ${esc(msg.body)}
+                        ${attachmentHtml(msg)}${msg.body ? esc(msg.body) : ''}
                     </div>
                     <button class="absolute top-1 ${mine ? 'left-1' : 'right-1'} opacity-0 group-hover:opacity-100 text-xs text-on-surface-variant hover:text-primary w-6 h-6 flex items-center justify-center rounded-full hover:bg-surface-container" data-msg-id="${esc(msg.id)}" data-action="show-picker">+</button>
                     ${reactionPickerHtml(msg.id)}
@@ -184,6 +237,23 @@
         return res.json();
     }
 
+    async function sendAttachment(file, kind, body) {
+        const form = new FormData();
+        form.append('file', file);
+        form.append('kind', kind);
+        if (body) form.append('body', body);
+        const res = await fetch(`/api/circles/${state.circleId}/messages/attachment`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: form,
+        });
+        if (!res.ok) {
+            const e = await res.json().catch(() => ({}));
+            throw new Error(e.error || res.status);
+        }
+        return res.json();
+    }
+
     composer.addEventListener('submit', async (e) => {
         e.preventDefault();
         const text = input.value.trim();
@@ -214,6 +284,128 @@
     input.addEventListener('input', () => {
         input.style.height = 'auto';
         input.style.height = Math.min(input.scrollHeight, 160) + 'px';
+        const now = Date.now();
+        if (now - typingLastSent > 3000) {
+            typingLastSent = now;
+            fetch(`/api/circles/${state.circleId}/typing`, {
+                method: 'POST', credentials: 'same-origin',
+            }).catch(() => {});
+        }
+    });
+
+    if (imgBtn && imgInput) {
+        imgBtn.addEventListener('click', () => imgInput.click());
+        imgInput.addEventListener('change', async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            imgBtn.disabled = true;
+            try {
+                const msg = await sendAttachment(file, 'image', null);
+                appendMessage(msg);
+                scrollToBottom();
+                userScrolledUp = false;
+            } catch (err) {
+                alert('Image upload failed: ' + err.message);
+            } finally {
+                imgBtn.disabled = false;
+                imgInput.value = '';
+            }
+        });
+    }
+
+    function getSupportedMimeType() {
+        const types = [
+            'audio/mp4;codecs=mp4a.40.2',
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/mp4',
+        ];
+        for (const t of types) {
+            if (MediaRecorder.isTypeSupported(t)) return t;
+        }
+        return '';
+    }
+
+    if (micBtn && typeof MediaRecorder !== 'undefined') {
+        micBtn.addEventListener('pointerdown', async (e) => {
+            e.preventDefault();
+            if (isRecording) return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const mimeType = getSupportedMimeType();
+                mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+                audioChunks = [];
+                mediaRecorder.ondataavailable = (ev) => { if (ev.data.size > 0) audioChunks.push(ev.data); };
+                mediaRecorder.onstop = async () => {
+                    stream.getTracks().forEach((t) => t.stop());
+                    const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/mp4' });
+                    const ext = blob.type.includes('webm') ? 'webm' : 'm4a';
+                    const file = new File([blob], `voice.${ext}`, { type: blob.type });
+                    micBtn.disabled = true;
+                    try {
+                        const msg = await sendAttachment(file, 'audio', null);
+                        appendMessage(msg);
+                        scrollToBottom();
+                        userScrolledUp = false;
+                    } catch (err) {
+                        alert('Voice upload failed: ' + err.message);
+                    } finally {
+                        micBtn.disabled = false;
+                        isRecording = false;
+                        micBtn.textContent = 'mic';
+                        micBtn.classList.remove('text-error');
+                        micBtn.classList.add('text-on-surface-variant');
+                    }
+                };
+                mediaRecorder.start();
+                isRecording = true;
+                micBtn.textContent = 'stop';
+                micBtn.classList.add('text-error');
+                micBtn.classList.remove('text-on-surface-variant');
+            } catch (err) {
+                alert('Microphone access denied');
+            }
+        });
+        micBtn.addEventListener('pointerup', () => {
+            if (isRecording && mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+        });
+        micBtn.addEventListener('pointerleave', () => {
+            if (isRecording && mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+        });
+    }
+
+    list.addEventListener('click', (ev) => {
+        const target = ev.target.closest('[data-action]');
+        if (!target) return;
+        const action = target.dataset.action;
+        if (action === 'view-image') {
+            const src = target.dataset.src;
+            if (src) window.open(src, '_blank');
+            return;
+        }
+        if (action === 'show-picker') {
+            const picker = target.parentElement.querySelector('[data-picker]');
+            if (picker) picker.classList.toggle('hidden');
+            return;
+        }
+        if (action === 'react') {
+            const msgId = Number(target.dataset.msgId);
+            const emoji = target.dataset.emoji;
+            toggleReaction(msgId, emoji);
+            const picker = target.closest('[data-picker]');
+            if (picker) picker.classList.add('hidden');
+            return;
+        }
+        if (action === 'toggle-reaction') {
+            const msgId = Number(target.dataset.msgId);
+            const emoji = target.dataset.emoji;
+            toggleReaction(msgId, emoji);
+            return;
+        }
     });
 
     let ws, reconnectDelay = 1000;
@@ -234,6 +426,23 @@
                 }
             } else if (msg.type === 'reaction_added' || msg.type === 'reaction_removed') {
                 applyReactionEvent(msg);
+            } else if (msg.type === 'chat_typing') {
+                typingUsers.set(msg.userId, { displayName: msg.displayName, expiresAt: msg.expiresAt });
+                updateTypingUI();
+            } else if (msg.type === 'message_read') {
+                const el = list.querySelector(`[data-msg-id="${msg.messageId}"]`);
+                if (!el) return;
+                const mine = el.dataset.author == state.me.userId;
+                if (!mine) return;
+                let readersEl = el.querySelector('.readers-line');
+                if (!readersEl) {
+                    readersEl = document.createElement('div');
+                    readersEl.className = 'readers-line text-xs text-on-surface-variant mt-1';
+                    el.querySelector('.max-w-\\[70\\%\\]')?.appendChild(readersEl);
+                }
+                const count = (readersEl.dataset.count || 0) + 1;
+                readersEl.dataset.count = count;
+                readersEl.textContent = `Seen by ${count}`;
             }
         });
         ws.addEventListener('close', () => {
@@ -285,31 +494,20 @@
         }
     }
 
-    list.addEventListener('click', (ev) => {
-        const target = ev.target.closest('[data-action]');
-        if (!target) return;
-        const action = target.dataset.action;
-        if (action === 'show-picker') {
-            const picker = target.parentElement.querySelector('[data-picker]');
-            if (picker) picker.classList.toggle('hidden');
-            return;
-        }
-        if (action === 'react') {
-            const msgId = Number(target.dataset.msgId);
-            const emoji = target.dataset.emoji;
-            toggleReaction(msgId, emoji);
-            const picker = target.closest('[data-picker]');
-            if (picker) picker.classList.add('hidden');
-            return;
-        }
-        if (action === 'toggle-reaction') {
-            const msgId = Number(target.dataset.msgId);
-            const emoji = target.dataset.emoji;
-            toggleReaction(msgId, emoji);
-            return;
-        }
-    });
-
     loadHistory().then(connectWs);
     input.focus();
+
+    const observer = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+            if (entry.isIntersecting) {
+                const msgId = Number(entry.target.dataset.msgId);
+                const author = Number(entry.target.dataset.author);
+                if (msgId && author !== state.me.userId && !readQueue.includes(msgId)) {
+                    readQueue.push(msgId);
+                }
+            }
+        }
+    }, { root: list, threshold: 0.5 });
+
+    readTimer = setInterval(flushReads, 2000);
 })();

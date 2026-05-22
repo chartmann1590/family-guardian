@@ -11,6 +11,7 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PATCH
 import retrofit2.http.Streaming
@@ -107,6 +108,14 @@ interface GuardianApi {
         @Body body: SendMessageBody,
     ): ChatMessage
 
+    @Multipart
+    @POST
+    suspend fun sendAttachment(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body multipart: okhttp3.MultipartBody,
+    ): ChatMessage
+
     @GET
     suspend fun getHistory(
         @Url url: String,
@@ -118,6 +127,14 @@ interface GuardianApi {
         @Url url: String,
         @Header("Authorization") auth: String,
         @Body body: CheckinBody,
+    ): CheckinResponse
+
+    @Multipart
+    @POST
+    suspend fun sendCheckinWithPhoto(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body multipart: okhttp3.MultipartBody,
     ): CheckinResponse
 
     @GET
@@ -233,6 +250,19 @@ interface GuardianApi {
     suspend fun removeReaction(
         @Url url: String,
         @Header("Authorization") auth: String,
+    ): retrofit2.Response<Unit>
+
+    @POST
+    suspend fun sendTyping(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): retrofit2.Response<Unit>
+
+    @POST
+    suspend fun markRead(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: Map<String, @JvmSuppressWildcards List<Long>>,
     ): retrofit2.Response<Unit>
 }
 

@@ -52,6 +52,8 @@ import com.familyguardian.data.MembersResponse
 import com.familyguardian.data.Prefs
 import com.familyguardian.location.LocationService
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -143,6 +145,54 @@ fun AccountScreen(
                             Text(if (loggingOut) "Logging out..." else "Log out")
                         }
                     }
+                }
+            }
+
+            item {
+                var readReceiptsEnabled by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) {
+                    try {
+                        val s = prefs.snapshot()
+                        val server = s.serverUrl ?: return@LaunchedEffect
+                        val token = s.token ?: return@LaunchedEffect
+                        val url = ApiClient.endpoint(server, "/api/users/me")
+                        val me = ApiClient.api.me(url, "Bearer $token")
+                        readReceiptsEnabled = me["readReceiptsEnabled"]?.jsonPrimitive?.booleanOrNull == true
+                    } catch (_: Exception) {}
+                }
+                Text("Read receipts", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "When ON, people who also enable receipts will see when you've read their messages.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val s = prefs.snapshot()
+                                val server = s.serverUrl ?: return@launch
+                                val token = s.token ?: return@launch
+                                val url = ApiClient.endpoint(server, "/api/users/me")
+                                val next = !readReceiptsEnabled
+                                ApiClient.okHttp.newCall(
+                                    okhttp3.Request.Builder()
+                                        .url(url)
+                                        .patch(okhttp3.MediaType.Companion.toMediaTypeOrNull("application/json")?.let {
+                                            okhttp3.RequestBody.create(it, """{"readReceiptsEnabled":$next}""")
+                                        }!!)
+                                        .header("Authorization", "Bearer $token")
+                                        .build()
+                                ).execute()
+                                readReceiptsEnabled = next
+                            } catch (_: Exception) {}
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text(if (readReceiptsEnabled) "Read receipts: ON" else "Read receipts: OFF")
                 }
             }
 

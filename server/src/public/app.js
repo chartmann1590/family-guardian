@@ -152,8 +152,10 @@
                         ${(() => {
                             const ci = checkins.get(m.userId);
                             const ciLabel = ci ? checkinLabel(ci.status) : null;
+                            const ciPhoto = ci?.photoUrl ? `<img src="${escapeHtml(ci.photoUrl)}" alt="" class="w-4 h-4 rounded-full object-cover" onerror="this.remove()">` : '';
                             return ciLabel ? `
                             <div class="flex items-center gap-1 px-2 py-0.5 rounded-full" style="background:${ciLabel.bg}33">
+                                ${ciPhoto}
                                 <span class="material-symbols-outlined text-[14px]" style="color:${ciLabel.fg}">${ciLabel.icon}</span>
                                 <span class="font-status-number text-status-number" style="color:${ciLabel.fg}">${ciLabel.text}</span>
                             </div>` : '';
@@ -403,7 +405,7 @@
         if (m) upsertMarker(m);
     }
     for (const ci of state.latestCheckins || []) {
-        checkins.set(ci.userId, { status: ci.status, createdAt: ci.createdAt });
+        checkins.set(ci.userId, { status: ci.status, createdAt: ci.createdAt, photoUrl: ci.photoUrl || null });
     }
     renderMemberList();
     renderSosBanner();
@@ -469,7 +471,7 @@
                     toast(`SOS resolved for ${msg.displayName}`, 'enter');
                 }
             } else if (msg.type === 'check_in') {
-                checkins.set(msg.userId, { status: msg.status, createdAt: msg.createdAt });
+                checkins.set(msg.userId, { status: msg.status, createdAt: msg.createdAt, photoUrl: msg.photoUrl || null });
                 renderMemberList();
                 const ciLabel = checkinLabel(msg.status);
                 if (ciLabel) toast(`${msg.displayName}: ${ciLabel.text}`, 'enter');

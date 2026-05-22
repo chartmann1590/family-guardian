@@ -420,6 +420,30 @@
     renderMyAvatar();
     fetchPause();
     loadViewLog();
+
+    const readReceiptsToggle = $('read-receipts-toggle');
+    if (readReceiptsToggle) {
+        fetch('/api/users/me', { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(d => {
+                readReceiptsToggle.checked = !!d.readReceiptsEnabled;
+            })
+            .catch(() => {});
+        readReceiptsToggle.addEventListener('change', async () => {
+            try {
+                await fetch('/api/users/me', {
+                    method: 'PATCH',
+                    headers: { 'content-type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ readReceiptsEnabled: readReceiptsToggle.checked }),
+                });
+                toast(readReceiptsToggle.checked ? 'Read receipts enabled' : 'Read receipts disabled', 'success');
+            } catch (err) {
+                toast('Failed: ' + err.message, 'error');
+                readReceiptsToggle.checked = !readReceiptsToggle.checked;
+            }
+        });
+    }
     $('view-log-refresh').addEventListener('click', loadViewLog);
     $('export-btn').addEventListener('click', exportData);
     $('delete-btn').addEventListener('click', deleteAccount);

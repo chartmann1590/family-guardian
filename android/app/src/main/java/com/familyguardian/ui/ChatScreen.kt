@@ -24,6 +24,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -40,6 +42,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -55,14 +58,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import com.familyguardian.data.ChatMessage
 import com.familyguardian.data.ChatRepo
 import com.familyguardian.data.Prefs
+import com.familyguardian.data.ProfileRepo
 import com.familyguardian.data.Reaction
 import com.familyguardian.events.Alerts
 import com.familyguardian.events.EventBus
 import com.familyguardian.events.GuardianEvent
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -99,6 +105,7 @@ fun ChatScreen(onBack: () -> Unit) {
 
     val EMOJIS = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
     var reactionPickerMsg by remember { mutableStateOf<ChatMessage?>(null) }
+    val typingUsers = remember { mutableStateOf(mutableMapOf<Long, Pair<String, Long>>()) }
 
     // Load history once we know the circleId.
     LaunchedEffect(circleId) {
@@ -127,6 +134,10 @@ fun ChatScreen(onBack: () -> Unit) {
                         displayName = ev.displayName,
                         body = ev.body,
                         createdAt = ev.createdAt,
+                        attachmentKind = ev.attachmentKind,
+                        attachmentUrl = ev.attachmentUrl,
+                        attachmentMime = ev.attachmentMime,
+                        attachmentDurationMs = ev.attachmentDurationMs,
                     ),
                 )
                 if (ev.userId != selfUserId) {
@@ -158,6 +169,31 @@ fun ChatScreen(onBack: () -> Unit) {
                     }
                     messages[idx] = msg.copy(reactions = rxs)
                 }
+            } else if (ev is GuardianEvent.ChatTyping) {
+                typingUsers.value = mutableMapOf<Long, Pair<String, Long>>().apply {
+                    putAll(typingUsers.value)
+                    put(ev.userId, Pair(ev.displayName, ev.expiresAt))
+                }
+            } else if (ev is GuardianEvent.MessageRead) {
+                val idx = messages.indexOfFirst { it.id == ev.messageId }
+                if (idx >= 0 && messages[idx].userId == selfUserId) {
+                    val readers = messages[idx].readers?.toMutableList() ?: mutableListOf()
+                    if (readers.none { it.userId == ev.userId }) {
+                        readers.add(com.familyguardian.data.MessageReader(ev.userId, ev.readAt))
+                        messages[idx] = messages[idx].copy(readers = readers)
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(1000)
+            val now = System.currentTimeMillis()
+            val filtered = typingUsers.value.filter { it.value.second > now }
+            if (filtered.size != typingUsers.value.size) {
+                typingUsers.value = filtered.toMutableMap()
             }
         }
     }
@@ -212,10 +248,20 @@ fun ChatScreen(onBack: () -> Unit) {
             )
         },
         bottomBar = {
-            Composer(
-                value = input,
-                onChange = { input = it },
-                onSend = {
+            Column {
+                val activeTyping = typingUsers.value.filter { it.value.second > System.currentTimeMillis() && it.key != selfUserId }
+                if (activeTyping.isNotEmpty()) {
+                    Text(
+                        activeTyping.values.joinToString(", ") { it.first } + " typing…",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Composer(
+                    value = input,
+                    onChange = { input = it },
+                    onSend = {
                     val cid = circleId ?: return@Composer
                     val text = input.trim()
                     if (text.isEmpty() || sending) return@Composer
@@ -237,7 +283,8 @@ fun ChatScreen(onBack: () -> Unit) {
                     }
                 },
                 sending = sending,
-            )
+                )
+            }
         },
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
@@ -302,6 +349,29 @@ fun ChatScreen(onBack: () -> Unit) {
 
 @Composable
 private fun Composer(value: String, onChange: (String) -> Unit, onSend: () -> Unit, sending: Boolean) {
+    val context = LocalContext.current
+    val prefs = remember { Prefs(context.applicationContext) }
+    val repo = remember { ChatRepo(prefs) }
+    val scope = rememberCoroutineScope()
+    var recording by remember { mutableStateOf(false) }
+    var mediaRecorder by remember { mutableStateOf<android.media.MediaRecorder?>(null) }
+
+    val imagePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            try {
+                val inputStream = context.contentResolver.openInputStream(uri) ?: return@launch
+                val tmpFile = File(context.cacheDir, "upload_img_${System.currentTimeMillis()}.jpg")
+                tmpFile.outputStream().use { out -> inputStream.copyTo(out) }
+                val cid = prefs.snapshot().circleId ?: return@launch
+                repo.sendAttachment(cid, tmpFile, "image")
+                tmpFile.delete()
+            } catch (_: Throwable) {}
+        }
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
@@ -310,8 +380,49 @@ private fun Composer(value: String, onChange: (String) -> Unit, onSend: () -> Un
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
+            IconButton(
+                onClick = { imagePickerLauncher.launch("image/*") },
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(Icons.Filled.Image, contentDescription = "Attach image", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            IconButton(
+                onClick = {
+                    if (recording) return@IconButton
+                    try {
+                        val mr = android.media.MediaRecorder(context)
+                        val tmpFile = File(context.cacheDir, "voice_${System.currentTimeMillis()}.m4a")
+                        mr.setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                        mr.setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
+                        mr.setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+                        mr.setOutputFile(tmpFile.absolutePath)
+                        mr.prepare()
+                        mr.start()
+                        mediaRecorder = mr
+                        recording = true
+                        scope.launch {
+                            kotlinx.coroutines.delay(60_000)
+                            if (recording) {
+                                mediaRecorder?.apply { stop(); release() }
+                                mediaRecorder = null
+                                recording = false
+                                val cid = prefs.snapshot().circleId ?: return@launch
+                                try { repo.sendAttachment(cid, tmpFile, "audio") } catch (_: Throwable) {}
+                                tmpFile.delete()
+                            }
+                        }
+                    } catch (_: Throwable) { recording = false }
+                },
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Mic,
+                    contentDescription = if (recording) "Recording..." else "Voice note",
+                    tint = if (recording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             OutlinedTextField(
                 value = value,
                 onValueChange = onChange,
@@ -385,12 +496,73 @@ private fun MessageBubble(
                     onLongClick = onLongPress,
                 ),
             ) {
-                Text(
-                    message.body,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                )
+                Column {
+                    if (message.attachmentKind == "image" && message.attachmentUrl != null) {
+                        val baseUrl = remember { com.familyguardian.data.Prefs(LocalContext.current.applicationContext).snapshot().serverUrl?.trimEnd('/') ?: "" }
+                        AsyncImage(
+                            model = coil.request.ImageRequest.Builder(LocalContext.current)
+                                .data("$baseUrl${message.attachmentUrl}")
+                                .addHeader("Authorization", "Bearer ${com.familyguardian.data.Prefs(LocalContext.current.applicationContext).snapshot().token ?: ""}")
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Photo",
+                            modifier = Modifier
+                                .widthIn(max = 240.dp)
+                                .height(max = 200.dp)
+                                .padding(horizontal = 4.dp, vertical = 4.dp),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        )
+                    }
+                    if (message.attachmentKind == "audio") {
+                        var isPlaying by remember { mutableStateOf(false) }
+                        val mediaPlayer = remember { mutableStateOf<android.media.MediaPlayer?>(null) }
+                        val context = LocalContext.current
+                        DisposableEffect(Unit) {
+                            onDispose { mediaPlayer.value?.release() }
+                        }
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            IconButton(onClick = {
+                                val mp = mediaPlayer.value
+                                if (mp != null && isPlaying) {
+                                    mp.pause()
+                                    isPlaying = false
+                                } else if (mp != null) {
+                                    mp.start()
+                                    isPlaying = true
+                                } else {
+                                    val baseUrl = com.familyguardian.data.Prefs(context.applicationContext).snapshot().serverUrl?.trimEnd('/') ?: ""
+                                    val token = com.familyguardian.data.Prefs(context.applicationContext).snapshot().token ?: ""
+                                    val newMp = android.media.MediaPlayer()
+                                    newMp.setDataSource("$baseUrl${message.attachmentUrl}", mapOf("Authorization" to "Bearer $token"))
+                                    newMp.setOnCompletionListener { isPlaying = false }
+                                    newMp.prepare()
+                                    newMp.start()
+                                    isPlaying = true
+                                    mediaPlayer.value = newMp
+                                }
+                            }) {
+                                Text(if (isPlaying) "⏸" else "▶", style = MaterialTheme.typography.titleMedium)
+                            }
+                            Text(
+                                if (isPlaying) "Playing…" else "Voice note",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    if (!message.body.isNullOrBlank()) {
+                        Text(
+                            message.body,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
             }
             if (message.reactions.isNotEmpty()) {
                 Row(

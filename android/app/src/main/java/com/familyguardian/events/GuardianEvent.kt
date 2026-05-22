@@ -82,8 +82,12 @@ sealed interface GuardianEvent {
         val id: Long,
         val userId: Long,
         val displayName: String? = null,
-        val body: String,
+        val body: String? = null,
         val createdAt: Long,
+        val attachmentKind: String? = null,
+        val attachmentUrl: String? = null,
+        val attachmentMime: String? = null,
+        val attachmentDurationMs: Long? = null,
     ) : GuardianEvent
 
     @Serializable
@@ -97,6 +101,7 @@ sealed interface GuardianEvent {
         val lng: Double? = null,
         val note: String? = null,
         val createdAt: Long,
+        val photoUrl: String? = null,
     ) : GuardianEvent
 
     @Serializable
@@ -180,6 +185,23 @@ sealed interface GuardianEvent {
         val messageId: Long,
         val userId: Long,
         val emoji: String,
+    ) : GuardianEvent
+
+    @Serializable
+    @SerialName("chat_typing")
+    data class ChatTyping(
+        val circleId: Long,
+        val userId: Long,
+        val displayName: String,
+        val expiresAt: Long,
+    ) : GuardianEvent
+
+    @Serializable
+    @SerialName("message_read")
+    data class MessageRead(
+        val messageId: Long,
+        val userId: Long,
+        val readAt: Long,
     ) : GuardianEvent
 
     @Serializable

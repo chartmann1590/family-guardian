@@ -140,14 +140,23 @@ data class Reaction(
 )
 
 @Serializable
+data class MessageReader(val userId: Long, val readAt: Long)
+
+@Serializable
 data class ChatMessage(
     val id: Long,
     val circleId: Long,
     val userId: Long,
     val displayName: String? = null,
-    val body: String,
+    val body: String? = null,
     val createdAt: Long,
     val reactions: List<Reaction> = emptyList(),
+    val attachmentKind: String? = null,
+    val attachmentUrl: String? = null,
+    val attachmentMime: String? = null,
+    val attachmentBytes: Long? = null,
+    val attachmentDurationMs: Long? = null,
+    val readers: List<MessageReader>? = null,
 )
 
 @Serializable
@@ -260,6 +269,7 @@ data class CheckinResponse(
     val lng: Double? = null,
     val note: String? = null,
     val createdAt: Long,
+    val photoUrl: String? = null,
 )
 
 @Serializable

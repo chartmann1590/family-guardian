@@ -5,14 +5,14 @@ import * as SecureStore from 'expo-secure-store';
 import * as TaskManager from 'expo-task-manager';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-type Session = { serverUrl: string; token: string; userId: number; circleId: number; displayName: string; email: string };
+type Session = { serverUrl: string; token: string; userId: number; circleId: number; displayName: string; email: string; readReceiptsEnabled?: boolean };
 type Member = { userId: number; displayName: string; email?: string; role?: string; lat?: number; lng?: number; accuracyM?: number; speedMps?: number; batteryPct?: number; bearing?: number; altitudeM?: number; activity?: string; activityConfidence?: number; recordedAt?: number; photoUrl?: string; address?: string; paused?: boolean; pausedUntil?: number | null; pauseReason?: string | null };
 type Place = { id: number; circleId: number; name: string; address?: string | null; lat: number; lng: number; radiusM: number; alertsOnEnter: boolean; alertsOnExit: boolean };
-type Message = { id: number; circleId?: number; userId: number; displayName?: string; body: string; createdAt: number; reactions?: { emoji: string; userIds: number[] }[] };
+type Message = { id: number; circleId?: number; userId: number; displayName?: string; body?: string; createdAt: number; reactions?: { emoji: string; userIds: number[] }[]; attachmentKind?: string; attachmentUrl?: string; attachmentMime?: string; attachmentBytes?: number; attachmentDurationMs?: number; readers?: { userId: number; readAt: number }[] };
 type AlertEvent = { id: number; userId: number; displayName?: string; circleId: number; type: string; value?: number; createdAt: number };
 type PlaceSubscription = { id: number; userId: number; placeId: number; memberId: number | null; placeName?: string; memberName?: string; onEnter: boolean; onExit: boolean; quietStart?: number | null; quietEnd?: number | null };
 type LocationPoint = { id: number; lat: number; lng: number; recordedAt: number; activity?: string; speedMps?: number };
@@ -28,7 +28,7 @@ async function api<T>(session: Session, path: string, init: RequestInit = {}): P
     headers: {
       Accept: 'application/json',
       Authorization: `Bearer ${session.token}`,
-      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(init.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
       ...(init.headers || {}),
     },
   });
@@ -37,6 +37,7 @@ async function api<T>(session: Session, path: string, init: RequestInit = {}): P
     try { err = (await res.json()).error || err; } catch {}
     throw new Error(err);
   }
+  if (res.status === 204) return undefined as T;
   return res.json();
 }
 
@@ -49,15 +50,10 @@ async function postLocationWithStoredSession(coords: Location.LocationObjectCoor
   await api(session, '/api/locations', {
     method: 'POST',
     body: JSON.stringify({
-      lat: coords.latitude,
-      lng: coords.longitude,
-      accuracyM: coords.accuracy ?? null,
-      speedMps: coords.speed ?? null,
-      bearing: coords.heading ?? null,
-      altitudeM: coords.altitude ?? null,
-      recordedAt,
-      activity: inferActivity(coords.speed ?? null),
-      activityConfidence: coords.speed == null ? null : 50,
+      lat: coords.latitude, lng: coords.longitude,
+      accuracyM: coords.accuracy ?? null, speedMps: coords.speed ?? null,
+      bearing: coords.heading ?? null, altitudeM: coords.altitude ?? null,
+      recordedAt, activity: inferActivity(coords.speed ?? null), activityConfidence: coords.speed == null ? null : 50,
     }),
   });
 }
@@ -72,10 +68,7 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
+    shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false,
   }),
 });
 
@@ -94,9 +87,7 @@ function formatPauseUntil(ms?: number | null) {
   return sameDay ? time : `${d.toLocaleDateString()} ${time}`;
 }
 function minutesUntilTonight() {
-  const now = new Date();
-  const t = new Date(now);
-  t.setHours(20, 0, 0, 0);
+  const now = new Date(); const t = new Date(now); t.setHours(20, 0, 0, 0);
   if (t <= now) t.setDate(t.getDate() + 1);
   return Math.max(1, Math.min(1440, Math.round((t.getTime() - now.getTime()) / 60000)));
 }
@@ -181,7 +172,10 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
   const [history, setHistory] = useState<LocationPoint[]>([]);
   const [sharing, setSharing] = useState(false);
   const [wsState, setWsState] = useState('offline');
+  const [typingUsers, setTypingUsers] = useState<Map<number, { displayName: string; expiresAt: number }>>(new Map());
   const mapRef = useRef<MapView | null>(null);
+  const readQueueRef = useRef<number[]>([]);
+  const readTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
     const [m, p] = await Promise.all([
@@ -201,7 +195,18 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
       const msg = JSON.parse(event.data);
       if (msg.type === 'location_update') setMembers((cur) => upsertMember(cur, msg));
       if (msg.type === 'chat_message') {
-        setMessages((cur) => [...cur, { ...msg, reactions: msg.reactions || [] }]);
+        setMessages((cur) => [...cur, { ...msg, reactions: msg.reactions || [], readers: msg.readers || [] }]);
+      }
+      if (msg.type === 'chat_typing') {
+        setTypingUsers((cur) => { const next = new Map(cur); next.set(msg.userId, { displayName: msg.displayName, expiresAt: msg.expiresAt }); return next; });
+      }
+      if (msg.type === 'message_read' && msg.userId && msg.messageId) {
+        setMessages((cur: Message[]) => cur.map((m: Message) => {
+          if (m.id !== msg.messageId || m.userId !== session.userId) return m;
+          const readers = [...(m.readers || [])];
+          if (!readers.find((r) => r.userId === msg.userId)) readers.push({ userId: msg.userId, readAt: msg.readAt });
+          return { ...m, readers };
+        }));
       }
       if (msg.type === 'reaction_added' || msg.type === 'reaction_removed') {
         setMessages((cur: Message[]) => cur.map((m: Message) => {
@@ -232,6 +237,19 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
     return () => ws.close();
   }, [session]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setTypingUsers((cur) => {
+        let changed = false;
+        const next = new Map(cur);
+        for (const [k, v] of next) { if (v.expiresAt < now) { next.delete(k); changed = true; } }
+        return changed ? next : cur;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   async function startSharing() {
     if (sharing) {
       await Location.stopLocationUpdatesAsync(LOCATION_TASK).catch(() => {});
@@ -256,14 +274,17 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
   async function checkIn(status: string) {
     try { await api(session, '/api/checkins', { method: 'POST', body: JSON.stringify({ status }) }); Alert.alert('Check-in sent'); } catch (e: any) { Alert.alert('Check-in failed', e.message); }
   }
-  async function loadMessages() { setMessages((await api<{ messages: Message[] }>(session, `/api/circles/${session.circleId}/messages?limit=100`)).messages); }
+  async function loadMessages() {
+    const data = await api<{ messages: Message[] }>(session, `/api/circles/${session.circleId}/messages?limit=100${session.readReceiptsEnabled ? '&withReaders=1' : ''}`);
+    setMessages(data.messages);
+  }
   async function loadAlerts() { setAlerts((await api<{ alerts: AlertEvent[] }>(session, `/api/circles/${session.circleId}/alerts?limit=100`)).alerts); }
   async function logout() { await SecureStore.deleteItemAsync(TOKEN_KEY); await AsyncStorage.removeItem(SESSION_KEY); await Location.stopLocationUpdatesAsync(LOCATION_TASK).catch(() => {}); onLogout(); }
 
   return <SafeAreaView style={styles.app}><View style={styles.header}><View><Text style={styles.eyebrow}>{session.displayName}</Text><Text style={styles.title}>Family Guardian</Text></View><Text style={styles.badge}>{wsState}</Text></View>
     {tab === 'map' && <MapTab members={members} places={places} mapRef={mapRef} onMember={setSelectedMember} onShare={startSharing} sharing={sharing} onSos={sendSos} onCheckIn={checkIn} />}
     {tab === 'members' && <MembersTab session={session} members={members} selected={selectedMember} setSelected={setSelectedMember} history={history} setHistory={setHistory} />}
-    {tab === 'chat' && <ChatTab session={session} messages={messages} setMessages={setMessages} loadMessages={loadMessages} />}
+    {tab === 'chat' && <ChatTab session={session} messages={messages} setMessages={setMessages} loadMessages={loadMessages} typingUsers={typingUsers} readQueueRef={readQueueRef} readTimerRef={readTimerRef} />}
     {tab === 'places' && <PlacesTab session={session} places={places} setPlaces={setPlaces} />}
     {tab === 'alerts' && <AlertsTab alerts={alerts} loadAlerts={loadAlerts} />}
     {tab === 'more' && <MoreTab session={session} onLogout={logout} onRefresh={load} />}
@@ -283,7 +304,43 @@ function MembersTab({ session, members, selected, setSelected, history, setHisto
   return <ScrollView style={styles.content}>{members.map((m: Member) => <Pressable key={m.userId} style={styles.card} onPress={() => open(m)}><Text style={styles.cardTitle}>{m.displayName}</Text>{m.paused ? <Text style={[styles.meta, { color: '#943700' }]}>⏸ Paused{m.pausedUntil ? ` until ${formatPauseUntil(m.pausedUntil)}` : ''}</Text> : <Text style={styles.meta}>{m.address || (m.lat ? `${m.lat.toFixed(4)}, ${m.lng?.toFixed(4)}` : 'No location yet')}</Text>}<Text style={styles.meta}>{rel(m.recordedAt)} {m.batteryPct != null ? `· ${m.batteryPct}%` : ''}</Text></Pressable>)}{selected && <View style={styles.card}><Text style={styles.cardTitle}>{selected.displayName} history</Text><Text style={styles.meta}>{history.length} points in the last 7 days</Text>{history.length > 1 && <MapView style={styles.smallMap} initialRegion={{ latitude: history[0].lat, longitude: history[0].lng, latitudeDelta: .08, longitudeDelta: .08 }}><Polyline coordinates={history.map((p: LocationPoint) => ({ latitude: p.lat, longitude: p.lng }))} strokeColor="#006c49" strokeWidth={4} /></MapView>}</View>}</ScrollView>;
 }
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
-function ChatTab({ session, messages, setMessages, loadMessages }: any) { const [body, setBody] = useState(''); useEffect(() => { loadMessages().catch(() => {}); }, []); async function send() { if (!body.trim()) return; const msg = await api<Message>(session, `/api/circles/${session.circleId}/messages`, { method: 'POST', body: JSON.stringify({ body: body.trim() }) }); setMessages((cur: Message[]) => [...cur, msg]); setBody(''); }
+function ChatTab({ session, messages, setMessages, loadMessages, typingUsers, readQueueRef, readTimerRef }: any) {
+  const [body, setBody] = useState('');
+  const typingSentRef = useRef(0);
+  const flatListRef = useRef<FlatList>(null);
+
+  useEffect(() => { loadMessages().catch(() => {}); }, []);
+
+  useEffect(() => {
+    if (!session.readReceiptsEnabled) return;
+    readTimerRef.current = setInterval(() => {
+      const ids = readQueueRef.current.splice(0, 50);
+      if (ids.length === 0) return;
+      api(session, '/api/messages/read-batch', { method: 'POST', body: JSON.stringify({ messageIds: ids }) }).catch(() => {});
+    }, 2000);
+    return () => { if (readTimerRef.current) clearInterval(readTimerRef.current); };
+  }, [session.readReceiptsEnabled]);
+
+  async function send() {
+    if (!body.trim()) return;
+    const msg = await api<Message>(session, `/api/circles/${session.circleId}/messages`, { method: 'POST', body: JSON.stringify({ body: body.trim() }) });
+    setMessages((cur: Message[]) => [...cur, msg]);
+    setBody('');
+  }
+  async function sendAttachment(file: any, kind: string) {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('kind', kind);
+    const msg = await api<Message>(session, `/api/circles/${session.circleId}/messages/attachment`, { method: 'POST', body: form as any });
+    setMessages((cur: Message[]) => [...cur, msg]);
+  }
+  async function sendTyping() {
+    const now = Date.now();
+    if (now - typingSentRef.current < 3000) return;
+    typingSentRef.current = now;
+    await api(session, `/api/circles/${session.circleId}/typing`, { method: 'POST' }).catch(() => {});
+  }
+
   async function toggleReaction(msgId: number, emoji: string) {
     const msg = messages.find((m: Message) => m.id === msgId);
     const existing = msg?.reactions?.find((r: any) => r.emoji === emoji && r.userIds.includes(session.userId));
@@ -299,7 +356,54 @@ function ChatTab({ session, messages, setMessages, loadMessages }: any) { const 
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
-  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><FlatList style={styles.content} data={messages} keyExtractor={(m) => String(m.id)} renderItem={({ item }: any) => <Pressable onLongPress={() => showReactionPicker(item.id)}><View style={[styles.message, item.userId === session.userId && styles.mine]}><Text style={styles.meta}>{item.displayName || 'Member'}</Text><Text>{item.body}</Text>{item.reactions?.length > 0 && <View style={{ flexDirection: 'row', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>{item.reactions.map((rx: any, i: number) => <Pressable key={i} style={[styles.chip, rx.userIds.includes(session.userId) && styles.chipActive]} onPress={() => toggleReaction(item.id, rx.emoji)}><Text style={{ fontSize: 12 }}>{rx.emoji} {rx.userIds.length}</Text></Pressable>)}</View>}</View></Pressable>} /><View style={styles.composer}><TextInput style={styles.inputFlex} value={body} onChangeText={setBody} placeholder="Message" /><Pressable style={styles.primaryButton} onPress={send}><Text style={styles.buttonText}>Send</Text></Pressable></View></KeyboardAvoidingView>; }
+
+  const typingNames = Array.from(typingUsers.values()).filter((v) => v.expiresAt > Date.now()).map((v) => v.displayName);
+  const onViewableItemsChanged = useRef(({ changed }: any) => {
+    if (!session.readReceiptsEnabled) return;
+    for (const item of changed) {
+      if (item.isViewable && item.item && item.item.userId !== session.userId) {
+        if (!readQueueRef.current.includes(item.item.id)) {
+          readQueueRef.current.push(item.item.id);
+        }
+      }
+    }
+  }).current;
+
+  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <FlatList ref={flatListRef} style={styles.content} data={messages} keyExtractor={(m) => String(m.id)}
+      onViewableItemsChanged={onViewableItemsChanged} viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
+      onContentSizeChange={() => flatListRef.current?.scrollToEnd?.()}
+      renderItem={({ item }: any) => <Pressable onLongPress={() => showReactionPicker(item.id)}>
+        <View style={[styles.message, item.userId === session.userId && styles.mine]}>
+          <Text style={styles.meta}>{item.displayName || 'Member'}</Text>
+          {item.attachmentKind === 'image' && item.attachmentUrl && <Image source={{ uri: `${session.serverUrl.replace(/\/$/, '')}${item.attachmentUrl}`, headers: { Authorization: `Bearer ${session.token}` } }} style={{ width: 200, height: 150, borderRadius: 8, marginVertical: 4 }} resizeMode="cover" />}
+          {item.attachmentKind === 'audio' && item.attachmentUrl && <Text style={{ color: '#006c49', marginVertical: 4 }}>🎙 Voice note</Text>}
+          {item.body ? <Text>{item.body}</Text> : null}
+          {item.reactions?.length > 0 && <View style={{ flexDirection: 'row', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>{item.reactions.map((rx: any, i: number) => <Pressable key={i} style={[styles.chip, rx.userIds.includes(session.userId) && styles.chipActive]} onPress={() => toggleReaction(item.id, rx.emoji)}><Text style={{ fontSize: 12 }}>{rx.emoji} {rx.userIds.length}</Text></Pressable>)}</View>}
+          {session.readReceiptsEnabled && item.userId === session.userId && item.readers && item.readers.length > 0 && <Text style={styles.meta}>Seen by {item.readers.length}</Text>}
+        </View></Pressable>} />
+    {typingNames.length > 0 && <Text style={styles.meta}>{typingNames.join(', ')} typing…</Text>}
+    <View style={styles.composer}>
+      <TextInput style={styles.inputFlex} value={body} onChangeText={(t) => { setBody(t); sendTyping(); }} placeholder="Message" />
+      <Pressable style={styles.smallBtn} onPress={() => {
+        Alert.alert('Attach', 'Choose attachment type', [
+          { text: 'Photo', onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') return;
+            const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+            if (result.canceled || !result.assets?.[0]) return;
+            const asset = result.assets[0];
+            const resp = await fetch(asset.uri);
+            const blob = await resp.blob();
+            sendAttachment(new File([blob], 'photo.jpg', { type: 'image/jpeg' }), 'image');
+          }},
+          { text: 'Cancel', style: 'cancel' },
+        ]);
+      }}><Text>📷</Text></Pressable>
+      <Pressable style={styles.primaryButton} onPress={send}><Text style={styles.buttonText}>Send</Text></Pressable>
+    </View>
+  </KeyboardAvoidingView>;
+}
 function PlacesTab({ session, places, setPlaces }: any) {
   const [name, setName] = useState('');
   const [lat, setLat] = useState('');
@@ -359,6 +463,7 @@ function MoreTab({ session, onLogout, onRefresh }: any) {
   const [pauseUntil, setPauseUntil] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [views, setViews] = useState<any[]>([]);
+  const [readReceiptsEnabled, setReadReceiptsEnabled] = useState(session.readReceiptsEnabled || false);
   const RESOURCE_LABELS: Record<string, string> = { history: 'Location history', visits: 'Visits', trips: 'Trips', member_page: 'Profile page' };
   useEffect(() => {
     api<{ pausedUntil: number | null }>(session, '/api/users/me/pause')
@@ -366,6 +471,9 @@ function MoreTab({ session, onLogout, onRefresh }: any) {
       .catch(() => {});
     api<{ views: any[] }>(session, '/api/users/me/view-log?days=7')
       .then((d) => setViews(d.views || []))
+      .catch(() => {});
+    api<any>(session, '/api/users/me')
+      .then((d) => { if (d.readReceiptsEnabled != null) setReadReceiptsEnabled(d.readReceiptsEnabled); })
       .catch(() => {});
   }, [session]);
   const isPaused = !!(pauseUntil && pauseUntil > Date.now());
@@ -383,6 +491,14 @@ function MoreTab({ session, onLogout, onRefresh }: any) {
       await api(session, '/api/users/me/pause', { method: 'DELETE' });
       setPauseUntil(null);
     } catch (e: any) { Alert.alert('Resume failed', e.message); } finally { setBusy(false); }
+  }
+  async function toggleReadReceipts() {
+    const next = !readReceiptsEnabled;
+    try {
+      await api(session, '/api/users/me', { method: 'PATCH', body: JSON.stringify({ readReceiptsEnabled: next }) });
+      setReadReceiptsEnabled(next);
+      session.readReceiptsEnabled = next;
+    } catch (e: any) { Alert.alert('Failed', e.message); }
   }
   return <ScrollView style={styles.content}>
     <View style={styles.card}>
@@ -402,6 +518,11 @@ function MoreTab({ session, onLogout, onRefresh }: any) {
           </View>}
     </View>
     <View style={styles.card}>
+      <Text style={styles.cardTitle}>Read receipts</Text>
+      <Text style={styles.meta}>When ON, people who also enable receipts will see when you've read their messages.</Text>
+      <Pressable style={styles.secondaryButton} onPress={toggleReadReceipts}><Text>{readReceiptsEnabled ? '✅ Enabled' : '◻️ Disabled'}</Text></Pressable>
+    </View>
+    <View style={styles.card}>
       <Text style={styles.cardTitle}>Who viewed your history</Text>
       {views.length === 0
         ? <Text style={styles.meta}>Nobody has viewed your data recently.</Text>
@@ -413,14 +534,8 @@ function MoreTab({ session, onLogout, onRefresh }: any) {
         try {
           const res = await fetch(`${session.serverUrl}/api/users/me/export`, { headers: { Authorization: `Bearer ${session.token}` } });
           if (!res.ok) throw new Error('Export failed');
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          const match = res.headers.get('content-disposition')?.match(/filename="([^"]+)"/);
-          a.download = match ? match[1] : 'export.json';
-          a.click();
-          URL.revokeObjectURL(url);
+          const text = await res.text();
+          Alert.alert('Export', `Exported ${(text.length / 1024).toFixed(0)} KB. Full download requires web browser.`);
         } catch (e: any) { Alert.alert('Export failed', e.message); }
       }}><Text>Export my data</Text></Pressable>
       <Pressable style={styles.dangerButton} onPress={async () => {
@@ -457,7 +572,5 @@ function MoreTab({ session, onLogout, onRefresh }: any) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' }, app: { flex: 1, backgroundColor: '#eef7f0' }, auth: { flex: 1, padding: 22, justifyContent: 'center', backgroundColor: '#eef7f0' }, brand: { fontSize: 44, fontWeight: '900', letterSpacing: -2, color: '#061b16' }, subtitle: { color: '#53616b', marginVertical: 14, fontSize: 16 }, header: { paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, eyebrow: { color: '#66737f', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.4, fontWeight: '800' }, title: { fontSize: 24, fontWeight: '900', letterSpacing: -1.2 }, badge: { backgroundColor: '#dff2e9', color: '#006c49', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, overflow: 'hidden', fontWeight: '800' }, map: { flex: 1 }, floating: { position: 'absolute', left: 14, right: 14, bottom: 16, backgroundColor: 'rgba(255,255,255,.92)', borderRadius: 26, padding: 14, gap: 10 }, row: { flexDirection: 'row', gap: 10, alignItems: 'center' }, content: { flex: 1, paddingHorizontal: 14 }, card: { backgroundColor: 'white', borderRadius: 22, padding: 14, marginBottom: 10, gap: 8, shadowColor: '#071b24', shadowOpacity: .08, shadowRadius: 12 }, cardTitle: { fontSize: 18, fontWeight: '900' }, meta: { color: '#66737f', lineHeight: 20 }, input: { backgroundColor: 'white', borderRadius: 16, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(7,27,36,.12)' }, inputFlex: { flex: 1, backgroundColor: 'white', borderRadius: 16, padding: 13, borderWidth: 1, borderColor: 'rgba(7,27,36,.12)' }, primaryButton: { backgroundColor: '#006c49', padding: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flex: 1 }, dangerButton: { backgroundColor: '#ba1a1a', padding: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flex: 1 }, secondaryButton: { backgroundColor: '#dff2e9', padding: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flex: 1 }, chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: '#f0f0f0', marginLeft: 6 }, chipActive: { backgroundColor: '#dff2e9' }, buttonText: { color: 'white', fontWeight: '900' }, secondaryText: { color: '#006c49', fontWeight: '900' }, tabs: { flexDirection: 'row', padding: 8, gap: 4, backgroundColor: 'rgba(255,255,255,.94)' }, tab: { flex: 1, paddingVertical: 10, borderRadius: 14, alignItems: 'center' }, activeTab: { backgroundColor: '#dff2e9' }, tabText: { color: '#66737f', fontSize: 11, fontWeight: '800' }, activeTabText: { color: '#006c49' }, smallMap: { height: 220, borderRadius: 18 }, composer: { flexDirection: 'row', gap: 8, padding: 10 }, message: { maxWidth: '84%', backgroundColor: 'white', borderRadius: 18, padding: 10, marginBottom: 8 }, mine: { alignSelf: 'flex-end', backgroundColor: '#dff2e9' },
+  flex: { flex: 1 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' }, app: { flex: 1, backgroundColor: '#eef7f0' }, auth: { flex: 1, padding: 22, justifyContent: 'center', backgroundColor: '#eef7f0' }, brand: { fontSize: 44, fontWeight: '900', letterSpacing: -2, color: '#061b16' }, subtitle: { color: '#53616b', marginVertical: 14, fontSize: 16 }, header: { paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, eyebrow: { color: '#66737f', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.4, fontWeight: '800' }, title: { fontSize: 24, fontWeight: '900', letterSpacing: -1.2 }, badge: { backgroundColor: '#dff2e9', color: '#006c49', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, overflow: 'hidden', fontWeight: '800' }, map: { flex: 1 }, floating: { position: 'absolute', left: 14, right: 14, bottom: 16, backgroundColor: 'rgba(255,255,255,.92)', borderRadius: 26, padding: 14, gap: 10 }, row: { flexDirection: 'row', gap: 10, alignItems: 'center' }, content: { flex: 1, paddingHorizontal: 14 }, card: { backgroundColor: 'white', borderRadius: 22, padding: 14, marginBottom: 10, gap: 8, shadowColor: '#071b24', shadowOpacity: .08, shadowRadius: 12 }, cardTitle: { fontSize: 18, fontWeight: '900' }, meta: { color: '#66737f', lineHeight: 20 }, input: { backgroundColor: 'white', borderRadius: 16, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(7,27,36,.12)' }, inputFlex: { flex: 1, backgroundColor: 'white', borderRadius: 16, padding: 13, borderWidth: 1, borderColor: 'rgba(7,27,36,.12)' }, primaryButton: { backgroundColor: '#006c49', padding: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flex: 1 }, dangerButton: { backgroundColor: '#ba1a1a', padding: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flex: 1 }, secondaryButton: { backgroundColor: '#dff2e9', padding: 13, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flex: 1 }, secondaryText: { color: '#006c49', fontWeight: '700' }, buttonText: { color: 'white', fontWeight: '700' }, tabs: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: 'rgba(7,27,36,.08)' }, tab: { flex: 1, paddingVertical: 8, alignItems: 'center' }, tabText: { fontSize: 12, color: '#66737f', textTransform: 'capitalize' }, activeTab: { backgroundColor: '#dff2e9' }, activeTabText: { color: '#006c49', fontWeight: '800' }, message: { backgroundColor: 'white', borderRadius: 16, padding: 10, marginVertical: 2 }, mine: { backgroundColor: '#006c49' }, composer: { flexDirection: 'row', alignItems: 'center', padding: 10, gap: 8, backgroundColor: 'white', borderTopWidth: 1, borderTopColor: 'rgba(7,27,36,.08)' }, chip: { backgroundColor: '#f0f4f8', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }, chipActive: { backgroundColor: '#006c49' }, smallMap: { height: 220, borderRadius: 12 }, smallBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: '#dff2e9' },
 });
-
-

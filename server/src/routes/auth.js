@@ -93,8 +93,9 @@ export default async function authRoutes(fastify, { db }) {
 
         const { userId, circleId, role } = tx();
         const { token } = createSession(db, userId);
+        const readReceiptsEnabled = !!db.prepare('SELECT read_receipts_enabled FROM users WHERE id = ?').get(userId)?.read_receipts_enabled;
         reply.setCookie('fg_session', token, COOKIE_OPTS);
-        return { token, userId, circleId, role, displayName };
+        return { token, userId, circleId, role, displayName, readReceiptsEnabled };
     });
 
     fastify.post('/api/auth/login', {
@@ -115,7 +116,8 @@ export default async function authRoutes(fastify, { db }) {
         const circleId = db
             .prepare('SELECT circle_id AS circleId FROM circle_members WHERE user_id = ? LIMIT 1')
             .get(user.id)?.circleId;
-        return { token, userId: user.id, circleId, displayName: user.display_name };
+        const readReceiptsEnabled = !!user.read_receipts_enabled;
+        return { token, userId: user.id, circleId, displayName: user.display_name, readReceiptsEnabled };
     });
 
     fastify.post('/api/auth/logout', async (req, reply) => {

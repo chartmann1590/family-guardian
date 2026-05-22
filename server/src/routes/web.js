@@ -177,7 +177,7 @@ export default async function webRoutes(fastify, { db }) {
 
         const latestCheckins = db
             .prepare(
-                `SELECT c.user_id AS userId, c.status, c.created_at AS createdAt
+                `SELECT c.id AS id, c.user_id AS userId, c.status, c.created_at AS createdAt, c.photo_path AS photoPath
                  FROM check_ins c
                  INNER JOIN (
                      SELECT user_id, MAX(created_at) AS max_at
@@ -185,7 +185,8 @@ export default async function webRoutes(fastify, { db }) {
                      GROUP BY user_id
                  ) latest ON c.user_id = latest.user_id AND c.created_at = latest.max_at`
             )
-            .all(circleRow.circleId);
+            .all(circleRow.circleId)
+            .map((c) => ({ userId: c.userId, status: c.status, createdAt: c.createdAt, photoUrl: c.photoPath ? `/api/checkins/${c.id}/photo` : null }));
 
         const initialState = {
             circleId: circleRow.circleId,
@@ -278,7 +279,7 @@ export default async function webRoutes(fastify, { db }) {
 
         const latestCheckins = db
             .prepare(
-                `SELECT c.user_id AS userId, c.status, c.created_at AS createdAt
+                `SELECT c.id AS id, c.user_id AS userId, c.status, c.created_at AS createdAt, c.photo_path AS photoPath
                  FROM check_ins c
                  INNER JOIN (
                      SELECT user_id, MAX(created_at) AS max_at
@@ -286,7 +287,8 @@ export default async function webRoutes(fastify, { db }) {
                      GROUP BY user_id
                  ) latest ON c.user_id = latest.user_id AND c.created_at = latest.max_at`
             )
-            .all(circleRow.circleId);
+            .all(circleRow.circleId)
+            .map((c) => ({ userId: c.userId, status: c.status, createdAt: c.createdAt, photoUrl: c.photoPath ? `/api/checkins/${c.id}/photo` : null }));
 
         const initialState = {
             circleId: circleRow.circleId,
@@ -336,6 +338,7 @@ export default async function webRoutes(fastify, { db }) {
         const myPhoto = db
             .prepare('SELECT photo_path AS photoPath FROM users WHERE id = ?')
             .get(session.userId);
+        const readReceiptsEnabled = !!db.prepare('SELECT read_receipts_enabled AS v FROM users WHERE id = ?').get(session.userId)?.v;
 
         const initialState = {
             circleId: circleRow.circleId,
@@ -344,6 +347,7 @@ export default async function webRoutes(fastify, { db }) {
                 userId: session.userId,
                 displayName: session.displayName,
                 photoUrl: myPhoto?.photoPath ? `/api/users/${session.userId}/photo` : null,
+                readReceiptsEnabled,
             },
             members: chatMembers,
         };

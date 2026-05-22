@@ -108,12 +108,22 @@
     <!-- Message list -->
     <div class="relative flex-1 overflow-hidden flex flex-col">
         <div id="messages" class="flex-1 overflow-y-auto px-margin-mobile md:px-margin-desktop py-4 flex flex-col gap-2"></div>
+        <div id="typing-line" class="hidden px-margin-mobile md:px-margin-desktop"></div>
         <button id="new-msg-pill" class="hidden absolute bottom-2 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-full bg-primary text-on-primary text-sm font-semibold shadow-lg hover:bg-primary/90 transition-colors"></button>
     </div>
 
     <!-- Composer -->
     <form id="composer" class="border-t border-outline-variant/20 bg-surface px-margin-mobile md:px-margin-desktop py-4 flex items-end gap-2 shrink-0">
-        <textarea id="composer-text" rows="1" required
+        <input type="file" id="composer-img-input" accept="image/jpeg,image/png,image/webp" class="hidden">
+        <button type="button" id="composer-img"
+            class="h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container">
+            <span class="material-symbols-outlined">image</span>
+        </button>
+        <button type="button" id="composer-mic"
+            class="h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container select-none">
+            <span class="material-symbols-outlined">mic</span>
+        </button>
+        <textarea id="composer-text" rows="1"
             class="flex-1 px-4 py-3 border border-outline-variant rounded-2xl bg-surface text-on-surface text-sm resize-none focus:ring-2 focus:ring-primary focus:border-primary placeholder-outline"
             placeholder="Message your family…"></textarea>
         <button id="composer-send" type="submit"
