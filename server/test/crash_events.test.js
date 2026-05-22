@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createTestDb, seedUser, seedSecondUser } from './helpers.js';
+import { createTestDb, seedUser } from './helpers.js';
 
 describe('crash events', () => {
     it('rejects crash report when crash detection is disabled', () => {

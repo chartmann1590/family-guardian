@@ -82,7 +82,6 @@ class CrashDetector(
             scope.launch {
                 try {
                     val repo = CrashRepo(prefs)
-                    val peakX = magnitudeBuffer.maxOfOrNull { 0.0 } ?: x
                     val result = repo.report(
                         peakAccelMps2 = peakMag,
                         sustainedMs = sustainedMs.toInt(),

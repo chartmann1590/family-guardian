@@ -2,14 +2,6 @@ import { requireAuth } from '../auth.js';
 import { computeDrivingScore } from '../drivingScore.js';
 import { logView } from '../audit.js';
 
-function assertMember(db, circleId, userId, reply) {
-    const m = db
-        .prepare('SELECT 1 FROM circle_members WHERE circle_id = ? AND user_id = ?')
-        .get(circleId, userId);
-    if (!m) { reply.code(403).send({ error: 'not_a_member' }); return false; }
-    return true;
-}
-
 export default async function drivingScoreRoutes(fastify, { db }) {
     fastify.get('/api/users/:userId/driving-score', {
         preHandler: requireAuth(db),

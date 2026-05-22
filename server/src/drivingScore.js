@@ -116,9 +116,6 @@ export function computeDrivingScore(db, userId, sinceMs) {
     const drivingMs = trips.reduce((sum, t) => sum + (t.ended_at - t.started_at), 0);
     const distanceM = trips.reduce((sum, t) => sum + (t.distance_m ?? 0), 0);
 
-    const tripIds = trips.map(t => t.id);
-    const placeholders = tripIds.map(() => '?').join(',');
-
     const hardBrakes = db.prepare(
         `SELECT COUNT(*) AS cnt FROM trip_events
          WHERE user_id = ? AND kind = 'hard_brake' AND occurred_at >= ?`,

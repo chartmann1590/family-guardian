@@ -106,10 +106,6 @@ function normalizeServer(url: string) {
   if (!/^https?:\/\//i.test(trimmed)) return `http://${trimmed}`;
   return trimmed;
 }
-function wsUrl(serverUrl: string) {
-  return `${serverUrl.replace(/\/$/, '').replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')}/ws`;
-}
-
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
@@ -193,8 +189,6 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [history, setHistory] = useState<LocationPoint[]>([]);
   const [sharing, setSharing] = useState(false);
-  const [dsVersion, setDsVersion] = useState(0);
-  const [wsState, setWsState] = useState('offline');
   const [typingUsers, setTypingUsers] = useState<Map<number, { displayName: string; expiresAt: number }>>(new Map());
   const mapRef = useRef<MapView | null>(null);
   const readQueueRef = useRef<number[]>([]);
@@ -297,9 +291,9 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
   async function loadAlerts() { setAlerts((await api<{ alerts: AlertEvent[] }>(session, `/api/circles/${session.circleId}/alerts?limit=100`)).alerts); }
   async function logout() { await SecureStore.deleteItemAsync(TOKEN_KEY); await AsyncStorage.removeItem(SESSION_KEY); await Location.stopLocationUpdatesAsync(LOCATION_TASK).catch(() => {}); onLogout(); }
 
-  return <SafeAreaView style={styles.app}><View style={styles.header}><View><Text style={styles.eyebrow}>{session.displayName}</Text><Text style={styles.title}>Family Guardian</Text></View><Text style={styles.badge}>{wsState}</Text></View>
+  return <SafeAreaView style={styles.app}><View style={styles.header}><View><Text style={styles.eyebrow}>{session.displayName}</Text><Text style={styles.title}>Family Guardian</Text></View></View>
     {tab === 'map' && <MapTab members={members} places={places} mapRef={mapRef} onMember={setSelectedMember} onShare={startSharing} sharing={sharing} onSos={sendSos} onCheckIn={checkIn} />}
-    {tab === 'members' && <MembersTab session={session} members={members} selected={selectedMember} setSelected={setSelectedMember} history={history} setHistory={setHistory} dsVersion={dsVersion} />}
+    {tab === 'members' && <MembersTab session={session} members={members} selected={selectedMember} setSelected={setSelectedMember} history={history} setHistory={setHistory} />}
     {tab === 'chat' && <ChatTab session={session} messages={messages} setMessages={setMessages} loadMessages={loadMessages} typingUsers={typingUsers} readQueueRef={readQueueRef} readTimerRef={readTimerRef} />}
     {tab === 'places' && <PlacesTab session={session} places={places} setPlaces={setPlaces} />}
     {tab === 'alerts' && <AlertsTab alerts={alerts} loadAlerts={loadAlerts} />}
@@ -309,19 +303,15 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
   </SafeAreaView>;
 }
 
-function upsertMember(cur: Member[], msg: any) { const idx = cur.findIndex((m) => m.userId === msg.userId); const next = { ...(idx >= 0 ? cur[idx] : { userId: msg.userId }), ...msg }; return idx >= 0 ? cur.map((m, i) => i === idx ? next : m) : [...cur, next]; }
-async function notify(title: string, body: string) { await Notifications.requestPermissionsAsync(); await Notifications.scheduleNotificationAsync({ content: { title, body }, trigger: null }); }
-
 function MapTab({ members, places, mapRef, onMember, onShare, sharing, onSos, onCheckIn }: any) {
   const first = members.find((m: Member) => m.lat && m.lng);
   return <View style={styles.flex}><MapView ref={mapRef} style={styles.map} initialRegion={{ latitude: first?.lat || 37.7749, longitude: first?.lng || -122.4194, latitudeDelta: 0.08, longitudeDelta: 0.08 }}>{places.map((p: Place) => <Circle key={p.id} center={{ latitude: p.lat, longitude: p.lng }} radius={p.radiusM} strokeColor="#006c49" fillColor="rgba(0,108,73,.10)" />)}{members.filter((m: Member) => m.lat && m.lng).map((m: Member) => <Marker key={m.userId} coordinate={{ latitude: m.lat!, longitude: m.lng! }} title={m.displayName + (m.paused ? ' (paused)' : '')} description={m.paused ? `Paused${m.pausedUntil ? ' until ' + formatPauseUntil(m.pausedUntil) : ''}` : rel(m.recordedAt)} pinColor={m.paused ? 'gray' : 'red'} opacity={m.paused ? 0.7 : 1} onPress={() => onMember(m)} />)}</MapView><View style={styles.floating}><Text style={styles.cardTitle}>{members.length} members</Text><View style={styles.row}><Pressable style={styles.primaryButton} onPress={onShare}><Text style={styles.buttonText}>{sharing ? 'Stop GPS' : 'Share GPS'}</Text></Pressable><Pressable style={styles.dangerButton} onPress={onSos}><Text style={styles.buttonText}>SOS</Text></Pressable></View><View style={styles.row}><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('safe_home')}><Text>Safe home</Text></Pressable><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('heading_home')}><Text>Heading home</Text></Pressable></View></View></View>;
 }
-function MembersTab({ session, members, selected, setSelected, history, setHistory, dsVersion }: any) {
+function MembersTab({ session, members, selected, setSelected, history, setHistory }: any) {
   const [ds, setDs] = useState<any>(null);
   const [dsDays, setDsDays] = useState(7);
   async function open(m: Member) { setSelected(m); setDs(null); const to = Date.now(); const from = to - 86400000 * 7; const data = await api<{ points: LocationPoint[] }>(session, `/api/circles/${session.circleId}/members/${m.userId}/history?from=${from}&to=${to}&limit=500`); setHistory(data.points); loadDs(m.userId, 7); }
   async function loadDs(uid: number, days: number) { try { setDsDays(days); const d = await api<any>(session, `/api/users/${uid}/driving-score?days=${days}`); setDs(d); } catch { setDs(null); } }
-  useEffect(() => { if (selected && dsVersion > 0) loadDs(selected.userId, dsDays); }, [dsVersion]);
   const scoreColor = ds?.score == null ? '#76777d' : ds.score >= 80 ? '#2E7D32' : ds.score >= 60 ? '#F57F17' : '#C62828';
   return <ScrollView style={styles.content}>{members.map((m: Member) => <Pressable key={m.userId} style={styles.card} onPress={() => open(m)}><Text style={styles.cardTitle}>{m.displayName}</Text>{m.paused ? <Text style={[styles.meta, { color: '#943700' }]}>⏸ Paused{m.pausedUntil ? ` until ${formatPauseUntil(m.pausedUntil)}` : ''}</Text> : <Text style={styles.meta}>{m.address || (m.lat ? `${m.lat.toFixed(4)}, ${m.lng?.toFixed(4)}` : 'No location yet')}</Text>}<Text style={styles.meta}>{rel(m.recordedAt)} {m.batteryPct != null ? `· ${m.batteryPct}%` : ''}</Text></Pressable>)}{selected && <View style={styles.card}><Text style={styles.cardTitle}>Driving Safety</Text>{ds?.score == null ? <Text style={styles.meta}>Not enough driving data.</Text> : <><Text style={{ fontSize: 40, fontWeight: '900', color: scoreColor }}>{Math.round(ds.score)}<Text style={{ fontSize: 14, color: '#76777d' }}> / 100</Text></Text><View style={{ flexDirection: 'row', gap: 8, marginVertical: 8 }}>{[7,30,90].map(d => <Pressable key={d} onPress={() => loadDs(selected.userId, d)} style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 50, backgroundColor: dsDays === d ? '#006c49' : '#e5eeff' }}><Text style={{ color: dsDays === d ? '#fff' : '#45464d', fontWeight: '600', fontSize: 12 }}>{d}d</Text></Pressable>)}</View><Text style={styles.meta}>Hard brakes: {ds.hardBrakeCount} ({ds.hardBrakePer100Km?.toFixed(1)} / 100km)</Text><Text style={styles.meta}>Speeding: {ds.speedingMinutes?.toFixed(1)} min</Text><Text style={styles.meta}>Night driving: {((ds.nightDrivingPct ?? 0) * 100).toFixed(0)}%</Text></>}</View>}{selected && <View style={styles.card}><Text style={styles.cardTitle}>{selected.displayName} history</Text><Text style={styles.meta}>{history.length} points in the last 7 days</Text>{history.length > 1 && <MapView style={styles.smallMap} initialRegion={{ latitude: history[0].lat, longitude: history[0].lng, latitudeDelta: .08, longitudeDelta: .08 }}><Polyline coordinates={history.map((p: LocationPoint) => ({ latitude: p.lat, longitude: p.lng }))} strokeColor="#006c49" strokeWidth={4} /></MapView>}</View>}</ScrollView>;
 }

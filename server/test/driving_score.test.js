@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createTestDb, seedUser, seedSecondUser } from './helpers.js';
-import { computeDrivingScore, recordTripEvents } from '../src/drivingScore.js';
+import { createTestDb, seedUser } from './helpers.js';
+import { computeDrivingScore } from '../src/drivingScore.js';
 import { loadOpenTrips, onLocationFix } from '../src/trips.js';
 
 function seedTripWithEvents(db, userId, circleId, events) {
