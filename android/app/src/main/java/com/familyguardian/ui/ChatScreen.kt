@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -498,17 +499,23 @@ private fun MessageBubble(
             ) {
                 Column {
                     if (message.attachmentKind == "image" && message.attachmentUrl != null) {
-                        val baseUrl = remember { com.familyguardian.data.Prefs(LocalContext.current.applicationContext).snapshot().serverUrl?.trimEnd('/') ?: "" }
+                        val imageContext = LocalContext.current
+                        val appContext = imageContext.applicationContext
+                        val snap = remember(appContext) {
+                            com.familyguardian.data.Prefs(appContext).snapshotBlocking()
+                        }
+                        val baseUrl = snap.serverUrl?.trimEnd('/') ?: ""
+                        val token = snap.token ?: ""
                         AsyncImage(
-                            model = coil.request.ImageRequest.Builder(LocalContext.current)
+                            model = coil.request.ImageRequest.Builder(imageContext)
                                 .data("$baseUrl${message.attachmentUrl}")
-                                .addHeader("Authorization", "Bearer ${com.familyguardian.data.Prefs(LocalContext.current.applicationContext).snapshot().token ?: ""}")
+                                .addHeader("Authorization", "Bearer $token")
                                 .crossfade(true)
                                 .build(),
                             contentDescription = "Photo",
                             modifier = Modifier
                                 .widthIn(max = 240.dp)
-                                .height(max = 200.dp)
+                                .heightIn(max = 200.dp)
                                 .padding(horizontal = 4.dp, vertical = 4.dp),
                             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                         )
@@ -534,10 +541,15 @@ private fun MessageBubble(
                                     mp.start()
                                     isPlaying = true
                                 } else {
-                                    val baseUrl = com.familyguardian.data.Prefs(context.applicationContext).snapshot().serverUrl?.trimEnd('/') ?: ""
-                                    val token = com.familyguardian.data.Prefs(context.applicationContext).snapshot().token ?: ""
+                                    val snap = com.familyguardian.data.Prefs(context.applicationContext).snapshotBlocking()
+                                    val baseUrl = snap.serverUrl?.trimEnd('/') ?: ""
+                                    val token = snap.token ?: ""
                                     val newMp = android.media.MediaPlayer()
-                                    newMp.setDataSource("$baseUrl${message.attachmentUrl}", mapOf("Authorization" to "Bearer $token"))
+                                    newMp.setDataSource(
+                                        context,
+                                        android.net.Uri.parse("$baseUrl${message.attachmentUrl}"),
+                                        mapOf("Authorization" to "Bearer $token"),
+                                    )
                                     newMp.setOnCompletionListener { isPlaying = false }
                                     newMp.prepare()
                                     newMp.start()

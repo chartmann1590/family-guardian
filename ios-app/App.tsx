@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
@@ -357,7 +358,9 @@ function ChatTab({ session, messages, setMessages, loadMessages, typingUsers, re
     ]);
   }
 
-  const typingNames = Array.from(typingUsers.values()).filter((v) => v.expiresAt > Date.now()).map((v) => v.displayName);
+  const typingNames = Array.from(typingUsers.values() as Iterable<{ displayName: string; expiresAt: number }>)
+    .filter((v) => v.expiresAt > Date.now())
+    .map((v) => v.displayName);
   const onViewableItemsChanged = useRef(({ changed }: any) => {
     if (!session.readReceiptsEnabled) return;
     for (const item of changed) {

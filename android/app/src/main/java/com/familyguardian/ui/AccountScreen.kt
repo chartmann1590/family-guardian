@@ -54,6 +54,8 @@ import com.familyguardian.location.LocationService
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -176,12 +178,12 @@ fun AccountScreen(
                                 val token = s.token ?: return@launch
                                 val url = ApiClient.endpoint(server, "/api/users/me")
                                 val next = !readReceiptsEnabled
+                                val body = """{"readReceiptsEnabled":$next}"""
+                                    .toRequestBody("application/json".toMediaType())
                                 ApiClient.okHttp.newCall(
                                     okhttp3.Request.Builder()
                                         .url(url)
-                                        .patch(okhttp3.MediaType.Companion.toMediaTypeOrNull("application/json")?.let {
-                                            okhttp3.RequestBody.create(it, """{"readReceiptsEnabled":$next}""")
-                                        }!!)
+                                        .patch(body)
                                         .header("Authorization", "Bearer $token")
                                         .build()
                                 ).execute()

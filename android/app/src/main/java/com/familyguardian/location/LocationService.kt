@@ -197,12 +197,20 @@ class LocationService : Service() {
                 }
                 is GuardianEvent.ChatMessage -> {
                     if (ev.userId != selfId) {
-                        Alerts.showChatMessage(
-                            context = applicationContext,
-                            userId = ev.userId,
-                            displayName = ev.displayName,
-                            body = ev.body,
-                        )
+                        val text = ev.body ?: when (ev.attachmentKind) {
+                            "image" -> "Sent a photo"
+                            "audio" -> "Sent a voice note"
+                            null -> ""
+                            else -> "Sent an attachment"
+                        }
+                        if (text.isNotEmpty()) {
+                            Alerts.showChatMessage(
+                                context = applicationContext,
+                                userId = ev.userId,
+                                displayName = ev.displayName,
+                                body = text,
+                            )
+                        }
                     }
                 }
                 is GuardianEvent.CheckIn -> {
