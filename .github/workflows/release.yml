@@ -141,6 +141,44 @@ jobs:
               print(f"Patched {file}")
           PY
 
+      - name: Patch expo-image-picker iOS 26 PHAsset.contentType API
+        # expo-image-picker ~55.0.20 references PHAsset/PHAssetResource.contentType
+        # behind `if #available(iOS 26.0, *)`. The macOS-latest runner's Xcode
+        # SDK predates iOS 26 so the symbol is unknown; collapse to the else
+        # branch which already provides a fallback via UTType(filenameExtension:).
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          file = "node_modules/expo-image-picker/ios/MediaHandler.swift"
+          path = Path(file)
+          text = path.read_text()
+          edits = [
+              (
+                  "    let utType: UTType? = if #available(iOS 26.0, *) {\n"
+                  "      asset?.contentType ?? UTType(filenameExtension: fileExtension)\n"
+                  "    } else {\n"
+                  "      UTType(filenameExtension: fileExtension)\n"
+                  "    }\n",
+                  "    let utType: UTType? = UTType(filenameExtension: fileExtension)\n",
+              ),
+              (
+                  "    let utType: UTType? = if #available(iOS 26.0, *) {\n"
+                  "      resource.contentType\n"
+                  "    } else {\n"
+                  "      UTType(resource.uniformTypeIdentifier) ?? UTType(filenameExtension: fileExtension)\n"
+                  "    }\n",
+                  "    let utType: UTType? = UTType(resource.uniformTypeIdentifier) ?? UTType(filenameExtension: fileExtension)\n",
+              ),
+          ]
+          for old, new in edits:
+              if old not in text:
+                  raise SystemExit(f"Expected block not found in {file}")
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+          print(f"Patched {file}")
+          PY
+
       - name: Patch expo-notifications unsupported DateComponents field
         run: |
           python3 <<'PY'
