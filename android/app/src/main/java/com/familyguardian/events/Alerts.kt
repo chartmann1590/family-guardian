@@ -82,7 +82,8 @@ object Alerts {
     fun showSos(context: Context, event: GuardianEvent.SosActive) {
         if (!canPostNotifications(context)) return
         ensureChannels(context)
-        val title = "🚨 SOS from ${event.displayName ?: "a family member"}"
+        val prefix = if (event.source == "crash") "🚨 Crash SOS from" else "🚨 SOS from"
+        val title = "$prefix ${event.displayName ?: "a family member"}"
         val text = if (event.lat != null && event.lng != null) {
             "Last location: ${"%.4f".format(event.lat)}, ${"%.4f".format(event.lng)}"
         } else "Location unavailable"
@@ -252,4 +253,25 @@ object Alerts {
     private fun speedingNotifId(userId: Long): Int = 6_000_000 + (userId.toInt() and 0xFFFFF)
     private fun lowBatteryNotifId(userId: Long): Int = 7_000_000 + (userId.toInt() and 0xFFFFF)
     private fun offlineNotifId(userId: Long): Int = 8_000_000 + (userId.toInt() and 0xFFFFF)
+
+    fun showCrashPending(context: Context, event: GuardianEvent.CrashPending) {
+        if (!canPostNotifications(context)) return
+        ensureChannels(context)
+        val title = "⚠️ Possible crash: ${event.displayName ?: "a member"}"
+        val text = "Waiting for confirmation…"
+        val notif = NotificationCompat.Builder(context, CHANNEL_HIGH)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setColor(0xFFBA1A1A.toInt())
+            .setAutoCancel(true)
+            .setContentIntent(openAppIntent(context))
+            .build()
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(crashNotifId(event.crashEventId), notif)
+    }
+
+    private fun crashNotifId(eventId: Long): Int = 9_000_000 + (eventId.toInt() and 0xFFFFF)
 }

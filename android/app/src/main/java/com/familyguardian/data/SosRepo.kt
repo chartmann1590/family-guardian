@@ -7,6 +7,8 @@ class SosRepo(private val prefs: Prefs) {
         lng: Double? = null,
         accuracyM: Double? = null,
         note: String? = null,
+        source: String? = null,
+        crashEventId: Long? = null,
     ): SosEvent {
         val s = prefs.snapshot()
         val server = s.serverUrl ?: error("not signed in")
@@ -15,7 +17,7 @@ class SosRepo(private val prefs: Prefs) {
         return ApiClient.api.activateSos(
             url = url,
             auth = "Bearer $token",
-            body = SosActivateBody(lat = lat, lng = lng, accuracyM = accuracyM, note = note),
+            body = SosActivateBody(lat = lat, lng = lng, accuracyM = accuracyM, note = note, source = source, crashEventId = crashEventId),
         )
     }
 

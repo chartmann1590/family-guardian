@@ -264,6 +264,25 @@ interface GuardianApi {
         @Header("Authorization") auth: String,
         @Body body: Map<String, @JvmSuppressWildcards List<Long>>,
     ): retrofit2.Response<Unit>
+
+    @GET
+    suspend fun getDrivingScore(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): DrivingScore
+
+    @POST
+    suspend fun reportCrash(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: CrashReportBody,
+    ): CrashReportResponse
+
+    @POST
+    suspend fun dismissCrash(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): retrofit2.Response<Unit>
 }
 
 object ApiClient {

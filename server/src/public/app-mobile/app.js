@@ -52,6 +52,20 @@
     $('toast-host').appendChild(el);
     setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 350); }, 3600);
   }
+  let crashBannerTimer = null;
+  function showCrashBanner(msg) {
+    const el = $('crash-banner');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = 'block';
+    clearTimeout(crashBannerTimer);
+    crashBannerTimer = setTimeout(hideCrashBanner, 35000);
+  }
+  function hideCrashBanner() {
+    const el = $('crash-banner');
+    if (el) el.style.display = 'none';
+    clearTimeout(crashBannerTimer);
+  }
   function avatarHtml(m) {
     if (m.photoUrl) return `<img src="${escapeHtml(m.photoUrl)}" alt="${escapeHtml(initials(m.displayName))}">`;
     return `<span>${escapeHtml(initials(m.displayName))}</span>`;
@@ -260,8 +274,9 @@
       if (ev.type === 'location_update') { members.set(ev.userId, { ...(members.get(ev.userId) || {}), ...ev }); renderMembers(); }
       if (ev.type === 'location_address') { const m = members.get(ev.userId); if (m) { m.address = ev.address; renderMembers(); } }
       if (ev.type === 'chat_message') addMessage(ev);
-      if (ev.type === 'sos_active') { sosByUser.set(ev.userId, ev); renderMembers(); toast(`SOS active: ${ev.displayName || 'Member'}`); }
-      if (ev.type === 'sos_resolved') { for (const [uid, sos] of sosByUser) if (sos.id === ev.id) sosByUser.delete(uid); renderMembers(); toast('SOS resolved'); }
+      if (ev.type === 'sos_active') { sosByUser.set(ev.userId, ev); renderMembers(); toast(`SOS active${ev.source === 'crash' ? ' (crash detected)' : ''}: ${ev.displayName || 'Member'}`); hideCrashBanner(); }
+      if (ev.type === 'sos_resolved') { for (const [uid, sos] of sosByUser) if (sos.id === ev.id) sosByUser.delete(uid); renderMembers(); toast('SOS resolved'); hideCrashBanner(); }
+      if (ev.type === 'crash_pending') { showCrashBanner(`Possible crash detected for ${ev.displayName || 'a member'} — waiting for confirmation…`); }
       if (ev.type === 'check_in') { checkins.set(ev.userId, ev); toast(`${ev.displayName || 'Member'} checked in`); }
       if (ev.type === 'pause_changed') {
         const existing = members.get(ev.userId) || { userId: ev.userId };

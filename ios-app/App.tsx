@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
@@ -6,11 +7,11 @@ import * as SecureStore from 'expo-secure-store';
 import * as TaskManager from 'expo-task-manager';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Vibration } from 'react-native';
 import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-type Session = { serverUrl: string; token: string; userId: number; circleId: number; displayName: string; email: string; readReceiptsEnabled?: boolean };
+type Session = { serverUrl: string; token: string; userId: number; circleId: number; displayName: string; email: string; readReceiptsEnabled?: boolean; crashDetectionEnabled?: boolean };
 type Member = { userId: number; displayName: string; email?: string; role?: string; lat?: number; lng?: number; accuracyM?: number; speedMps?: number; batteryPct?: number; bearing?: number; altitudeM?: number; activity?: string; activityConfidence?: number; recordedAt?: number; photoUrl?: string; address?: string; paused?: boolean; pausedUntil?: number | null; pauseReason?: string | null };
 type Place = { id: number; circleId: number; name: string; address?: string | null; lat: number; lng: number; radiusM: number; alertsOnEnter: boolean; alertsOnExit: boolean };
 type Message = { id: number; circleId?: number; userId: number; displayName?: string; body?: string; createdAt: number; reactions?: { emoji: string; userIds: number[] }[]; attachmentKind?: string; attachmentUrl?: string; attachmentMime?: string; attachmentBytes?: number; attachmentDurationMs?: number; readers?: { userId: number; readAt: number }[] };
@@ -163,6 +164,26 @@ function Auth({ onSession }: { onSession: (s: Session) => void }) {
   </SafeAreaView>;
 }
 
+function CrashCountdownModal({ crashState, onCancel, onExpire }: any) {
+  const [remaining, setRemaining] = useState(Math.max(0, Math.ceil((crashState.expiresAt - Date.now()) / 1000)));
+  useEffect(() => {
+    if (remaining <= 0) { onExpire(); return; }
+    const timer = setInterval(() => setRemaining((r: number) => r - 1), 1000);
+    return () => clearInterval(timer);
+  }, [remaining]);
+  return <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={() => {}}>
+    <View style={{ flex: 1, backgroundColor: '#ba1a1a', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+      <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 16 }}>CRASH DETECTED</Text>
+      <Text style={{ color: '#fff', fontSize: 72, fontWeight: '900' }}>{remaining}</Text>
+      <Text style={{ color: '#ffffffcc', fontSize: 16, marginBottom: 32 }}>seconds until SOS</Text>
+      <View style={{ flexDirection: 'row', gap: 16 }}>
+        <Pressable onPress={onCancel} style={{ backgroundColor: '#fff', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 }}><Text style={{ color: '#ba1a1a', fontWeight: '700' }}>I'M OK — CANCEL</Text></Pressable>
+        <Pressable onPress={onExpire} style={{ backgroundColor: '#fff', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 }}><Text style={{ color: '#ba1a1a', fontWeight: '700' }}>Send SOS now</Text></Pressable>
+      </View>
+    </View>
+  </Modal>;
+}
+
 function Guardian({ session, onLogout }: { session: Session; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('map');
   const [members, setMembers] = useState<Member[]>([]);
@@ -172,11 +193,23 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [history, setHistory] = useState<LocationPoint[]>([]);
   const [sharing, setSharing] = useState(false);
+  const [dsVersion, setDsVersion] = useState(0);
   const [wsState, setWsState] = useState('offline');
   const [typingUsers, setTypingUsers] = useState<Map<number, { displayName: string; expiresAt: number }>>(new Map());
   const mapRef = useRef<MapView | null>(null);
   const readQueueRef = useRef<number[]>([]);
   const readTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [crashState, setCrashState] = useState<{ id: number; expiresAt: number } | null>(null);
+  const recentSpeedsRef = useRef<number[]>([]);
+  const lastFixTimeRef = useRef<number>(0);
+
+  function isProbablyDriving(): boolean {
+    const speeds = recentSpeedsRef.current;
+    if (speeds.length === 0) return false;
+    const sorted = [...speeds].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    return median >= 5 && (Date.now() - lastFixTimeRef.current) < 60000;
+  }
 
   const load = useCallback(async () => {
     const [m, p] = await Promise.all([
@@ -187,56 +220,38 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
   }, [session]);
 
   useEffect(() => { load().catch((e) => Alert.alert('Load failed', e.message)); }, [load]);
+
   useEffect(() => {
-    const ws = new WebSocket(`${wsUrl(session.serverUrl)}?token=${encodeURIComponent(session.token)}`);
-    ws.onopen = () => setWsState('live');
-    ws.onclose = () => setWsState('offline');
-    ws.onerror = () => setWsState('offline');
-    ws.onmessage = async (event: { data: string }) => {
-      const msg = JSON.parse(event.data);
-      if (msg.type === 'location_update') setMembers((cur) => upsertMember(cur, msg));
-      if (msg.type === 'chat_message') {
-        setMessages((cur) => [...cur, { ...msg, reactions: msg.reactions || [], readers: msg.readers || [] }]);
+    if (!session.crashDetectionEnabled || crashState) return;
+    let DeviceMotion: any;
+    try { DeviceMotion = require('expo-sensors').DeviceMotion; } catch { return; }
+    DeviceMotion.setUpdateInterval(20);
+    const sub = DeviceMotion.addListener((data: any) => {
+      if (!session.crashDetectionEnabled || crashState) return;
+      if (!isProbablyDriving()) return;
+      const a = data.acceleration;
+      if (!a) return;
+      const mag = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z) * 9.81;
+      if (mag >= 30) {
+        (async () => {
+          try {
+            const res = await api<any>(session, '/api/crash-events', {
+              method: 'POST',
+              body: JSON.stringify({ peakAccelMps2: mag, sustainedMs: 100, speedMps: recentSpeedsRef.current[recentSpeedsRef.current.length - 1] || 0, platform: 'ios' }),
+            });
+            setCrashState({ id: res.id, expiresAt: Date.now() + 30000 });
+          } catch {}
+        })();
       }
-      if (msg.type === 'chat_typing') {
-        setTypingUsers((cur) => { const next = new Map(cur); next.set(msg.userId, { displayName: msg.displayName, expiresAt: msg.expiresAt }); return next; });
-      }
-      if (msg.type === 'message_read' && msg.userId && msg.messageId) {
-        setMessages((cur: Message[]) => cur.map((m: Message) => {
-          if (m.id !== msg.messageId || m.userId !== session.userId) return m;
-          const readers = [...(m.readers || [])];
-          if (!readers.find((r) => r.userId === msg.userId)) readers.push({ userId: msg.userId, readAt: msg.readAt });
-          return { ...m, readers };
-        }));
-      }
-      if (msg.type === 'reaction_added' || msg.type === 'reaction_removed') {
-        setMessages((cur: Message[]) => cur.map((m: Message) => {
-          if (m.id !== msg.messageId) return m;
-          const rxs = [...(m.reactions || [])];
-          if (msg.type === 'reaction_added') {
-            const existing = rxs.find((r: any) => r.emoji === msg.emoji);
-            if (existing) { if (!existing.userIds.includes(msg.userId)) existing.userIds = [...existing.userIds, msg.userId]; }
-            else rxs.push({ emoji: msg.emoji, userIds: [msg.userId] });
-          } else {
-            const existing = rxs.find((r: any) => r.emoji === msg.emoji);
-            if (existing) { existing.userIds = existing.userIds.filter((id: number) => id !== msg.userId); if (existing.userIds.length === 0) rxs.splice(rxs.indexOf(existing), 1); }
-          }
-          return { ...m, reactions: rxs };
-        }));
-      }
-      if (msg.type === 'sos_active') await notify('SOS active', `${msg.displayName || 'A member'} triggered SOS`);
-      if (msg.type === 'pause_changed') {
-        setMembers((cur) => cur.map((m) => m.userId === msg.userId
-          ? { ...m, paused: !!msg.pausedUntil, pausedUntil: msg.pausedUntil, pauseReason: msg.reason }
-          : m));
-      }
-      if (msg.type?.includes('alert') || msg.type?.startsWith('geofence')) {
-        if (msg.type?.startsWith('geofence') && msg.notifyUserIds && Array.isArray(msg.notifyUserIds) && !msg.notifyUserIds.includes(session.userId)) return;
-        await notify('Family Guardian', `${msg.displayName || 'Member'}: ${msg.type.replaceAll('_', ' ')}`);
-      }
-    };
-    return () => ws.close();
-  }, [session]);
+    });
+    return () => { try { sub.remove(); } catch {} };
+  }, [session.crashDetectionEnabled, crashState]);
+
+  useEffect(() => {
+    if (!crashState) return;
+    const vibInterval = setInterval(() => { Vibration.vibrate([0, 500, 500] as any, false); try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); } catch {} }, 800);
+    return () => { clearInterval(vibInterval); Vibration.cancel(); };
+  }, [crashState]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -284,12 +299,13 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
 
   return <SafeAreaView style={styles.app}><View style={styles.header}><View><Text style={styles.eyebrow}>{session.displayName}</Text><Text style={styles.title}>Family Guardian</Text></View><Text style={styles.badge}>{wsState}</Text></View>
     {tab === 'map' && <MapTab members={members} places={places} mapRef={mapRef} onMember={setSelectedMember} onShare={startSharing} sharing={sharing} onSos={sendSos} onCheckIn={checkIn} />}
-    {tab === 'members' && <MembersTab session={session} members={members} selected={selectedMember} setSelected={setSelectedMember} history={history} setHistory={setHistory} />}
+    {tab === 'members' && <MembersTab session={session} members={members} selected={selectedMember} setSelected={setSelectedMember} history={history} setHistory={setHistory} dsVersion={dsVersion} />}
     {tab === 'chat' && <ChatTab session={session} messages={messages} setMessages={setMessages} loadMessages={loadMessages} typingUsers={typingUsers} readQueueRef={readQueueRef} readTimerRef={readTimerRef} />}
     {tab === 'places' && <PlacesTab session={session} places={places} setPlaces={setPlaces} />}
     {tab === 'alerts' && <AlertsTab alerts={alerts} loadAlerts={loadAlerts} />}
     {tab === 'more' && <MoreTab session={session} onLogout={logout} onRefresh={load} />}
     <View style={styles.tabs}>{(['map','members','chat','places','alerts','more'] as Tab[]).map((t) => <Pressable key={t} onPress={() => { setTab(t); if (t === 'chat') loadMessages().catch(() => {}); if (t === 'alerts') loadAlerts().catch(() => {}); }} style={[styles.tab, tab === t && styles.activeTab]}><Text style={[styles.tabText, tab === t && styles.activeTabText]}>{t}</Text></Pressable>)}</View>
+    {crashState && <CrashCountdownModal crashState={crashState} onCancel={async () => { try { await api(session, `/api/crash-events/${crashState.id}/dismiss`, { method: 'POST', body: '{}' }); } catch {} setCrashState(null); }} onExpire={async () => { try { await api(session, '/api/sos/activate', { method: 'POST', body: JSON.stringify({ source: 'crash', crashEventId: crashState.id }) }); } catch {} setCrashState(null); }} />}
   </SafeAreaView>;
 }
 
@@ -300,9 +316,14 @@ function MapTab({ members, places, mapRef, onMember, onShare, sharing, onSos, on
   const first = members.find((m: Member) => m.lat && m.lng);
   return <View style={styles.flex}><MapView ref={mapRef} style={styles.map} initialRegion={{ latitude: first?.lat || 37.7749, longitude: first?.lng || -122.4194, latitudeDelta: 0.08, longitudeDelta: 0.08 }}>{places.map((p: Place) => <Circle key={p.id} center={{ latitude: p.lat, longitude: p.lng }} radius={p.radiusM} strokeColor="#006c49" fillColor="rgba(0,108,73,.10)" />)}{members.filter((m: Member) => m.lat && m.lng).map((m: Member) => <Marker key={m.userId} coordinate={{ latitude: m.lat!, longitude: m.lng! }} title={m.displayName + (m.paused ? ' (paused)' : '')} description={m.paused ? `Paused${m.pausedUntil ? ' until ' + formatPauseUntil(m.pausedUntil) : ''}` : rel(m.recordedAt)} pinColor={m.paused ? 'gray' : 'red'} opacity={m.paused ? 0.7 : 1} onPress={() => onMember(m)} />)}</MapView><View style={styles.floating}><Text style={styles.cardTitle}>{members.length} members</Text><View style={styles.row}><Pressable style={styles.primaryButton} onPress={onShare}><Text style={styles.buttonText}>{sharing ? 'Stop GPS' : 'Share GPS'}</Text></Pressable><Pressable style={styles.dangerButton} onPress={onSos}><Text style={styles.buttonText}>SOS</Text></Pressable></View><View style={styles.row}><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('safe_home')}><Text>Safe home</Text></Pressable><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('heading_home')}><Text>Heading home</Text></Pressable></View></View></View>;
 }
-function MembersTab({ session, members, selected, setSelected, history, setHistory }: any) {
-  async function open(m: Member) { setSelected(m); const to = Date.now(); const from = to - 86400000 * 7; const data = await api<{ points: LocationPoint[] }>(session, `/api/circles/${session.circleId}/members/${m.userId}/history?from=${from}&to=${to}&limit=500`); setHistory(data.points); }
-  return <ScrollView style={styles.content}>{members.map((m: Member) => <Pressable key={m.userId} style={styles.card} onPress={() => open(m)}><Text style={styles.cardTitle}>{m.displayName}</Text>{m.paused ? <Text style={[styles.meta, { color: '#943700' }]}>⏸ Paused{m.pausedUntil ? ` until ${formatPauseUntil(m.pausedUntil)}` : ''}</Text> : <Text style={styles.meta}>{m.address || (m.lat ? `${m.lat.toFixed(4)}, ${m.lng?.toFixed(4)}` : 'No location yet')}</Text>}<Text style={styles.meta}>{rel(m.recordedAt)} {m.batteryPct != null ? `· ${m.batteryPct}%` : ''}</Text></Pressable>)}{selected && <View style={styles.card}><Text style={styles.cardTitle}>{selected.displayName} history</Text><Text style={styles.meta}>{history.length} points in the last 7 days</Text>{history.length > 1 && <MapView style={styles.smallMap} initialRegion={{ latitude: history[0].lat, longitude: history[0].lng, latitudeDelta: .08, longitudeDelta: .08 }}><Polyline coordinates={history.map((p: LocationPoint) => ({ latitude: p.lat, longitude: p.lng }))} strokeColor="#006c49" strokeWidth={4} /></MapView>}</View>}</ScrollView>;
+function MembersTab({ session, members, selected, setSelected, history, setHistory, dsVersion }: any) {
+  const [ds, setDs] = useState<any>(null);
+  const [dsDays, setDsDays] = useState(7);
+  async function open(m: Member) { setSelected(m); setDs(null); const to = Date.now(); const from = to - 86400000 * 7; const data = await api<{ points: LocationPoint[] }>(session, `/api/circles/${session.circleId}/members/${m.userId}/history?from=${from}&to=${to}&limit=500`); setHistory(data.points); loadDs(m.userId, 7); }
+  async function loadDs(uid: number, days: number) { try { setDsDays(days); const d = await api<any>(session, `/api/users/${uid}/driving-score?days=${days}`); setDs(d); } catch { setDs(null); } }
+  useEffect(() => { if (selected && dsVersion > 0) loadDs(selected.userId, dsDays); }, [dsVersion]);
+  const scoreColor = ds?.score == null ? '#76777d' : ds.score >= 80 ? '#2E7D32' : ds.score >= 60 ? '#F57F17' : '#C62828';
+  return <ScrollView style={styles.content}>{members.map((m: Member) => <Pressable key={m.userId} style={styles.card} onPress={() => open(m)}><Text style={styles.cardTitle}>{m.displayName}</Text>{m.paused ? <Text style={[styles.meta, { color: '#943700' }]}>⏸ Paused{m.pausedUntil ? ` until ${formatPauseUntil(m.pausedUntil)}` : ''}</Text> : <Text style={styles.meta}>{m.address || (m.lat ? `${m.lat.toFixed(4)}, ${m.lng?.toFixed(4)}` : 'No location yet')}</Text>}<Text style={styles.meta}>{rel(m.recordedAt)} {m.batteryPct != null ? `· ${m.batteryPct}%` : ''}</Text></Pressable>)}{selected && <View style={styles.card}><Text style={styles.cardTitle}>Driving Safety</Text>{ds?.score == null ? <Text style={styles.meta}>Not enough driving data.</Text> : <><Text style={{ fontSize: 40, fontWeight: '900', color: scoreColor }}>{Math.round(ds.score)}<Text style={{ fontSize: 14, color: '#76777d' }}> / 100</Text></Text><View style={{ flexDirection: 'row', gap: 8, marginVertical: 8 }}>{[7,30,90].map(d => <Pressable key={d} onPress={() => loadDs(selected.userId, d)} style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 50, backgroundColor: dsDays === d ? '#006c49' : '#e5eeff' }}><Text style={{ color: dsDays === d ? '#fff' : '#45464d', fontWeight: '600', fontSize: 12 }}>{d}d</Text></Pressable>)}</View><Text style={styles.meta}>Hard brakes: {ds.hardBrakeCount} ({ds.hardBrakePer100Km?.toFixed(1)} / 100km)</Text><Text style={styles.meta}>Speeding: {ds.speedingMinutes?.toFixed(1)} min</Text><Text style={styles.meta}>Night driving: {((ds.nightDrivingPct ?? 0) * 100).toFixed(0)}%</Text></>}</View>}{selected && <View style={styles.card}><Text style={styles.cardTitle}>{selected.displayName} history</Text><Text style={styles.meta}>{history.length} points in the last 7 days</Text>{history.length > 1 && <MapView style={styles.smallMap} initialRegion={{ latitude: history[0].lat, longitude: history[0].lng, latitudeDelta: .08, longitudeDelta: .08 }}><Polyline coordinates={history.map((p: LocationPoint) => ({ latitude: p.lat, longitude: p.lng }))} strokeColor="#006c49" strokeWidth={4} /></MapView>}</View>}</ScrollView>;
 }
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 function ChatTab({ session, messages, setMessages, loadMessages, typingUsers, readQueueRef, readTimerRef }: any) {
@@ -467,6 +488,7 @@ function MoreTab({ session, onLogout, onRefresh }: any) {
   const [busy, setBusy] = useState(false);
   const [views, setViews] = useState<any[]>([]);
   const [readReceiptsEnabled, setReadReceiptsEnabled] = useState(session.readReceiptsEnabled || false);
+  const [crashDetectionEnabled, setCrashDetectionEnabled] = useState(session.crashDetectionEnabled || false);
   const RESOURCE_LABELS: Record<string, string> = { history: 'Location history', visits: 'Visits', trips: 'Trips', member_page: 'Profile page' };
   useEffect(() => {
     api<{ pausedUntil: number | null }>(session, '/api/users/me/pause')
@@ -476,7 +498,7 @@ function MoreTab({ session, onLogout, onRefresh }: any) {
       .then((d) => setViews(d.views || []))
       .catch(() => {});
     api<any>(session, '/api/users/me')
-      .then((d) => { if (d.readReceiptsEnabled != null) setReadReceiptsEnabled(d.readReceiptsEnabled); })
+      .then((d) => { if (d.readReceiptsEnabled != null) setReadReceiptsEnabled(d.readReceiptsEnabled); if (d.crashDetectionEnabled != null) setCrashDetectionEnabled(d.crashDetectionEnabled); })
       .catch(() => {});
   }, [session]);
   const isPaused = !!(pauseUntil && pauseUntil > Date.now());
@@ -524,6 +546,18 @@ function MoreTab({ session, onLogout, onRefresh }: any) {
       <Text style={styles.cardTitle}>Read receipts</Text>
       <Text style={styles.meta}>When ON, people who also enable receipts will see when you've read their messages.</Text>
       <Pressable style={styles.secondaryButton} onPress={toggleReadReceipts}><Text>{readReceiptsEnabled ? '✅ Enabled' : '◻️ Disabled'}</Text></Pressable>
+    </View>
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Crash detection (auto-SOS)</Text>
+      <Text style={styles.meta}>When ON, Family Guardian uses your phone's motion sensor to detect possible crashes and alerts your circle if you don't dismiss the countdown.</Text>
+      <Pressable style={styles.secondaryButton} onPress={async () => {
+        const next = !crashDetectionEnabled;
+        try {
+          await api(session, '/api/users/me', { method: 'PATCH', body: JSON.stringify({ crashDetectionEnabled: next }) });
+          setCrashDetectionEnabled(next);
+          session.crashDetectionEnabled = next;
+        } catch (e: any) { Alert.alert('Failed', e.message); }
+      }}><Text>{crashDetectionEnabled ? '✅ Enabled' : '◻️ Disabled'}</Text></Pressable>
     </View>
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Who viewed your history</Text>

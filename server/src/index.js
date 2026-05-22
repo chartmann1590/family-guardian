@@ -29,6 +29,8 @@ import webRoutes from './routes/web.js';
 import accountRoutes from './routes/account.js';
 import placeSubRoutes from './routes/placeSubscriptions.js';
 import downloadRoutes from './routes/download.js';
+import drivingScoreRoutes from './routes/drivingScore.js';
+import crashEventRoutes from './routes/crashEvents.js';
 import { loadOpenVisits } from './visits.js';
 import { loadOpenTrips } from './trips.js';
 import { startScheduler } from './scheduler.js';
@@ -103,6 +105,8 @@ await fastify.register(wsRoutes, { db });
 await fastify.register(webRoutes, { db });
 await fastify.register(accountRoutes, { db });
 await fastify.register(downloadRoutes);
+await fastify.register(drivingScoreRoutes, { db });
+await fastify.register(crashEventRoutes, { db });
 
 fastify.get('/healthz', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req, reply) => {
     try {

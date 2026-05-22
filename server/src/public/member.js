@@ -345,6 +345,48 @@
 
     loadHistory('24h');
 
+    // Driving Safety Score
+    let dsRange = 7;
+    async function loadDrivingScore(days) {
+        dsRange = days;
+        const body = document.getElementById('ds-body');
+        body.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant">Loading…</p>';
+        try {
+            const res = await fetch(
+                '/api/users/' + state.targetUserId + '/driving-score?days=' + days,
+                { credentials: 'same-origin' }
+            );
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const d = await res.json();
+            if (d.score == null) {
+                body.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant">Not enough driving data.</p>';
+                return;
+            }
+            const color = d.score >= 80 ? 'text-green-700' : d.score >= 60 ? 'text-amber-600' : 'text-red-700';
+            const distStr = window.FgUnits ? window.FgUnits.formatDistance(d.distanceM) : (d.distanceM / 1000).toFixed(1) + ' km';
+            const durStr = window.FgUnits ? window.FgUnits.formatDuration(d.drivingMs) : '';
+            body.innerHTML =
+                '<div class="flex items-center gap-4">' +
+                    '<span class="font-headline-md text-headline-lg ' + color + '" style="font-size:40px;font-weight:900">' + Math.round(d.score) + '</span>' +
+                    '<span class="font-label-md text-label-md text-on-surface-variant">/ 100</span>' +
+                '</div>' +
+                '<div class="flex flex-col gap-1 mt-2">' +
+                    '<div class="flex justify-between"><span class="font-body-md text-on-surface-variant">Hard brakes</span><span class="font-status-number text-status-number">' + d.hardBrakeCount + ' (' + d.hardBrakePer100Km.toFixed(1) + ' / 100km)</span></div>' +
+                    '<div class="flex justify-between"><span class="font-body-md text-on-surface-variant">Speeding</span><span class="font-status-number text-status-number">' + d.speedingMinutes.toFixed(1) + ' min</span></div>' +
+                    '<div class="flex justify-between"><span class="font-body-md text-on-surface-variant">Night driving</span><span class="font-status-number text-status-number">' + (d.nightDrivingPct * 100).toFixed(0) + '%</span></div>' +
+                    '<div class="flex justify-between"><span class="font-body-md text-on-surface-variant">Trips</span><span class="font-status-number text-status-number">' + d.tripCount + '</span></div>' +
+                    '<div class="flex justify-between"><span class="font-body-md text-on-surface-variant">Distance</span><span class="font-status-number text-status-number">' + esc(distStr) + '</span></div>' +
+                    '<div class="flex justify-between"><span class="font-body-md text-on-surface-variant">Driving time</span><span class="font-status-number text-status-number">' + esc(durStr) + '</span></div>' +
+                '</div>';
+        } catch (err) {
+            body.innerHTML = '<p class="font-label-md text-label-md text-error">Failed: ' + esc(err.message) + '</p>';
+        }
+    }
+    document.getElementById('ds-range').addEventListener('change', function () {
+        loadDrivingScore(Number(this.value));
+    });
+    loadDrivingScore(7);
+
     // WebSocket — live location updates
     let ws, reconnectDelay = 1000;
     function connectWs() {
@@ -375,6 +417,8 @@
             } else if (msg.type === 'visit_end' && msg.userId === state.targetUserId) {
                 // Refresh the visits list when a new visit closes.
                 if (activeTab === 'visits') loadVisits();
+            } else if (msg.type === 'driving_score_updated' && msg.userId === state.targetUserId) {
+                loadDrivingScore(dsRange);
             }
         });
         ws.addEventListener('close', () => {

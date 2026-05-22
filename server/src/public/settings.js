@@ -427,6 +427,8 @@
             .then(r => r.json())
             .then(d => {
                 readReceiptsToggle.checked = !!d.readReceiptsEnabled;
+                const crashToggle = $('crash-detection-toggle');
+                if (crashToggle) crashToggle.checked = !!d.crashDetectionEnabled;
             })
             .catch(() => {});
         readReceiptsToggle.addEventListener('change', async () => {
@@ -441,6 +443,24 @@
             } catch (err) {
                 toast('Failed: ' + err.message, 'error');
                 readReceiptsToggle.checked = !readReceiptsToggle.checked;
+            }
+        });
+    }
+
+    const crashDetectionToggle = $('crash-detection-toggle');
+    if (crashDetectionToggle) {
+        crashDetectionToggle.addEventListener('change', async () => {
+            try {
+                await fetch('/api/users/me', {
+                    method: 'PATCH',
+                    headers: { 'content-type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ crashDetectionEnabled: crashDetectionToggle.checked }),
+                });
+                toast(crashDetectionToggle.checked ? 'Crash detection enabled' : 'Crash detection disabled', 'success');
+            } catch (err) {
+                toast('Failed: ' + err.message, 'error');
+                crashDetectionToggle.checked = !crashDetectionToggle.checked;
             }
         });
     }

@@ -239,11 +239,14 @@ Without `FCM_SERVICE_ACCOUNT_PATH`, the server logs "FCM disabled" once and cont
 | GET    | `/api/users/me/pause`        | ✓    | Read caller's current pause state           |
 | POST   | `/api/users/me/pause`        | ✓    | Pause sharing for `{durationMinutes, reason?}` (1–1440 min) |
 | DELETE | `/api/users/me/pause`        | ✓    | Resume sharing immediately                  |
-| GET    | `/api/users/me/view-log`     | ✓    | List who recently viewed your history/visits/trips (`?days=` ≤ 30) |
+| GET    | `/api/users/me/view-log`     | ✓    | List who recently viewed your history/visits/trips/driving score (`?days=` ≤ 30) |
+| GET    | `/api/users/:userId/driving-score` | ✓ | 0–100 driving safety score for a circle member with hard-brake count, speeding minutes, night driving %; `?days=` ∈ [1, 90], default 7 |
+| POST   | `/api/crash-events`          | ✓    | Report a detected crash candidate (requires `crashDetectionEnabled` flag); broadcasts `crash_pending` |
+| POST   | `/api/crash-events/:id/dismiss` | ✓ | Owner-only; cancel an unfinished crash countdown (409 once escalated to SOS) |
 | GET    | `/api/users/me/export`       | ✓    | Download a JSON of all your data (1/day)    |
 | DELETE | `/api/users/me`              | ✓    | Delete account; body `{password}`; 409 if you're a sole admin with co-members |
 | POST   | `/api/circles/:id/admins/:userId` | ✓ | Admin-only; promote a member to admin (for handoff) |
-| GET    | `/ws`                         | ✓    | WebSocket upgrade (auth via cookie or `Authorization: Bearer`); emits `location_update`, `geofence_*` (with `notifyUserIds` for targeted dispatch), `sos_active`, `sos_resolved`, `chat_message`, `reaction_added`, `reaction_removed`, `check_in`, `pause_changed` |
+| GET    | `/ws`                         | ✓    | WebSocket upgrade (auth via cookie or `Authorization: Bearer`); emits `location_update`, `geofence_*` (with `notifyUserIds` for targeted dispatch), `sos_active` (now with optional `source: 'user' \| 'crash'`), `sos_resolved`, `chat_message`, `reaction_added`, `reaction_removed`, `check_in`, `pause_changed`, `chat_typing`, `message_read`, `crash_pending`, `driving_score_updated` |
 | GET    | `/member/:userId`             | cookie | Web member detail page with route history      |
 | GET    | `/welcome`                    | cookie | Post-signup wizard: display name + photo + first invite |
 | GET    | `/healthz`                    | —    | Liveness probe                                |
@@ -312,7 +315,17 @@ Recently added (Sprint 1 — privacy & control):
 
 Recently added (Sprint 2 — smart notifications + reactions):
 - ✅ **Per-place, per-member notification subscriptions** — `place_subscriptions` table lets each user subscribe to arrival/departure events for a specific place + specific member (or "anyone"). Each subscription has independent `on_enter` / `on_exit` toggles and optional quiet-hours window (`quiet_start` / `quiet_end` in minutes-from-midnight). The geofence engine queries subscriptions at transition time and populates `notifyUserIds` (respecting quiet hours) for targeted FCM push and WS dispatch. Full CRUD via `/api/circles/:id/place-subscriptions`. Surfaced on the Android **Places** screen (per-place bell icon → subscription sheet) and the PWA **Places** editor.
-- ✅ **Message reactions** — `message_reactions` table with a 6-emoji allowlist (👍 ❤️ 😂 😮 😢 🙏). `POST /api/messages/:id/reactions` toggles a reaction on; `DELETE /api/messages/:id/reactions/:emoji` removes yours. Both broadcast `reaction_added` / `reaction_removed` WS events with the full emoji + userId payload. Chat history responses now include a `reactions` array per message grouped by emoji with `userIds`. Surfaced on Android (long-press → bottom-sheet picker) and PWA (hover/click → inline picker). 59 tests passing in vitest.
+- ✅ **Message reactions** — `message_reactions` table with a 6-emoji allowlist (👍 ❤️ 😂 😮 😢 🙏). `POST /api/messages/:id/reactions` toggles a reaction on; `DELETE /api/messages/:id/reactions/:emoji` removes yours. Both broadcast `reaction_added` / `reaction_removed` WS events with the full emoji + userId payload. Chat history responses now include a `reactions` array per message grouped by emoji with `userIds`. Surfaced on Android (long-press → bottom-sheet picker) and PWA (hover/click → inline picker).
+
+Recently added (Sprint 3 — chat polish):
+- ✅ **Voice notes + photo attachments in chat** — `messages` gains `attachment_kind` / `attachment_path` / `attachment_mime` / `attachment_bytes` / `attachment_duration_ms`. `POST /api/circles/:id/messages/attachment` is a single multipart send (text body + file) that mirrors the profile-photo upload. Audio mime allowlist covers Safari (`audio/webm`) plus the standard `audio/mp4`/`aac`/`m4a`. JPEG attachments are EXIF-stripped server-side. `GET /api/messages/:id/attachment` serves the file with circle-membership ACL.
+- ✅ **Photo check-ins** — `check_ins.photo_path`, `POST /api/checkins/with-photo` (multipart) and `GET /api/checkins/:id/photo`. EXIF stripped. Thumbnails render on dashboards.
+- ✅ **Typing indicators** — `POST /api/circles/:id/typing` publishes a transient `chat_typing` WS event (no FCM fan-out). Client debounces 3 s; server caps 60/min.
+- ✅ **Read receipts (opt-in)** — `users.read_receipts_enabled` toggle (defaults OFF). Receipts only written when **both** message author and reader have the flag ON at read time. `POST /api/messages/read-batch` (≤50 ids) flushes visible messages; author-only `readers: [...]` array attached to `?withReaders=1` history responses. New `message_read` WS event.
+
+Recently added (Sprint 4 — driving safety):
+- ✅ **Driving safety score** — server-derived 0–100 score from existing trip data + a new `trip_events` table populated during live driving trips. Detects hard brakes from GPS speed deltas (Δv ≤ −3.5 m/s over Δt ≤ 6 s, 8 s cooldown), tracks speeding minutes via the per-user `alert_prefs.speeding_threshold_mps`, and accumulates night-driving distance with a longitude-approximated local clock. Formula deducts up to 25 for hard-brake density, 25 for speeding rate, 15 for night driving %, plus 5 for short-window drives. `GET /api/users/:userId/driving-score?days=` (∈ [1, 90]) returns the score plus raw components. Rendered on the Android Trips screen and PWA member page; pushes a `driving_score_updated` WS event when a trip closes.
+- ✅ **Crash detection + auto-SOS** — opt-in (`users.crash_detection_enabled`, defaults OFF). Android `SensorManager.TYPE_LINEAR_ACCELERATION` and iOS `expo-sensors` `DeviceMotion` watch for magnitude ≥ 3 g sustained ≥ 100 ms, gated by GPS speed ≥ 5 m/s in the last 60 s + activity = `driving`. On detection: a full-screen 30-s countdown activity/modal (vibration + audible alarm on `STREAM_ALARM`, dismissible) reports a `crash_events` row and broadcasts `crash_pending`. If the user doesn't cancel, the client fires `POST /api/sos/activate` with `source: 'crash'` and the crash row is linked to the resulting `sos_events.id`. PWA renders the pending banner and the upgraded "Crash SOS" label.
 
 Privacy notes:
 - Reverse geocoding hits the public OSM Nominatim service. Each lookup is rate-limited (≤1 req/sec) and cached in `geocode_cache`, but if you'd rather keep all addresses local set `NOMINATIM_DISABLED=1` (or point `NOMINATIM_URL` at your own Nominatim instance). When disabled, visits keep a `lat,lng` label only.
@@ -321,7 +334,6 @@ Privacy notes:
 Still on the table:
 - FCM push notifications (optional) — would allow notifications when the Android app is killed
 - HTTPS termination inside the container (optional)
-- Chat polish — voice notes, photo check-ins, typing/read indicators
 
 ---
 

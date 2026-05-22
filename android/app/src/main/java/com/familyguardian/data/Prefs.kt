@@ -23,6 +23,7 @@ class Prefs(private val context: Context) {
     private val keyUserId      = longPreferencesKey("user_id")
     private val keyOnboarded   = booleanPreferencesKey("onboarded")
     private val keyFcmToken    = stringPreferencesKey("fcm_token")
+    private val keyCrashDetectionEnabled = booleanPreferencesKey("pref_crash_detection_enabled")
 
     val serverUrl: Flow<String?>   = context.dataStore.data.map { it[keyServerUrl] }
     val token:     Flow<String?>   = context.dataStore.data.map { it[keyToken] }
@@ -32,6 +33,7 @@ class Prefs(private val context: Context) {
     val userId:    Flow<Long?>     = context.dataStore.data.map { it[keyUserId] }
     val onboarded: Flow<Boolean>   = context.dataStore.data.map { it[keyOnboarded] ?: false }
     val fcmToken: Flow<String?>    = context.dataStore.data.map { it[keyFcmToken] }
+    val crashDetectionEnabled: Flow<Boolean> = context.dataStore.data.map { it[keyCrashDetectionEnabled] ?: false }
 
     suspend fun snapshot(): Snapshot = context.dataStore.data.map {
         Snapshot(
@@ -42,6 +44,7 @@ class Prefs(private val context: Context) {
             circleId    = it[keyCircleId],
             userId      = it[keyUserId],
             onboarded   = it[keyOnboarded] ?: false,
+            crashDetectionEnabled = it[keyCrashDetectionEnabled] ?: false,
         )
     }.first()
 
@@ -58,6 +61,8 @@ class Prefs(private val context: Context) {
     suspend fun setDisplayName(name: String) = context.dataStore.edit { it[keyDisplayName] = name }
 
     suspend fun setFcmToken(token: String) = context.dataStore.edit { it[keyFcmToken] = token }
+
+    suspend fun setCrashDetectionEnabled(enabled: Boolean) = context.dataStore.edit { it[keyCrashDetectionEnabled] = enabled }
 
     suspend fun saveSession(
         token: String,
@@ -94,5 +99,6 @@ class Prefs(private val context: Context) {
         val circleId: Long?,
         val userId: Long?,
         val onboarded: Boolean = false,
+        val crashDetectionEnabled: Boolean = false,
     )
 }

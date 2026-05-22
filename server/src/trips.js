@@ -6,13 +6,15 @@ import { haversineMeters } from './geofence.js';
 import { getOpenVisit } from './visits.js';
 import { enqueueGeocode } from './geocoder.js';
 import { publish } from './hub.js';
+import { recordTripEvents } from './drivingScore.js';
 
 const MOVING_SPEED_MPS = 1.4;
 const MIN_TRIP_DURATION_MS = 60_000;
 const MIN_TRIP_DISTANCE_M = 100;
 
 // userId -> { id, startedAt, lastLat, lastLng, lastAt, distance, maxSpeed,
-//             sumSpeed, sumSpeedCount, activityCounts, startLat, startLng }
+//             sumSpeed, sumSpeedCount, activityCounts, startLat, startLng,
+//             lastSpeedMps, lastRecordedAt, circleId, displayName }
 const liveTrips = new Map();
 
 export function loadOpenTrips(db) {
@@ -42,6 +44,8 @@ export function loadOpenTrips(db) {
             startLng: r.startLng,
             circleId: null,
             displayName: null,
+            lastSpeedMps: null,
+            lastRecordedAt: null,
         });
     }
 }
@@ -80,6 +84,8 @@ export function onLocationFix(db, fix) {
             startLng: lng,
             circleId,
             displayName,
+            lastSpeedMps: speedMps ?? null,
+            lastRecordedAt: recordedAt,
         };
         if (activity) fresh.activityCounts.set(activity, 1);
         liveTrips.set(userId, fresh);
@@ -87,6 +93,7 @@ export function onLocationFix(db, fix) {
     }
 
     // Already in a trip: update aggregates.
+    const prevFix = { speedMps: live.lastSpeedMps, recordedAt: live.lastRecordedAt, lat: live.lastLat, lng: live.lastLng };
     const segment = haversineMeters(live.lastLat, live.lastLng, lat, lng);
     live.distance += segment;
     live.lastLat = lat;
@@ -114,6 +121,10 @@ export function onLocationFix(db, fix) {
         lng,
         live.id,
     );
+
+    recordTripEvents(db, live, { userId, lat, lng, speedMps, activity, recordedAt }, prevFix);
+    live.lastSpeedMps = speedMps ?? null;
+    live.lastRecordedAt = recordedAt;
 }
 
 function closeTrip(db, userId, endedAt) {
@@ -151,6 +162,7 @@ function closeTrip(db, userId, endedAt) {
             startedAt: live.startedAt,
             endedAt,
         });
+        publish(live.circleId, { type: 'driving_score_updated', userId });
     }
 }
 

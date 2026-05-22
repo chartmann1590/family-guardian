@@ -27,7 +27,7 @@ Repo conventions, dev-environment quirks, and "things that bit us last time" are
 | 1 | **Privacy & Control** — pause sharing, view-audit log, data export & account delete | **Shipped** |
 | 2 | **Smart Notifications + Reactions** — per-place/per-member subscriptions, message reactions, test suite | **Shipped** |
 | 3 | Chat polish (voice notes, photo check-ins, typing/read) | **Shipped** |
-| 4 | Driving safety (crash detection auto-SOS + driving safety score) | Sketched |
+| 4 | Driving safety (crash detection auto-SOS + driving safety score) | **Shipped** |
 
 **Why privacy first.** Family Guardian's pitch is "self-hosted family safety — your box, your data." Shipping pause / audit / export *before* more tracking features is what defensibly separates it from "Life360 on a VPS." Trust foundation goes in first, the rest builds on top.
 

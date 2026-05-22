@@ -466,9 +466,16 @@
             } else if (msg.type === 'sos_active' || msg.type === 'sos_resolved') {
                 applySosEvent(msg);
                 if (msg.type === 'sos_active') {
-                    toast(`🚨 ${msg.displayName} triggered SOS`, 'exit');
+                    toast(`🚨 ${msg.displayName} triggered SOS${msg.source === 'crash' ? ' (crash detected)' : ''}`, 'exit');
                 } else {
                     toast(`SOS resolved for ${msg.displayName}`, 'enter');
+                }
+            } else if (msg.type === 'crash_pending') {
+                const banner = document.getElementById('crash-banner');
+                if (banner) {
+                    banner.textContent = `Possible crash detected for ${msg.displayName || 'a member'} — waiting for confirmation…`;
+                    banner.style.display = 'block';
+                    setTimeout(() => { banner.style.display = 'none'; }, 35000);
                 }
             } else if (msg.type === 'check_in') {
                 checkins.set(msg.userId, { status: msg.status, createdAt: msg.createdAt, photoUrl: msg.photoUrl || null });

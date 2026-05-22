@@ -8,6 +8,8 @@ const ActivateBody = z.object({
     lng: z.number().min(-180).max(180).optional(),
     accuracyM: z.number().nonnegative().optional(),
     note: z.string().max(500).optional(),
+    source: z.enum(['user', 'crash']).optional(),
+    crashEventId: z.number().int().positive().optional(),
 });
 
 function rowToEvent(r) {
@@ -37,7 +39,7 @@ export default async function sosRoutes(fastify, { db }) {
         if (!circleId) return reply.code(400).send({ error: 'no_circle' });
 
         // Fall back to the user's last-known location if the client didn't send one.
-        let { lat, lng, accuracyM, note } = parsed.data;
+        let { lat, lng, accuracyM, note, source, crashEventId } = parsed.data;
         if (lat === undefined || lng === undefined) {
             const last = db
                 .prepare('SELECT lat, lng, accuracy_m AS accuracyM FROM locations WHERE user_id = ?')
@@ -81,7 +83,13 @@ export default async function sosRoutes(fastify, { db }) {
             )
             .get(id);
 
+        if (source === 'crash' && crashEventId) {
+            db.prepare('UPDATE crash_events SET sos_event_id = ? WHERE id = ? AND user_id = ? AND sos_event_id IS NULL')
+                .run(id, crashEventId, userId);
+        }
+
         const event = rowToEvent(row);
+        if (source) event.source = source;
         publish(circleId, { type: 'sos_active', ...event });
         fanOut(circleId, { type: 'sos_active', ...event }, db, userId);
         return event;

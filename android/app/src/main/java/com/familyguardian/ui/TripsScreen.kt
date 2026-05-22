@@ -1,13 +1,18 @@
 package com.familyguardian.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,12 +37,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.familyguardian.data.DrivingScore
 import com.familyguardian.data.Prefs
 import com.familyguardian.data.Trip
 import com.familyguardian.data.TripsRepo
+import com.familyguardian.events.EventBus
+import com.familyguardian.events.GuardianEvent
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -51,6 +61,13 @@ fun TripsScreen(circleId: Long, userId: Long, displayName: String, onBack: () ->
     var trips by remember { mutableStateOf<List<Trip>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var score by remember { mutableStateOf<DrivingScore?>(null) }
+    var scoreDays by remember { mutableStateOf(7) }
+
+    suspend fun loadScore(days: Int) {
+        scoreDays = days
+        try { score = repo.drivingScore(userId, days) } catch (_: Exception) {}
+    }
 
     LaunchedEffect(circleId, userId) {
         loading = true
@@ -62,6 +79,15 @@ fun TripsScreen(circleId: Long, userId: Long, displayName: String, onBack: () ->
             error = t.message ?: t::class.simpleName
         } finally {
             loading = false
+        }
+        loadScore(7)
+    }
+
+    LaunchedEffect(Unit) {
+        EventBus.events.collect { ev ->
+            if (ev is GuardianEvent.DrivingScoreUpdated && ev.userId == userId) {
+                try { score = repo.drivingScore(userId, scoreDays) } catch (_: Exception) {}
+            }
         }
     }
 
@@ -89,15 +115,23 @@ fun TripsScreen(circleId: Long, userId: Long, displayName: String, onBack: () ->
                     modifier = Modifier.padding(16.dp),
                     color = MaterialTheme.colorScheme.error,
                 )
-                trips.isEmpty() -> Text(
-                    "No trips in the last 7 days.",
-                    modifier = Modifier.padding(16.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 else -> LazyColumn(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
+                    item {
+                        DrivingScoreCard(score = score, selectedDays = scoreDays) { days ->
+                            scoreDays = days
+                        }
+                    }
+                    if (trips.isEmpty()) {
+                        item {
+                            Text(
+                                "No trips in the last 7 days.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     items(trips) { t ->
                         Surface(
                             shape = RoundedCornerShape(12.dp),
@@ -136,6 +170,102 @@ fun TripsScreen(circleId: Long, userId: Long, displayName: String, onBack: () ->
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DrivingScoreCard(score: DrivingScore?, selectedDays: Int, onDaysChanged: (Int) -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth(),
+        tonalElevation = 2.dp,
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Driving Safety", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    for (d in listOf(7, 30, 90)) {
+                        val selected = d == selectedDays
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.clickable { onDaysChanged(d) },
+                        ) {
+                            Text(
+                                "${d}d",
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp,
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            if (score == null || score.score == null) {
+                Text("Not enough driving data.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                val scoreColor = when {
+                    score.score >= 80 -> Color(0xFF2E7D32)
+                    score.score >= 60 -> Color(0xFFF57F17)
+                    else -> Color(0xFFC62828)
+                }
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "${Math.round(score.score)}",
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.Black,
+                        color = scoreColor,
+                    )
+                    Text(
+                        "/ 100",
+                        fontSize = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("Hard brakes", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "${score.hardBrakeCount} (${String.format("%.1f", score.hardBrakePer100Km)} / 100km)",
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("Speeding", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "${String.format("%.1f", score.speedingMinutes)} min",
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("Night driving", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "${(score.nightDrivingPct * 100).toInt()}%",
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
         }

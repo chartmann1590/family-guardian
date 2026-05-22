@@ -44,6 +44,13 @@ class LocationService : Service() {
         const val ACTION_START = "com.familyguardian.location.START"
         const val ACTION_STOP  = "com.familyguardian.location.STOP"
 
+        @Volatile
+        var lastSpeedMps: Double? = null
+            private set
+        @Volatile
+        var lastFixAtMs: Long = 0L
+            private set
+
         fun start(context: Context) {
             val intent = Intent(context, LocationService::class.java).apply { action = ACTION_START }
             ContextCompat.startForegroundService(context, intent)
@@ -58,6 +65,7 @@ class LocationService : Service() {
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var reporter: LocationReporter? = null
     private var eventStream: EventStreamClient? = null
+    private var crashDetector: CrashDetector? = null
     private val client by lazy { LocationServices.getFusedLocationProviderClient(this) }
     private val activityClient by lazy { ActivityRecognition.getClient(this) }
     private val activityPendingIntent by lazy {
@@ -77,7 +85,14 @@ class LocationService : Service() {
             val batteryPct = currentBatteryPct()
             updateNotification(lastFixAtMs = fix.time, batteryPct = batteryPct)
             val speedMps = if (fix.hasSpeed()) fix.speed.toDouble() else null
+            lastSpeedMps = speedMps
+            lastFixAtMs = fix.time
             val (activity, confidence) = inferActivity(speedMps, latestActivitySample())
+            crashDetector?.let { cd ->
+                cd.lastSpeedMps = speedMps
+                cd.lastFixAtMs = fix.time
+                cd.currentActivity = activity
+            }
             scope.launch {
                 reporter?.report(
                     lat = fix.latitude,
@@ -116,6 +131,26 @@ class LocationService : Service() {
         val prefs = Prefs(applicationContext)
         reporter = LocationReporter(prefs)
         ensureChannel()
+
+        scope.launch {
+            prefs.crashDetectionEnabled.collect { enabled ->
+                if (enabled) {
+                    if (crashDetector == null) {
+                        crashDetector = CrashDetector(applicationContext, prefs) { crashEventId ->
+                            val intent = Intent(this@LocationService, com.familyguardian.ui.CrashCountdownActivity::class.java)
+                            intent.putExtra("crashEventId", crashEventId)
+                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                            startActivity(intent)
+                        }
+                        crashDetector?.start()
+                    }
+                } else {
+                    crashDetector?.stop()
+                    crashDetector = null
+                }
+            }
+        }
+
         eventStream = EventStreamClient(prefs, scope).also { stream ->
             stream.start()
             scope.launch { observeEvents(prefs, stream) }
@@ -172,6 +207,9 @@ class LocationService : Service() {
                 }
                 is GuardianEvent.SosResolved -> {
                     Alerts.cancelSos(applicationContext, ev.id)
+                }
+                is GuardianEvent.CrashPending -> {
+                    if (ev.userId != selfId) Alerts.showCrashPending(applicationContext, ev)
                 }
                 is GuardianEvent.GeofenceEnter -> {
                     if (ev.userId != selfId) {

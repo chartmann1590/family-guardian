@@ -64,6 +64,7 @@ sealed interface GuardianEvent {
         val lat: Double? = null,
         val lng: Double? = null,
         val note: String? = null,
+        val source: String? = null,
     ) : GuardianEvent
 
     @Serializable
@@ -207,4 +208,17 @@ sealed interface GuardianEvent {
     @Serializable
     @SerialName("error")
     data class Error(val error: String) : GuardianEvent
+
+    @Serializable
+    @SerialName("driving_score_updated")
+    data class DrivingScoreUpdated(val userId: Long) : GuardianEvent
+
+    @Serializable
+    @SerialName("crash_pending")
+    data class CrashPending(
+        val userId: Long,
+        val displayName: String? = null,
+        val crashEventId: Long,
+        val detectedAt: Long,
+    ) : GuardianEvent
 }

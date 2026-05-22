@@ -42,6 +42,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ui.CrashCountdownActivity"
+            android:exported="false"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.FamilyGuardian" />
+
         <service
             android:name=".location.LocationService"
             android:exported="false"

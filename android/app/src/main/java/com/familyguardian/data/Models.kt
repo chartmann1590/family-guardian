@@ -112,6 +112,8 @@ data class SosActivateBody(
     val lng: Double? = null,
     val accuracyM: Double? = null,
     val note: String? = null,
+    val source: String? = null,
+    val crashEventId: Long? = null,
 )
 
 @Serializable
@@ -325,3 +327,40 @@ data class PlaceSubPatch(
 
 @Serializable
 data class AddReactionBody(val emoji: String)
+
+@Serializable
+data class DrivingScore(
+    val score: Double? = null,
+    val days: Int = 0,
+    val tripCount: Int = 0,
+    val drivingMs: Long = 0,
+    val distanceM: Double = 0.0,
+    val hardBrakeCount: Int = 0,
+    val hardBrakePer100Km: Double = 0.0,
+    val speedingMinutes: Double = 0.0,
+    val speedingThresholdMps: Double = 0.0,
+    val nightMiles: Double = 0.0,
+    val nightDrivingPct: Double = 0.0,
+)
+
+@Serializable
+data class CrashReportBody(
+    val peakAccelMps2: Double,
+    val sustainedMs: Int,
+    val peakAxisX: Double? = null,
+    val peakAxisY: Double? = null,
+    val peakAxisZ: Double? = null,
+    val speedMps: Double? = null,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    val accuracyM: Double? = null,
+    val activity: String? = null,
+    val platform: String,
+    val note: String? = null,
+)
+
+@Serializable
+data class CrashReportResponse(
+    val id: Long,
+    val detectedAt: Long,
+)

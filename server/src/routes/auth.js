@@ -94,8 +94,9 @@ export default async function authRoutes(fastify, { db }) {
         const { userId, circleId, role } = tx();
         const { token } = createSession(db, userId);
         const readReceiptsEnabled = !!db.prepare('SELECT read_receipts_enabled FROM users WHERE id = ?').get(userId)?.read_receipts_enabled;
+        const crashDetectionEnabled = !!db.prepare('SELECT crash_detection_enabled FROM users WHERE id = ?').get(userId)?.crash_detection_enabled;
         reply.setCookie('fg_session', token, COOKIE_OPTS);
-        return { token, userId, circleId, role, displayName, readReceiptsEnabled };
+        return { token, userId, circleId, role, displayName, readReceiptsEnabled, crashDetectionEnabled };
     });
 
     fastify.post('/api/auth/login', {
@@ -117,7 +118,8 @@ export default async function authRoutes(fastify, { db }) {
             .prepare('SELECT circle_id AS circleId FROM circle_members WHERE user_id = ? LIMIT 1')
             .get(user.id)?.circleId;
         const readReceiptsEnabled = !!user.read_receipts_enabled;
-        return { token, userId: user.id, circleId, displayName: user.display_name, readReceiptsEnabled };
+        const crashDetectionEnabled = !!user.crash_detection_enabled;
+        return { token, userId: user.id, circleId, displayName: user.display_name, readReceiptsEnabled, crashDetectionEnabled };
     });
 
     fastify.post('/api/auth/logout', async (req, reply) => {

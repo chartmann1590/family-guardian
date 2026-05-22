@@ -20,4 +20,12 @@ class TripsRepo(private val prefs: Prefs) {
         )
         return api.getTrips(url, "Bearer $token").trips
     }
+
+    suspend fun drivingScore(userId: Long, days: Int = 7): DrivingScore {
+        val snap = prefs.snapshot()
+        val server = snap.serverUrl ?: throw IllegalStateException("No server URL")
+        val token = snap.token ?: throw IllegalStateException("Not authenticated")
+        val url = ApiClient.endpoint(server, "/api/users/$userId/driving-score?days=$days")
+        return api.getDrivingScore(url, "Bearer $token")
+    }
 }

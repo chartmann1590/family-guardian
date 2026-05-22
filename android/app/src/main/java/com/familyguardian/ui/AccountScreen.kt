@@ -78,9 +78,22 @@ fun AccountScreen(
     var deleting by remember { mutableStateOf(false) }
     var loggingOut by remember { mutableStateOf(false) }
     var signedInAs by remember { mutableStateOf<String?>(null) }
+    var readReceiptsEnabled by remember { mutableStateOf(false) }
+    var crashDetectionEnabled by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         signedInAs = prefs.snapshot().email
+        try {
+            val s = prefs.snapshot()
+            val server = s.serverUrl
+            val token = s.token
+            if (server != null && token != null) {
+                val url = ApiClient.endpoint(server, "/api/users/me")
+                val me = ApiClient.api.me(url, "Bearer $token")
+                readReceiptsEnabled = me["readReceiptsEnabled"]?.jsonPrimitive?.booleanOrNull == true
+                crashDetectionEnabled = me["crashDetectionEnabled"]?.jsonPrimitive?.booleanOrNull == true
+            }
+        } catch (_: Exception) {}
     }
 
     LaunchedEffect(Unit) {
@@ -151,17 +164,6 @@ fun AccountScreen(
             }
 
             item {
-                var readReceiptsEnabled by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) {
-                    try {
-                        val s = prefs.snapshot()
-                        val server = s.serverUrl ?: return@LaunchedEffect
-                        val token = s.token ?: return@LaunchedEffect
-                        val url = ApiClient.endpoint(server, "/api/users/me")
-                        val me = ApiClient.api.me(url, "Bearer $token")
-                        readReceiptsEnabled = me["readReceiptsEnabled"]?.jsonPrimitive?.booleanOrNull == true
-                    } catch (_: Exception) {}
-                }
                 Text("Read receipts", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
                     "When ON, people who also enable receipts will see when you've read their messages.",
@@ -195,6 +197,44 @@ fun AccountScreen(
                     shape = RoundedCornerShape(12.dp),
                 ) {
                     Text(if (readReceiptsEnabled) "Read receipts: ON" else "Read receipts: OFF")
+                }
+            }
+
+            item {
+                Text("Crash detection (auto-SOS)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "When ON, Family Guardian uses your phone's motion sensor to detect possible crashes and alerts your circle if you don't dismiss the countdown.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val s = prefs.snapshot()
+                                val server = s.serverUrl ?: return@launch
+                                val token = s.token ?: return@launch
+                                val url = ApiClient.endpoint(server, "/api/users/me")
+                                val next = !crashDetectionEnabled
+                                val body = """{"crashDetectionEnabled":$next}"""
+                                    .toRequestBody("application/json".toMediaType())
+                                ApiClient.okHttp.newCall(
+                                    okhttp3.Request.Builder()
+                                        .url(url)
+                                        .patch(body)
+                                        .header("Authorization", "Bearer $token")
+                                        .build()
+                                ).execute()
+                                crashDetectionEnabled = next
+                                prefs.setCrashDetectionEnabled(next)
+                            } catch (_: Exception) {}
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text(if (crashDetectionEnabled) "Crash detection: ON" else "Crash detection: OFF")
                 }
             }
 

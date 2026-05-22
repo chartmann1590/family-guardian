@@ -10,6 +10,7 @@ import { isFcmDisabled } from '../fcm.js';
 const UpdateMeBody = z.object({
     displayName: z.string().min(1).max(64).optional(),
     readReceiptsEnabled: z.boolean().optional(),
+    crashDetectionEnabled: z.boolean().optional(),
 });
 
 const FcmTokenBody = z.object({
@@ -33,7 +34,7 @@ export default async function profileRoutes(fastify, { db, uploadsDir }) {
         if (!parsed.success) {
             return reply.code(400).send({ error: 'invalid_body', details: parsed.error.flatten() });
         }
-        const { displayName, readReceiptsEnabled } = parsed.data;
+        const { displayName, readReceiptsEnabled, crashDetectionEnabled } = parsed.data;
         if (displayName != null) {
             db.prepare('UPDATE users SET display_name = ? WHERE id = ?')
                 .run(displayName.trim(), req.auth.userId);
@@ -42,8 +43,12 @@ export default async function profileRoutes(fastify, { db, uploadsDir }) {
             db.prepare('UPDATE users SET read_receipts_enabled = ? WHERE id = ?')
                 .run(readReceiptsEnabled ? 1 : 0, req.auth.userId);
         }
+        if (crashDetectionEnabled != null) {
+            db.prepare('UPDATE users SET crash_detection_enabled = ? WHERE id = ?')
+                .run(crashDetectionEnabled ? 1 : 0, req.auth.userId);
+        }
         const row = db.prepare(
-            'SELECT id AS userId, display_name AS displayName, email, photo_path AS photoPath, read_receipts_enabled AS readReceiptsEnabled FROM users WHERE id = ?',
+            'SELECT id AS userId, display_name AS displayName, email, photo_path AS photoPath, read_receipts_enabled AS readReceiptsEnabled, crash_detection_enabled AS crashDetectionEnabled FROM users WHERE id = ?',
         ).get(req.auth.userId);
         return {
             userId: row.userId,
@@ -51,6 +56,7 @@ export default async function profileRoutes(fastify, { db, uploadsDir }) {
             email: row.email,
             photoUrl: row.photoPath ? `/api/users/${row.userId}/photo` : null,
             readReceiptsEnabled: !!row.readReceiptsEnabled,
+            crashDetectionEnabled: !!row.crashDetectionEnabled,
         };
     });
 
