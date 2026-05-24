@@ -11,12 +11,6 @@ function assertMember(db, circleId, userId, reply) {
     return true;
 }
 
-function isAdmin(db, circleId, userId) {
-    return !!db
-        .prepare('SELECT 1 FROM circle_members WHERE circle_id = ? AND user_id = ? AND role = ?')
-        .get(circleId, userId, 'admin');
-}
-
 function routineRowToJson(r) {
     return {
         id: r.id,

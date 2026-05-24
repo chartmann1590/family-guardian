@@ -132,7 +132,6 @@
         container.classList.remove('hidden');
         container.innerHTML = '<div class="text-xs text-on-surface-variant mb-1 font-medium">Coming up</div>' +
             items.map(a => {
-                const m = members.get(a.userId);
                 const inMin = Math.round((a.expectedAt - Date.now()) / 60000);
                 const timeLabel = inMin > 0 ? `${inMin}m` : 'now';
                 return `<div class="flex items-center gap-2 text-xs py-1">

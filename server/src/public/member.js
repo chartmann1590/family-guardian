@@ -407,7 +407,6 @@
         } catch { container.innerHTML = '<p class="text-sm text-on-surface-variant">Could not load routines.</p>'; }
     }
     function minuteToTime(m) { return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`; }
-    function esc(s) { return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
     loadMemberRoutines();
 
     // WebSocket — live location updates
