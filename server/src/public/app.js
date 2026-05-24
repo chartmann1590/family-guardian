@@ -119,6 +119,45 @@
         return null;
     }
 
+    const upcomingArrivals = new Map((state.upcomingArrivals || []).map(a => [`${a.userId}-${a.placeId}`, a]));
+
+    function renderUpcomingArrivals() {
+        const container = document.getElementById('upcoming-arrivals');
+        if (!container) return;
+        const items = Array.from(upcomingArrivals.values())
+            .filter(a => a.expectedAt > Date.now())
+            .sort((a, b) => a.expectedAt - b.expectedAt)
+            .slice(0, 5);
+        if (!items.length) { container.classList.add('hidden'); return; }
+        container.classList.remove('hidden');
+        container.innerHTML = '<div class="text-xs text-on-surface-variant mb-1 font-medium">Coming up</div>' +
+            items.map(a => {
+                const m = members.get(a.userId);
+                const inMin = Math.round((a.expectedAt - Date.now()) / 60000);
+                const timeLabel = inMin > 0 ? `${inMin}m` : 'now';
+                return `<div class="flex items-center gap-2 text-xs py-1">
+                    <span class="font-medium">${esc(a.displayName)}</span>
+                    <span class="text-on-surface-variant">${esc(a.placeName)}</span>
+                    <span class="text-on-surface-variant">${formatTime(a.expectedAt)}</span>
+                    <span class="text-primary font-medium">${timeLabel}</span>
+                </div>`;
+            }).join('');
+    }
+
+    async function refreshArrivals() {
+        try {
+            const res = await fetch(`/api/circles/${state.circleId}/expected-arrivals?within=240`);
+            const data = await res.json();
+            upcomingArrivals.clear();
+            for (const a of (data.arrivals || [])) upcomingArrivals.set(`${a.userId}-${a.placeId}`, a);
+            renderUpcomingArrivals();
+        } catch {}
+    }
+
+    function formatTime(epochMs) {
+        return new Date(epochMs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+
     function renderMemberList() {
         const list = document.getElementById('member-list');
         const activeCount = document.getElementById('active-count');
@@ -500,6 +539,12 @@
                         }
                     }
                 }
+                if (msg.type === 'routine_deviation') {
+                    const m = members.get(msg.userId);
+                    const name = msg.displayName || (m ? m.displayName : 'A member');
+                    const kindLabel = msg.kind === 'missed_arrival' ? "didn't arrive at" : msg.kind === 'overstay' ? 'stayed too long at' : 'deviated from';
+                    toast(`${name} ${kindLabel} ${msg.placeName || 'a place'}`, 'exit');
+                }
             }
         });
         ws.addEventListener('close', () => {
@@ -512,6 +557,9 @@
 
     // Periodic re-render so "Just now / 2m ago" stays fresh
     setInterval(renderMemberList, 30_000);
+    setInterval(refreshArrivals, 300_000);
+
+    refreshArrivals();
 
     // Map needs an invalidateSize when the sidebar layout settles
     window.addEventListener('resize', () => map.invalidateSize());

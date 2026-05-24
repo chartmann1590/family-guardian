@@ -274,4 +274,36 @@ object Alerts {
     }
 
     private fun crashNotifId(eventId: Long): Int = 9_000_000 + (eventId.toInt() and 0xFFFFF)
+
+    fun showRoutineDeviation(
+        context: Context,
+        userId: Long,
+        displayName: String?,
+        placeName: String,
+        kind: String,
+    ) {
+        if (!canPostNotifications(context)) return
+        ensureChannels(context)
+        val name = displayName ?: "Someone"
+        val title = "Routine deviation"
+        val text = when (kind) {
+            "overstay" -> "$name still at $placeName past usual time"
+            "early_departure" -> "$name left $placeName earlier than usual"
+            else -> "$name may have missed arrival at $placeName"
+        }
+        val notif = NotificationCompat.Builder(context, CHANNEL_NORMAL)
+            .setSmallIcon(android.R.drawable.stat_sys_warning)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setAutoCancel(true)
+            .setContentIntent(openAppIntent(context))
+            .build()
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(routineDeviationNotifId(userId, placeName), notif)
+    }
+
+    private fun routineDeviationNotifId(userId: Long, placeName: String): Int =
+        10_000_000 + ((userId.toInt() * 31 + placeName.hashCode()) and 0xFFFFF)
 }

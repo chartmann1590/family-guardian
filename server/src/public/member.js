@@ -387,6 +387,29 @@
     });
     loadDrivingScore(7);
 
+    const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    async function loadMemberRoutines() {
+        const container = document.getElementById('member-routines');
+        if (!container) return;
+        try {
+            const token = document.cookie.match(/fg_session=([^;]+)/)?.[1];
+            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+            const res = await fetch(`/api/users/${state.targetUserId}/routines`, { headers });
+            const data = await res.json();
+            const routines = (data.routines || []).filter(r => r.active);
+            if (!routines.length) {
+                container.innerHTML = '<p class="text-sm text-on-surface-variant">No routines detected yet.</p>';
+                return;
+            }
+            container.innerHTML = '<table class="w-full text-sm"><thead><tr class="border-b text-left text-on-surface-variant text-xs"><th class="py-1 pr-2">Place</th><th class="py-1 pr-2">Kind</th><th class="py-1 pr-2">Day</th><th class="py-1 pr-2">Expected</th></tr></thead><tbody>' +
+                routines.map(r => `<tr class="border-b border-outline-variant/10"><td class="py-1 pr-2">${esc(r.placeName)}</td><td class="py-1 pr-2 capitalize">${r.kind}</td><td class="py-1 pr-2">${DAYS[r.dayOfWeek]}</td><td class="py-1 pr-2">${minuteToTime(r.expectedMinute)}</td></tr>`).join('') +
+                '</tbody></table>';
+        } catch { container.innerHTML = '<p class="text-sm text-on-surface-variant">Could not load routines.</p>'; }
+    }
+    function minuteToTime(m) { return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`; }
+    function esc(s) { return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    loadMemberRoutines();
+
     // WebSocket — live location updates
     let ws, reconnectDelay = 1000;
     function connectWs() {

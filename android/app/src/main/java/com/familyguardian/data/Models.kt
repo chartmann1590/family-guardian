@@ -364,3 +364,61 @@ data class CrashReportResponse(
     val id: Long,
     val detectedAt: Long,
 )
+
+@Serializable
+data class Routine(
+    val id: Int,
+    val userId: Int,
+    val circleId: Int,
+    val placeId: Int,
+    val placeName: String,
+    val kind: String,
+    val dayOfWeek: Int,
+    val expectedMinute: Int,
+    val toleranceMinutes: Int,
+    val sampleCount: Int,
+    val confidence: Double,
+    val source: String,
+    val active: Boolean,
+    val firstSeenAt: Long? = null,
+    val lastSeenAt: Long? = null,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
+@Serializable
+data class RoutinesResponse(val routines: List<Routine>)
+
+@Serializable
+data class RoutinePrefs(
+    val routinesEnabled: Boolean,
+    val quietStart: Int? = null,
+    val quietEnd: Int? = null,
+)
+
+@Serializable
+data class CreateRoutineRequest(
+    val placeId: Int,
+    val kind: String,
+    val daysOfWeek: List<Int>,
+    val expectedMinute: Int,
+    val toleranceMinutes: Int,
+)
+
+@Serializable
+data class CreateRoutineResponse(val ids: List<Int>, val count: Int)
+
+@Serializable
+data class ExpectedArrival(
+    val userId: Int,
+    val displayName: String,
+    val photoUrl: String? = null,
+    val placeId: Int,
+    val placeName: String,
+    val kind: String,
+    val expectedMinute: Int,
+    val expectedAt: Long,
+)
+
+@Serializable
+data class ExpectedArrivalsResponse(val arrivals: List<ExpectedArrival>)

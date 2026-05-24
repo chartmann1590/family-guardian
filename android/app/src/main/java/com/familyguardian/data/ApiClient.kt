@@ -283,6 +283,51 @@ interface GuardianApi {
         @Url url: String,
         @Header("Authorization") auth: String,
     ): retrofit2.Response<Unit>
+
+    @GET
+    suspend fun listRoutines(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): RoutinesResponse
+
+    @PATCH
+    suspend fun patchRoutine(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: okhttp3.RequestBody,
+    ): Routine
+
+    @DELETE
+    suspend fun deleteRoutine(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): OkResponse
+
+    @GET
+    suspend fun getRoutinePrefs(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): RoutinePrefs
+
+    @PATCH
+    suspend fun patchRoutinePrefs(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: okhttp3.RequestBody,
+    ): RoutinePrefs
+
+    @GET
+    suspend fun getExpectedArrivals(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): ExpectedArrivalsResponse
+
+    @POST
+    suspend fun createRoutine(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: okhttp3.RequestBody,
+    ): CreateRoutineResponse
 }
 
 object ApiClient {

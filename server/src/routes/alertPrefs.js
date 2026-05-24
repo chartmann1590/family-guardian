@@ -19,6 +19,9 @@ function rowToJson(r) {
         lowBatteryThreshold: r.low_battery_threshold,
         offlineEnabled: !!r.offline_enabled,
         offlineMinutes: r.offline_minutes,
+        routinesEnabled: !!(r.routines_enabled ?? 1),
+        routinesQuietStart: r.routines_quiet_start ?? null,
+        routinesQuietEnd: r.routines_quiet_end ?? null,
     };
 }
 

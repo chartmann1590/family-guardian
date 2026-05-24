@@ -221,4 +221,17 @@ sealed interface GuardianEvent {
         val crashEventId: Long,
         val detectedAt: Long,
     ) : GuardianEvent
+
+    @Serializable
+    @SerialName("routine_deviation")
+    data class RoutineDeviation(
+        val userId: Long,
+        val displayName: String,
+        val routineId: Long,
+        val placeId: Long,
+        val placeName: String,
+        val kind: String,
+        val expectedMinute: Int,
+        val actualMinute: Int? = null,
+    ) : GuardianEvent
 }

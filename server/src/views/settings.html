@@ -166,6 +166,94 @@
             </div>
         </section>
 
+        <!-- Smart Routines -->
+        <section class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-primary">routine</span>
+                    <div>
+                        <h2 class="font-headline-md text-headline-md text-on-surface">Smart Routines</h2>
+                        <p class="text-sm text-on-surface-variant mt-1">Get notified when family members deviate from their usual arrival/departure patterns.</p>
+                    </div>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="routines-enabled-toggle" class="sr-only peer">
+                    <div class="w-11 h-6 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+            </div>
+            <div id="routines-config" class="hidden flex flex-col gap-4">
+                <div class="flex flex-wrap gap-4 items-end">
+                    <div class="flex flex-col gap-1">
+                        <label class="font-label-md text-label-md text-on-surface-variant">Quiet hours start</label>
+                        <input type="time" id="quiet-start" class="rounded-lg border border-outline-variant/40 px-3 py-2 text-sm bg-surface-container-lowest">
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <label class="font-label-md text-label-md text-on-surface-variant">Quiet hours end</label>
+                        <input type="time" id="quiet-end" class="rounded-lg border border-outline-variant/40 px-3 py-2 text-sm bg-surface-container-lowest">
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-outline-variant/20 text-left text-on-surface-variant">
+                                <th class="py-2 pr-3">Place</th>
+                                <th class="py-2 pr-3">Kind</th>
+                                <th class="py-2 pr-3">Day</th>
+                                <th class="py-2 pr-3">Expected</th>
+                                <th class="py-2 pr-3">Tol.</th>
+                                <th class="py-2 pr-3">Source</th>
+                                <th class="py-2 pr-3">Active</th>
+                                <th class="py-2"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="routines-tbody"></tbody>
+                    </table>
+                </div>
+                <button id="add-routine-btn" class="bg-primary text-on-primary px-4 py-2 rounded-lg text-sm hover:bg-primary/90 flex items-center gap-2 self-start">
+                    <span class="material-symbols-outlined text-base">add</span> Add routine
+                </button>
+                <div id="add-routine-form" class="hidden bg-surface-container rounded-lg p-4 flex flex-col gap-3">
+                    <div class="flex flex-wrap gap-3 items-end">
+                        <div class="flex flex-col gap-1 flex-1 min-w-[140px]">
+                            <label class="text-xs text-on-surface-variant">Place</label>
+                            <select id="routine-place" class="rounded-lg border border-outline-variant/40 px-3 py-2 text-sm bg-surface-container-lowest"></select>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <label class="text-xs text-on-surface-variant">Kind</label>
+                            <select id="routine-kind" class="rounded-lg border border-outline-variant/40 px-3 py-2 text-sm bg-surface-container-lowest">
+                                <option value="arrival">Arrival</option>
+                                <option value="departure">Departure</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <label class="text-xs text-on-surface-variant">Time</label>
+                            <input type="time" id="routine-time" class="rounded-lg border border-outline-variant/40 px-3 py-2 text-sm bg-surface-container-lowest">
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <label class="text-xs text-on-surface-variant">Days</label>
+                        <div class="flex flex-wrap gap-2" id="routine-days">
+                            <label class="flex items-center gap-1 text-sm"><input type="checkbox" value="1" class="routine-day"> Mon</label>
+                            <label class="flex items-center gap-1 text-sm"><input type="checkbox" value="2" class="routine-day"> Tue</label>
+                            <label class="flex items-center gap-1 text-sm"><input type="checkbox" value="3" class="routine-day"> Wed</label>
+                            <label class="flex items-center gap-1 text-sm"><input type="checkbox" value="4" class="routine-day"> Thu</label>
+                            <label class="flex items-center gap-1 text-sm"><input type="checkbox" value="5" class="routine-day"> Fri</label>
+                            <label class="flex items-center gap-1 text-sm"><input type="checkbox" value="6" class="routine-day"> Sat</label>
+                            <label class="flex items-center gap-1 text-sm"><input type="checkbox" value="0" class="routine-day"> Sun</label>
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <label class="text-xs text-on-surface-variant">Tolerance: <span id="tol-val">15</span> min</label>
+                        <input type="range" id="routine-tolerance" min="5" max="60" step="5" value="15" class="accent-primary">
+                    </div>
+                    <div class="flex gap-2 self-start">
+                        <button id="save-routine-btn" class="bg-primary text-on-primary px-4 py-2 rounded-lg text-sm hover:bg-primary/90">Save</button>
+                        <button id="cancel-routine-btn" class="bg-surface-container-high text-on-surface px-4 py-2 rounded-lg text-sm">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Who viewed your history -->
         <section class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">
             <div class="flex items-center justify-between mb-4">

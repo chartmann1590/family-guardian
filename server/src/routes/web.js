@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { lookupSession, extractToken } from '../auth.js';
 import { logView } from '../audit.js';
+import { getUpcomingRoutines } from '../routines.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const VIEWS_DIR = join(__dirname, '..', 'views');
@@ -196,6 +197,7 @@ export default async function webRoutes(fastify, { db }) {
             places,
             sosActive,
             latestCheckins,
+            upcomingArrivals: getUpcomingRoutines(db, circleRow.circleId, 240),
         };
 
         send(
@@ -396,6 +398,9 @@ export default async function webRoutes(fastify, { db }) {
             me: { userId: session.userId, displayName: session.displayName, role: circleRow.role },
             members,
             isAdmin: circleRow.role === 'admin',
+            places: db.prepare(
+                'SELECT id, name FROM places WHERE circle_id = ? ORDER BY name COLLATE NOCASE'
+            ).all(circleRow.circleId),
         };
 
         send(

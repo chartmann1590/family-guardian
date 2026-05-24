@@ -487,4 +487,128 @@
         inviteSection.classList.add('hidden');
         nonAdminNote.classList.remove('hidden');
     }
+
+    const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    function minuteToTime(m) {
+        const h = Math.floor(m / 60);
+        const min = m % 60;
+        return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+    }
+
+    function timeToMinute(t) {
+        const [h, m] = t.split(':').map(Number);
+        return h * 60 + m;
+    }
+
+    function authHeaders() {
+        const token = document.cookie.match(/fg_session=([^;]+)/)?.[1];
+        return token ? { 'Authorization': `Bearer ${token}` } : {};
+    }
+
+    async function loadRoutines() {
+        const res = await fetch(`/api/users/${state.me.userId}/routines`, { headers: authHeaders() });
+        const data = await res.json();
+        renderRoutines(data.routines || []);
+    }
+
+    function renderRoutines(routines) {
+        if (!routines.length) {
+            $('routines-tbody').innerHTML = '<tr><td colspan="8" class="py-4 text-center text-on-surface-variant">No routines detected yet.</td></tr>';
+            return;
+        }
+        $('routines-tbody').innerHTML = routines.map(r => `<tr>
+            <td class="py-2 pr-3">${esc(r.placeName)}</td>
+            <td class="py-2 pr-3 capitalize">${r.kind}</td>
+            <td class="py-2 pr-3">${DAYS[r.dayOfWeek]}</td>
+            <td class="py-2 pr-3">${minuteToTime(r.expectedMinute)}</td>
+            <td class="py-2 pr-3">${r.toleranceMinutes}m</td>
+            <td class="py-2 pr-3 text-xs">${r.source === 'manual' ? 'Manual' : 'Auto'}</td>
+            <td class="py-2 pr-3"><input type="checkbox" ${r.active ? 'checked' : ''} data-rid="${r.id}" class="rt-active"></td>
+            <td class="py-2"><button data-rid="${r.id}" class="rt-del text-error text-xs hover:underline">Delete</button></td>
+        </tr>`).join('');
+
+        for (const cb of $('routines-tbody').querySelectorAll('.rt-active')) {
+            cb.addEventListener('change', async () => {
+                await fetch(`/api/routines/${cb.dataset.rid}`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                    body: JSON.stringify({ active: cb.checked }),
+                });
+            });
+        }
+        for (const btn of $('routines-tbody').querySelectorAll('.rt-del')) {
+            btn.addEventListener('click', async () => {
+                await fetch(`/api/routines/${btn.dataset.rid}`, { method: 'DELETE', headers: authHeaders() });
+                loadRoutines();
+            });
+        }
+    }
+
+    async function loadPrefs() {
+        const toggle = $('routines-enabled-toggle');
+        const config = $('routines-config');
+        const quietStart = $('quiet-start');
+        const quietEnd = $('quiet-end');
+        if (!toggle) return;
+        const res = await fetch('/api/users/me/routine-prefs', { headers: authHeaders() });
+        const prefs = await res.json();
+        toggle.checked = prefs.routinesEnabled;
+        config.classList.toggle('hidden', !prefs.routinesEnabled);
+        if (prefs.quietStart != null) quietStart.value = minuteToTime(prefs.quietStart);
+        if (prefs.quietEnd != null) quietEnd.value = minuteToTime(prefs.quietEnd);
+    }
+
+    async function savePrefs() {
+        const toggle = $('routines-enabled-toggle');
+        const quietStart = $('quiet-start');
+        const quietEnd = $('quiet-end');
+        const body = { routinesEnabled: toggle.checked };
+        body.quietStart = quietStart.value ? timeToMinute(quietStart.value) : null;
+        body.quietEnd = quietEnd.value ? timeToMinute(quietEnd.value) : null;
+        await fetch('/api/users/me/routine-prefs', {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify(body),
+        });
+    }
+
+    const rToggle = $('routines-enabled-toggle');
+    if (rToggle) {
+        const rConfig = $('routines-config');
+        rToggle.addEventListener('change', () => {
+            rConfig.classList.toggle('hidden', !rToggle.checked);
+            savePrefs();
+        });
+        $('quiet-start')?.addEventListener('change', savePrefs);
+        $('quiet-end')?.addEventListener('change', savePrefs);
+
+        if (state.places) {
+            const ps = $('routine-place');
+            if (ps) ps.innerHTML = '<option value="">Select place...</option>' +
+                state.places.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+        }
+
+        $('add-routine-btn')?.addEventListener('click', () => $('add-routine-form')?.classList.toggle('hidden'));
+        $('cancel-routine-btn')?.addEventListener('click', () => $('add-routine-form')?.classList.add('hidden'));
+        $('routine-tolerance')?.addEventListener('input', function () { $('tol-val').textContent = this.value; });
+
+        $('save-routine-btn')?.addEventListener('click', async () => {
+            const days = [...document.querySelectorAll('.routine-day:checked')].map(cb => Number(cb.value));
+            if (!days.length || !$('routine-place')?.value || !$('routine-time')?.value) return;
+            await fetch('/api/users/me/routines', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                body: JSON.stringify({
+                    placeId: Number($('routine-place').value),
+                    kind: $('routine-kind').value,
+                    daysOfWeek: days,
+                    expectedMinute: timeToMinute($('routine-time').value),
+                    toleranceMinutes: Number($('routine-tolerance')?.value || 15),
+                }),
+            });
+            $('add-routine-form')?.classList.add('hidden');
+            loadRoutines();
+        });
+
+        loadPrefs();
+        loadRoutines();
+    }
 })();

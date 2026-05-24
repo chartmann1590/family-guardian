@@ -211,6 +211,17 @@ class LocationService : Service() {
                 is GuardianEvent.CrashPending -> {
                     if (ev.userId != selfId) Alerts.showCrashPending(applicationContext, ev)
                 }
+                is GuardianEvent.RoutineDeviation -> {
+                    if (ev.userId != selfId) {
+                        Alerts.showRoutineDeviation(
+                            context = applicationContext,
+                            userId = ev.userId,
+                            displayName = ev.displayName,
+                            placeName = ev.placeName,
+                            kind = ev.kind,
+                        )
+                    }
+                }
                 is GuardianEvent.GeofenceEnter -> {
                     if (ev.userId != selfId) {
                         Alerts.showGeofence(

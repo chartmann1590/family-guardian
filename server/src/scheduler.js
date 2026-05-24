@@ -2,12 +2,15 @@
 // sweep. setInterval is fine for self-hosted single-process deployments.
 
 import { evaluateOfflineSweep } from './alerts.js';
+import { mineRoutines, evaluateRoutineSweep } from './routines.js';
 import { publish } from './hub.js';
 
 const OFFLINE_SWEEP_INTERVAL_MS = 60_000;
 const PAUSE_SWEEP_INTERVAL_MS = 60_000;
+const ROUTINE_SWEEP_INTERVAL_MS = 60_000;
 const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1_000;
+const MINE_COOLDOWN_MS = 6 * 60 * 60 * 1_000;
 
 function expirePauses(db) {
     const now = Date.now();
@@ -50,6 +53,44 @@ export function startScheduler(db, log) {
     };
     const pauseHandle = setInterval(pauseTick, PAUSE_SWEEP_INTERVAL_MS);
     if (pauseHandle.unref) pauseHandle.unref();
+
+    let lastMineTime = 0;
+    const mineTick = () => {
+        const now = Date.now();
+        if (now - lastMineTime < MINE_COOLDOWN_MS) return;
+        try {
+            const result = mineRoutines(db);
+            lastMineTime = now;
+            log?.info?.(result, 'routine_mine_complete');
+        } catch (err) {
+            log?.warn?.({ err: err.message }, 'routine_mine_failed');
+        }
+    };
+
+    const scheduleNextMine = () => {
+        const now = new Date();
+        const next = new Date(now);
+        next.setHours(3, 0, 0, 0);
+        if (next <= now) next.setDate(next.getDate() + 1);
+        const delay = next - now;
+        const handle = setTimeout(() => {
+            mineTick();
+            scheduleNextMine();
+        }, delay);
+        if (handle.unref) handle.unref();
+    };
+    scheduleNextMine();
+    mineTick();
+
+    const routineSweepTick = () => {
+        try {
+            evaluateRoutineSweep(db);
+        } catch (err) {
+            log?.warn?.({ err: err.message }, 'routine_sweep_failed');
+        }
+    };
+    const routineSweepHandle = setInterval(routineSweepTick, ROUTINE_SWEEP_INTERVAL_MS);
+    if (routineSweepHandle.unref) routineSweepHandle.unref();
 
     const cleanupTick = () => {
         const cutoff = Date.now() - RETENTION_MS;

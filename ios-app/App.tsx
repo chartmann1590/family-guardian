@@ -7,7 +7,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as TaskManager from 'expo-task-manager';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Vibration } from 'react-native';
+import { Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, Vibration } from 'react-native';
 import MapView, { Circle, Marker, Polyline } from 'react-native-maps';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
@@ -17,6 +17,17 @@ type Place = { id: number; circleId: number; name: string; address?: string | nu
 type Message = { id: number; circleId?: number; userId: number; displayName?: string; body?: string; createdAt: number; reactions?: { emoji: string; userIds: number[] }[]; attachmentKind?: string; attachmentUrl?: string; attachmentMime?: string; attachmentBytes?: number; attachmentDurationMs?: number; readers?: { userId: number; readAt: number }[] };
 type AlertEvent = { id: number; userId: number; displayName?: string; circleId: number; type: string; value?: number; createdAt: number };
 type PlaceSubscription = { id: number; userId: number; placeId: number; memberId: number | null; placeName?: string; memberName?: string; onEnter: boolean; onExit: boolean; quietStart?: number | null; quietEnd?: number | null };
+type Routine = {
+  id: number; userId: number; circleId: number; placeId: number; placeName: string;
+  kind: string; dayOfWeek: number; expectedMinute: number; toleranceMinutes: number;
+  sampleCount: number; confidence: number; source: string; active: boolean;
+  createdAt: number; updatedAt: number;
+};
+type RoutinePrefs = { routinesEnabled: boolean; quietStart: number | null; quietEnd: number | null };
+type ExpectedArrival = {
+  userId: number; displayName: string; photoUrl: string | null;
+  placeId: number; placeName: string; kind: string; expectedMinute: number; expectedAt: number;
+};
 type LocationPoint = { id: number; lat: number; lng: number; recordedAt: number; activity?: string; speedMps?: number };
 type Tab = 'map' | 'members' | 'chat' | 'places' | 'alerts' | 'more';
 
@@ -260,6 +271,23 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const wsUrl = session.serverUrl.replace(/^http/, 'ws').replace(/\/$/, '');
+    const ws = new WebSocket(`${wsUrl}/ws?token=${session.token}`);
+    ws.onmessage = (e) => {
+      let msg: any;
+      try { msg = JSON.parse(e.data); } catch { return; }
+      if (msg.type === 'routine_deviation') {
+        const kindLabel = msg.kind === 'missed_arrival' ? "didn't arrive at" : msg.kind === 'overstay' ? 'stayed too long at' : 'deviated from';
+        Notifications.scheduleNotificationAsync({
+          content: { title: 'Routine deviation', body: `${msg.displayName} ${kindLabel} ${msg.placeName}`, sound: true },
+          trigger: null,
+        });
+      }
+    };
+    return () => { ws.close(); };
+  }, [session]);
+
   async function startSharing() {
     if (sharing) {
       await Location.stopLocationUpdatesAsync(LOCATION_TASK).catch(() => {});
@@ -479,6 +507,7 @@ function MoreTab({ session, onLogout, onRefresh }: any) {
   const [views, setViews] = useState<any[]>([]);
   const [readReceiptsEnabled, setReadReceiptsEnabled] = useState(session.readReceiptsEnabled || false);
   const [crashDetectionEnabled, setCrashDetectionEnabled] = useState(session.crashDetectionEnabled || false);
+  const [routinesEnabled, setRoutinesEnabled] = useState(true);
   const RESOURCE_LABELS: Record<string, string> = { history: 'Location history', visits: 'Visits', trips: 'Trips', member_page: 'Profile page' };
   useEffect(() => {
     api<{ pausedUntil: number | null }>(session, '/api/users/me/pause')
@@ -489,6 +518,9 @@ function MoreTab({ session, onLogout, onRefresh }: any) {
       .catch(() => {});
     api<any>(session, '/api/users/me')
       .then((d) => { if (d.readReceiptsEnabled != null) setReadReceiptsEnabled(d.readReceiptsEnabled); if (d.crashDetectionEnabled != null) setCrashDetectionEnabled(d.crashDetectionEnabled); })
+      .catch(() => {});
+    api<RoutinePrefs>(session, '/api/users/me/routine-prefs')
+      .then((d) => { if (d.routinesEnabled != null) setRoutinesEnabled(d.routinesEnabled); })
       .catch(() => {});
   }, [session]);
   const isPaused = !!(pauseUntil && pauseUntil > Date.now());
@@ -548,6 +580,16 @@ function MoreTab({ session, onLogout, onRefresh }: any) {
           session.crashDetectionEnabled = next;
         } catch (e: any) { Alert.alert('Failed', e.message); }
       }}><Text>{crashDetectionEnabled ? '✅ Enabled' : '◻️ Disabled'}</Text></Pressable>
+    </View>
+    <View style={{ padding: 16, borderBottomWidth: 1, borderColor: '#e5e7eb' }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={{ fontWeight: '600' }}>Smart routines</Text>
+        <Switch value={routinesEnabled} onValueChange={async (v) => {
+          setRoutinesEnabled(v);
+          await api(session, '/api/users/me/routine-prefs', { method: 'PATCH', body: JSON.stringify({ routinesEnabled: v }) });
+        }} />
+      </View>
+      <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>Get notified when family deviates from usual patterns</Text>
     </View>
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Who viewed your history</Text>
