@@ -29,6 +29,30 @@ type ExpectedArrival = {
   placeId: number; placeName: string; kind: string; expectedMinute: number; expectedAt: number;
 };
 type LocationPoint = { id: number; lat: number; lng: number; recordedAt: number; activity?: string; speedMps?: number };
+type MemberHealth = {
+  userId: number;
+  displayName: string;
+  photoUrl: string | null;
+  batteryPct: number | null;
+  lastFixAt: number | null;
+  staleMinutes: number | null;
+  activity: string | null;
+  paused: boolean;
+  pausedUntil: number | null;
+  nextRoutine: { kind: string; placeName: string; expectedMinute: number } | null;
+  drivingScore: number | null;
+  checkinStatus: string | null;
+  checkinAt: number | null;
+};
+type TimelineItem = {
+  kind: string;
+  at: number;
+  payload: Record<string, any>;
+};
+type TimelineResponse = { items: TimelineItem[]; cursor: number | null };
+type PlaceAnalyticsMember = { userId: number; displayName: string; visitCount: number; totalDwellMs: number; lastVisitAt: number | null; avgDwellMs: number | null; longestDwellMs: number | null };
+type WeekOverWeek = { lastWeekCount: number; prevWeekCount: number; deltaPct: number };
+type PlaceAnalytics = { placeId: number; placeName: string; days: number; perMember: PlaceAnalyticsMember[]; weekOverWeek: WeekOverWeek };
 type Tab = 'map' | 'members' | 'chat' | 'places' | 'alerts' | 'more';
 
 const LOCATION_TASK = 'family-guardian-background-location';
@@ -207,6 +231,8 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
   const [crashState, setCrashState] = useState<{ id: number; expiresAt: number } | null>(null);
   const recentSpeedsRef = useRef<number[]>([]);
   const lastFixTimeRef = useRef<number>(0);
+  const [health, setHealth] = useState<MemberHealth[]>([]);
+  const healthDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function isProbablyDriving(): boolean {
     const speeds = recentSpeedsRef.current;
@@ -224,7 +250,14 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
     setMembers(m.members); setPlaces(p.places);
   }, [session]);
 
-  useEffect(() => { load().catch((e) => Alert.alert('Load failed', e.message)); }, [load]);
+  const loadHealth = useCallback(async () => {
+    try {
+      const data = await api<{ members: MemberHealth[] }>(session, `/api/circles/${session.circleId}/health`);
+      setHealth(data.members);
+    } catch {}
+  }, [session]);
+
+  useEffect(() => { load().catch((e) => Alert.alert('Load failed', e.message)); loadHealth().catch(() => {}); }, [load]);
 
   useEffect(() => {
     if (!session.crashDetectionEnabled || crashState) return;
@@ -284,6 +317,10 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
           trigger: null,
         });
       }
+      if (['location_update', 'check_in', 'pause_changed', 'sos_active', 'sos_resolved', 'routine_deviation'].includes(msg.type)) {
+        if (healthDebounceRef.current) clearTimeout(healthDebounceRef.current);
+        healthDebounceRef.current = setTimeout(() => { loadHealth().catch(() => {}); }, 2000);
+      }
     };
     return () => { ws.close(); };
   }, [session]);
@@ -320,7 +357,7 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
   async function logout() { await SecureStore.deleteItemAsync(TOKEN_KEY); await AsyncStorage.removeItem(SESSION_KEY); await Location.stopLocationUpdatesAsync(LOCATION_TASK).catch(() => {}); onLogout(); }
 
   return <SafeAreaView style={styles.app}><View style={styles.header}><View><Text style={styles.eyebrow}>{session.displayName}</Text><Text style={styles.title}>Family Guardian</Text></View></View>
-    {tab === 'map' && <MapTab members={members} places={places} mapRef={mapRef} onMember={setSelectedMember} onShare={startSharing} sharing={sharing} onSos={sendSos} onCheckIn={checkIn} />}
+    {tab === 'map' && <MapTab members={members} places={places} mapRef={mapRef} onMember={setSelectedMember} onShare={startSharing} sharing={sharing} onSos={sendSos} onCheckIn={checkIn} health={health} />}
     {tab === 'members' && <MembersTab session={session} members={members} selected={selectedMember} setSelected={setSelectedMember} history={history} setHistory={setHistory} />}
     {tab === 'chat' && <ChatTab session={session} messages={messages} setMessages={setMessages} loadMessages={loadMessages} typingUsers={typingUsers} readQueueRef={readQueueRef} readTimerRef={readTimerRef} />}
     {tab === 'places' && <PlacesTab session={session} places={places} setPlaces={setPlaces} />}
@@ -331,17 +368,48 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
   </SafeAreaView>;
 }
 
-function MapTab({ members, places, mapRef, onMember, onShare, sharing, onSos, onCheckIn }: any) {
+function HealthStrip({ health }: { health: MemberHealth[] }) {
+  if (health.length === 0) return null;
+  function getInitials(name: string) {
+    return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  }
+  function statusColor(m: MemberHealth) {
+    if (m.paused) return '#76777d';
+    if (m.staleMinutes == null) return '#76777d';
+    if (m.staleMinutes < 5) return '#006c49';
+    if (m.staleMinutes < 30) return '#F57F17';
+    return '#ba1a1a';
+  }
+  return <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 64, paddingHorizontal: 14, paddingVertical: 6 }}>
+    <View style={{ flexDirection: 'row', gap: 8 }}>
+      {health.map((m) => <View key={m.userId} style={{ backgroundColor: 'white', borderRadius: 999, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, gap: 6, shadowColor: '#071b24', shadowOpacity: .06, shadowRadius: 6, elevation: 2 }}>
+        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#dff2e9', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: '#006c49' }}>{getInitials(m.displayName)}</Text>
+        </View>
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: statusColor(m) }} />
+        <Text style={{ fontSize: 13, fontWeight: '700', color: '#061b16' }} numberOfLines={1}>{m.displayName.split(' ')[0]}</Text>
+        {m.batteryPct != null && <Text style={{ fontSize: 11, color: '#66737f' }}>{m.batteryPct}%</Text>}
+        {m.drivingScore != null && <View style={{ backgroundColor: m.drivingScore >= 80 ? '#dff2e9' : m.drivingScore >= 60 ? '#FFF8E1' : '#FFEBEE', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999 }}>
+          <Text style={{ fontSize: 10, fontWeight: '800', color: m.drivingScore >= 80 ? '#006c49' : m.drivingScore >= 60 ? '#F57F17' : '#ba1a1a' }}>{m.drivingScore}</Text>
+        </View>}
+      </View>)}
+    </View>
+  </ScrollView>;
+}
+
+function MapTab({ members, places, mapRef, onMember, onShare, sharing, onSos, onCheckIn, health }: any) {
   const first = members.find((m: Member) => m.lat && m.lng);
-  return <View style={styles.flex}><MapView ref={mapRef} style={styles.map} initialRegion={{ latitude: first?.lat || 37.7749, longitude: first?.lng || -122.4194, latitudeDelta: 0.08, longitudeDelta: 0.08 }}>{places.map((p: Place) => <Circle key={p.id} center={{ latitude: p.lat, longitude: p.lng }} radius={p.radiusM} strokeColor="#006c49" fillColor="rgba(0,108,73,.10)" />)}{members.filter((m: Member) => m.lat && m.lng).map((m: Member) => <Marker key={m.userId} coordinate={{ latitude: m.lat!, longitude: m.lng! }} title={m.displayName + (m.paused ? ' (paused)' : '')} description={m.paused ? `Paused${m.pausedUntil ? ' until ' + formatPauseUntil(m.pausedUntil) : ''}` : rel(m.recordedAt)} pinColor={m.paused ? 'gray' : 'red'} opacity={m.paused ? 0.7 : 1} onPress={() => onMember(m)} />)}</MapView><View style={styles.floating}><Text style={styles.cardTitle}>{members.length} members</Text><View style={styles.row}><Pressable style={styles.primaryButton} onPress={onShare}><Text style={styles.buttonText}>{sharing ? 'Stop GPS' : 'Share GPS'}</Text></Pressable><Pressable style={styles.dangerButton} onPress={onSos}><Text style={styles.buttonText}>SOS</Text></Pressable></View><View style={styles.row}><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('safe_home')}><Text>Safe home</Text></Pressable><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('heading_home')}><Text>Heading home</Text></Pressable></View></View></View>;
+  return <View style={styles.flex}><HealthStrip health={health} /><MapView ref={mapRef} style={styles.map} initialRegion={{ latitude: first?.lat || 37.7749, longitude: first?.lng || -122.4194, latitudeDelta: 0.08, longitudeDelta: 0.08 }}>{places.map((p: Place) => <Circle key={p.id} center={{ latitude: p.lat, longitude: p.lng }} radius={p.radiusM} strokeColor="#006c49" fillColor="rgba(0,108,73,.10)" />)}{members.filter((m: Member) => m.lat && m.lng).map((m: Member) => <Marker key={m.userId} coordinate={{ latitude: m.lat!, longitude: m.lng! }} title={m.displayName + (m.paused ? ' (paused)' : '')} description={m.paused ? `Paused${m.pausedUntil ? ' until ' + formatPauseUntil(m.pausedUntil) : ''}` : rel(m.recordedAt)} pinColor={m.paused ? 'gray' : 'red'} opacity={m.paused ? 0.7 : 1} onPress={() => onMember(m)} />)}</MapView><View style={styles.floating}><Text style={styles.cardTitle}>{members.length} members</Text><View style={styles.row}><Pressable style={styles.primaryButton} onPress={onShare}><Text style={styles.buttonText}>{sharing ? 'Stop GPS' : 'Share GPS'}</Text></Pressable><Pressable style={styles.dangerButton} onPress={onSos}><Text style={styles.buttonText}>SOS</Text></Pressable></View><View style={styles.row}><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('safe_home')}><Text>Safe home</Text></Pressable><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('heading_home')}><Text>Heading home</Text></Pressable></View></View></View>;
 }
 function MembersTab({ session, members, selected, setSelected, history, setHistory }: any) {
   const [ds, setDs] = useState<any>(null);
   const [dsDays, setDsDays] = useState(7);
-  async function open(m: Member) { setSelected(m); setDs(null); const to = Date.now(); const from = to - 86400000 * 7; const data = await api<{ points: LocationPoint[] }>(session, `/api/circles/${session.circleId}/members/${m.userId}/history?from=${from}&to=${to}&limit=500`); setHistory(data.points); loadDs(m.userId, 7); }
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  async function open(m: Member) { setSelected(m); setDs(null); setTimeline([]); setTimelineLoading(true); const to = Date.now(); const from = to - 86400000 * 7; const data = await api<{ points: LocationPoint[] }>(session, `/api/circles/${session.circleId}/members/${m.userId}/history?from=${from}&to=${to}&limit=500`); setHistory(data.points); loadDs(m.userId, 7); try { const tl = await api<TimelineResponse>(session, `/api/circles/${session.circleId}/members/${m.userId}/timeline?days=7`); setTimeline(tl.items); } catch {} setTimelineLoading(false); }
   async function loadDs(uid: number, days: number) { try { setDsDays(days); const d = await api<any>(session, `/api/users/${uid}/driving-score?days=${days}`); setDs(d); } catch { setDs(null); } }
   const scoreColor = ds?.score == null ? '#76777d' : ds.score >= 80 ? '#2E7D32' : ds.score >= 60 ? '#F57F17' : '#C62828';
-  return <ScrollView style={styles.content}>{members.map((m: Member) => <Pressable key={m.userId} style={styles.card} onPress={() => open(m)}><Text style={styles.cardTitle}>{m.displayName}</Text>{m.paused ? <Text style={[styles.meta, { color: '#943700' }]}>⏸ Paused{m.pausedUntil ? ` until ${formatPauseUntil(m.pausedUntil)}` : ''}</Text> : <Text style={styles.meta}>{m.address || (m.lat ? `${m.lat.toFixed(4)}, ${m.lng?.toFixed(4)}` : 'No location yet')}</Text>}<Text style={styles.meta}>{rel(m.recordedAt)} {m.batteryPct != null ? `· ${m.batteryPct}%` : ''}</Text></Pressable>)}{selected && <View style={styles.card}><Text style={styles.cardTitle}>Driving Safety</Text>{ds?.score == null ? <Text style={styles.meta}>Not enough driving data.</Text> : <><Text style={{ fontSize: 40, fontWeight: '900', color: scoreColor }}>{Math.round(ds.score)}<Text style={{ fontSize: 14, color: '#76777d' }}> / 100</Text></Text><View style={{ flexDirection: 'row', gap: 8, marginVertical: 8 }}>{[7,30,90].map(d => <Pressable key={d} onPress={() => loadDs(selected.userId, d)} style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 50, backgroundColor: dsDays === d ? '#006c49' : '#e5eeff' }}><Text style={{ color: dsDays === d ? '#fff' : '#45464d', fontWeight: '600', fontSize: 12 }}>{d}d</Text></Pressable>)}</View><Text style={styles.meta}>Hard brakes: {ds.hardBrakeCount} ({ds.hardBrakePer100Km?.toFixed(1)} / 100km)</Text><Text style={styles.meta}>Speeding: {ds.speedingMinutes?.toFixed(1)} min</Text><Text style={styles.meta}>Night driving: {((ds.nightDrivingPct ?? 0) * 100).toFixed(0)}%</Text></>}</View>}{selected && <View style={styles.card}><Text style={styles.cardTitle}>{selected.displayName} history</Text><Text style={styles.meta}>{history.length} points in the last 7 days</Text>{history.length > 1 && <MapView style={styles.smallMap} initialRegion={{ latitude: history[0].lat, longitude: history[0].lng, latitudeDelta: .08, longitudeDelta: .08 }}><Polyline coordinates={history.map((p: LocationPoint) => ({ latitude: p.lat, longitude: p.lng }))} strokeColor="#006c49" strokeWidth={4} /></MapView>}</View>}</ScrollView>;
+  return <ScrollView style={styles.content}>{members.map((m: Member) => <Pressable key={m.userId} style={styles.card} onPress={() => open(m)}><Text style={styles.cardTitle}>{m.displayName}</Text>{m.paused ? <Text style={[styles.meta, { color: '#943700' }]}>⏸ Paused{m.pausedUntil ? ` until ${formatPauseUntil(m.pausedUntil)}` : ''}</Text> : <Text style={styles.meta}>{m.address || (m.lat ? `${m.lat.toFixed(4)}, ${m.lng?.toFixed(4)}` : 'No location yet')}</Text>}<Text style={styles.meta}>{rel(m.recordedAt)} {m.batteryPct != null ? `· ${m.batteryPct}%` : ''}</Text></Pressable>)}{selected && <View style={styles.card}><Text style={styles.cardTitle}>Recent Activity</Text>{timelineLoading ? <Text style={styles.meta}>Loading...</Text> : timeline.length === 0 ? <Text style={styles.meta}>No recent activity.</Text> : timeline.slice(0, 20).map((item, idx) => { const kindColor = item.kind.startsWith('visit') ? '#006c49' : item.kind.startsWith('trip') ? '#7B1FA2' : item.kind === 'check_in' ? '#006c49' : item.kind === 'routine_deviation' ? '#F57F17' : '#ba1a1a'; const kindIcon = item.kind.startsWith('visit') ? '📍' : item.kind.startsWith('trip') ? '🚗' : item.kind === 'check_in' ? '✅' : item.kind === 'routine_deviation' ? '⚠️' : '🚨'; const kindLabel = item.kind === 'visit_started' ? 'Arrived at place' : item.kind === 'visit_ended' ? 'Left place' : item.kind === 'trip_started' ? 'Started trip' : item.kind === 'trip_ended' ? 'Ended trip' : item.kind === 'check_in' ? 'Checked in' : item.kind === 'routine_deviation' ? 'Routine deviation' : item.kind; return <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 }}><Text style={{ fontSize: 16 }}>{kindIcon}</Text><View style={{ flex: 1 }}><Text style={{ fontSize: 13, fontWeight: '600', color: kindColor }}>{kindLabel}</Text>{item.payload.placeName && <Text style={styles.meta}>{item.payload.placeName}</Text>}</View><Text style={styles.meta}>{rel(item.at)}</Text></View>; })}</View>}{selected && <View style={styles.card}><Text style={styles.cardTitle}>Driving Safety</Text>{ds?.score == null ? <Text style={styles.meta}>Not enough driving data.</Text> : <><Text style={{ fontSize: 40, fontWeight: '900', color: scoreColor }}>{Math.round(ds.score)}<Text style={{ fontSize: 14, color: '#76777d' }}> / 100</Text></Text><View style={{ flexDirection: 'row', gap: 8, marginVertical: 8 }}>{[7,30,90].map(d => <Pressable key={d} onPress={() => loadDs(selected.userId, d)} style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 50, backgroundColor: dsDays === d ? '#006c49' : '#e5eeff' }}><Text style={{ color: dsDays === d ? '#fff' : '#45464d', fontWeight: '600', fontSize: 12 }}>{d}d</Text></Pressable>)}</View><Text style={styles.meta}>Hard brakes: {ds.hardBrakeCount} ({ds.hardBrakePer100Km?.toFixed(1)} / 100km)</Text><Text style={styles.meta}>Speeding: {ds.speedingMinutes?.toFixed(1)} min</Text><Text style={styles.meta}>Night driving: {((ds.nightDrivingPct ?? 0) * 100).toFixed(0)}%</Text></>}</View>}{selected && <View style={styles.card}><Text style={styles.cardTitle}>{selected.displayName} history</Text><Text style={styles.meta}>{history.length} points in the last 7 days</Text>{history.length > 1 && <MapView style={styles.smallMap} initialRegion={{ latitude: history[0].lat, longitude: history[0].lng, latitudeDelta: .08, longitudeDelta: .08 }}><Polyline coordinates={history.map((p: LocationPoint) => ({ latitude: p.lat, longitude: p.lng }))} strokeColor="#006c49" strokeWidth={4} /></MapView>}</View>}</ScrollView>;
 }
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 function ChatTab({ session, messages, setMessages, loadMessages, typingUsers, readQueueRef, readTimerRef }: any) {
@@ -454,6 +522,9 @@ function PlacesTab({ session, places, setPlaces }: any) {
   const [members, setMembers] = useState<Member[]>([]);
   const [subs, setSubs] = useState<PlaceSubscription[]>([]);
   const [expandedPlace, setExpandedPlace] = useState<number | null>(null);
+  const [analyticsPlace, setAnalyticsPlace] = useState<number | null>(null);
+  const [analyticsData, setAnalyticsData] = useState<PlaceAnalytics | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   useEffect(() => {
     api<{ members: Member[] }>(session, `/api/circles/${session.circleId}/members`)
@@ -461,6 +532,17 @@ function PlacesTab({ session, places, setPlaces }: any) {
     api<{ subscriptions: PlaceSubscription[] }>(session, `/api/circles/${session.circleId}/place-subscriptions`)
       .then((d) => setSubs(d.subscriptions || [])).catch(() => {});
   }, [session]);
+
+  async function loadAnalytics(placeId: number) {
+    if (analyticsPlace === placeId && analyticsData) { setAnalyticsPlace(null); setAnalyticsData(null); return; }
+    setAnalyticsLoading(true);
+    setAnalyticsPlace(placeId);
+    try {
+      const data = await api<PlaceAnalytics>(session, `/api/places/${placeId}/analytics?days=30`);
+      setAnalyticsData(data);
+    } catch { setAnalyticsData(null); }
+    setAnalyticsLoading(false);
+  }
 
   async function toggleSub(placeId: number, memberId: number | null, onEnter: boolean, onExit: boolean) {
     if (!onEnter && !onExit) {
@@ -481,14 +563,30 @@ function PlacesTab({ session, places, setPlaces }: any) {
   }
 
   async function save() { const p = await api<Place>(session, `/api/circles/${session.circleId}/places`, { method: 'POST', body: JSON.stringify({ name, lat: Number(lat), lng: Number(lng), radiusM: Number(radius), alertsOnEnter: true, alertsOnExit: true }) }); setPlaces((cur: Place[]) => [...cur, p]); setName(''); }
+  function fmtMs(ms: number) {
+    const mins = Math.round(ms / 60000);
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    const rem = mins % 60;
+    return rem > 0 ? `${hrs}h ${rem}m` : `${hrs}h`;
+  }
+  function pctColor(pct: number) {
+    if (pct > 10) return '#006c49';
+    if (pct >= -10) return '#F57F17';
+    return '#ba1a1a';
+  }
   return <ScrollView style={styles.content}><View style={styles.card}><TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Place name" /><TextInput style={styles.input} value={lat} onChangeText={setLat} placeholder="Latitude" keyboardType="decimal-pad" /><TextInput style={styles.input} value={lng} onChangeText={setLng} placeholder="Longitude" keyboardType="decimal-pad" /><TextInput style={styles.input} value={radius} onChangeText={setRadius} placeholder="Radius meters" keyboardType="decimal-pad" /><Pressable style={styles.primaryButton} onPress={save}><Text style={styles.buttonText}>Save place</Text></Pressable></View>{places.map((p: Place) => {
     const placeSubs = subs.filter((s) => s.placeId === p.id);
     const isExpanded = expandedPlace === p.id;
+    const isAnalyticsOpen = analyticsPlace === p.id;
     const allTargets: { id: number | null; name: string }[] = [{ id: null, name: 'Anyone' }, ...members.map((m) => ({ id: m.userId, name: m.displayName }))];
     return <View style={styles.card} key={p.id}>
       <Text style={styles.cardTitle}>{p.name}</Text>
       <Text style={styles.meta}>{p.address || `${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}`} · {Math.round(p.radiusM)}m</Text>
-      <Pressable style={[styles.secondaryButton, { marginTop: 4 }]} onPress={() => setExpandedPlace(isExpanded ? null : p.id)}><Text>{isExpanded ? 'Hide notifications' : '🔔 Notify me when…'}</Text></Pressable>
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+        <Pressable style={[styles.secondaryButton, { flex: 1 }]} onPress={() => setExpandedPlace(isExpanded ? null : p.id)}><Text>{isExpanded ? 'Hide notifications' : '🔔 Notify me when…'}</Text></Pressable>
+        <Pressable style={[styles.secondaryButton, { flex: 1 }]} onPress={() => loadAnalytics(p.id)}><Text>{isAnalyticsOpen ? 'Hide analytics' : '📊 Analytics'}</Text></Pressable>
+      </View>
       {isExpanded && allTargets.map((t) => {
         const sub = placeSubs.find((s) => s.memberId === t.id);
         return <View key={t.id ?? 'any'} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 }}>
@@ -497,6 +595,29 @@ function PlacesTab({ session, places, setPlaces }: any) {
           <Pressable style={[styles.chip, sub?.onExit && styles.chipActive]} onPress={() => toggleSub(p.id, t.id, sub?.onEnter ?? false, !(sub?.onExit ?? false))}><Text>{sub?.onExit ? '✅' : '◻️'} Leaves</Text></Pressable>
         </View>;
       })}
+      {isAnalyticsOpen && (analyticsLoading ? <Text style={styles.meta}>Loading analytics...</Text> : analyticsData ? <View style={{ marginTop: 8, gap: 8 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#dff2e9', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 }}>
+          <Text style={{ fontWeight: '700', color: '#006c49' }}>Week over week</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 13, color: '#66737f' }}>{analyticsData.weekOverWeek.prevWeekCount} → {analyticsData.weekOverWeek.lastWeekCount} visits</Text>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: pctColor(analyticsData.weekOverWeek.deltaPct) }}>
+              {analyticsData.weekOverWeek.deltaPct >= 0 ? '+' : ''}{analyticsData.weekOverWeek.deltaPct.toFixed(0)}%
+            </Text>
+          </View>
+        </View>
+        <Text style={{ fontWeight: '600', fontSize: 13 }}>Last 30 days per member</Text>
+        {analyticsData.perMember.map((m) => <View key={m.userId} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderColor: '#e5e7eb' }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontWeight: '600' }}>{m.displayName}</Text>
+            <Text style={{ fontSize: 12, color: '#66737f' }}>{m.visitCount} visits · {fmtMs(m.totalDwellMs)} total</Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            {m.avgDwellMs != null && <Text style={{ fontSize: 12, color: '#66737f' }}>avg {fmtMs(m.avgDwellMs)}</Text>}
+            {m.lastVisitAt != null && <Text style={{ fontSize: 11, color: '#66737f' }}>last {rel(m.lastVisitAt)}</Text>}
+          </View>
+        </View>)}
+        {analyticsData.perMember.length === 0 && <Text style={styles.meta}>No visits in the last 30 days.</Text>}
+      </View> : <Text style={styles.meta}>Analytics unavailable.</Text>)}
     </View>;
   })}</ScrollView>;
 }

@@ -7,6 +7,20 @@ import { onLocationFix as tripsOnFix } from '../trips.js';
 import { evaluateAlerts } from '../alerts.js';
 import { enqueueGeocode, getCachedLabel } from '../geocoder.js';
 import { logView } from '../audit.js';
+import { computeDrivingScore } from '../drivingScore.js';
+
+const SCORE_CACHE_TTL_MS = 5 * 60_000;
+const scoreCache = new Map();
+
+function cachedDrivingScore(db, userId) {
+    const now = Date.now();
+    const cached = scoreCache.get(userId);
+    if (cached && now - cached.computedAt < SCORE_CACHE_TTL_MS) return cached.score;
+    const sinceMs = now - 7 * 86_400_000;
+    const result = computeDrivingScore(db, userId, sinceMs);
+    scoreCache.set(userId, { score: result.score, computedAt: now });
+    return result.score;
+}
 
 const ACTIVITY_VALUES = ['still', 'walking', 'running', 'cycling', 'driving', 'unknown'];
 
@@ -239,5 +253,89 @@ export default async function locationRoutes(fastify, { db }) {
 
         logView(db, req.auth.userId, targetUserId, 'history');
         return { points: rows };
+    });
+
+    fastify.get('/api/circles/:id/health', {
+        preHandler: requireAuth(db),
+        config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+    }, async (req, reply) => {
+        const circleId = Number(req.params.id);
+        if (!Number.isInteger(circleId)) return reply.code(400).send({ error: 'invalid_circle' });
+
+        const membership = db
+            .prepare('SELECT 1 FROM circle_members WHERE circle_id = ? AND user_id = ?')
+            .get(circleId, req.auth.userId);
+        if (!membership) return reply.code(403).send({ error: 'not_a_member' });
+
+        const now = Date.now();
+
+        const memberRows = db.prepare(
+            `SELECT u.id AS userId, u.display_name AS displayName, u.photo_path AS photoPath,
+                    u.paused_until AS pausedUntil,
+                    l.battery_pct AS batteryPct,
+                    l.recorded_at AS recordedAt,
+                    l.activity AS activity,
+                    l.lng AS lng
+             FROM circle_members cm
+             JOIN users u ON u.id = cm.user_id
+             LEFT JOIN locations l ON l.user_id = u.id
+             WHERE cm.circle_id = ?
+             ORDER BY cm.role DESC, u.display_name COLLATE NOCASE ASC`
+        ).all(circleId);
+
+        const latestCheckins = db.prepare(
+            `SELECT ci.user_id AS userId, ci.status, ci.created_at AS createdAt
+             FROM check_ins ci
+             INNER JOIN (
+                 SELECT user_id, MAX(created_at) AS max_at
+                 FROM check_ins
+                 WHERE circle_id = ?
+                 GROUP BY user_id
+             ) latest ON ci.user_id = latest.user_id AND ci.created_at = latest.max_at
+             WHERE ci.circle_id = ?`
+        ).all(circleId, circleId);
+        const checkinMap = new Map(latestCheckins.map(c => [c.userId, c]));
+
+        const members = memberRows.map((m) => {
+            const paused = !!(m.pausedUntil && m.pausedUntil > now);
+            const lastFixAt = m.recordedAt ?? null;
+            const staleMinutes = lastFixAt != null ? Math.round((now - lastFixAt) / 60000) : null;
+
+            const lng = m.lng ?? 0;
+            const utcOffsetH = Math.round(lng / 15);
+            const localMs = now + utcOffsetH * 3600000;
+            const localDow = new Date(localMs).getUTCDay();
+
+            const nextRoutine = db.prepare(`
+                SELECT r.kind, r.expected_minute, p.name AS placeName
+                FROM routines r
+                JOIN places p ON p.id = r.place_id
+                WHERE r.user_id = ? AND r.active = 1 AND r.day_of_week = ?
+                ORDER BY r.expected_minute ASC
+                LIMIT 1
+            `).get(m.userId, localDow);
+
+            const checkin = checkinMap.get(m.userId);
+
+            return {
+                userId: m.userId,
+                displayName: m.displayName,
+                photoUrl: m.photoPath ? `/api/users/${m.userId}/photo` : null,
+                batteryPct: m.batteryPct ?? null,
+                lastFixAt,
+                staleMinutes,
+                activity: m.activity ?? null,
+                paused,
+                pausedUntil: paused ? m.pausedUntil : null,
+                nextRoutine: nextRoutine
+                    ? { kind: nextRoutine.kind, placeName: nextRoutine.placeName, expectedMinute: nextRoutine.expected_minute }
+                    : null,
+                drivingScore: cachedDrivingScore(db, m.userId),
+                checkinStatus: checkin?.status ?? null,
+                checkinAt: checkin?.createdAt ?? null,
+            };
+        });
+
+        return { members };
     });
 }

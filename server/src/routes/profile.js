@@ -6,6 +6,7 @@ import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { requireAuth } from '../auth.js';
 import { isFcmDisabled } from '../fcm.js';
+import { buildDigest, persistDigest } from '../digest.js';
 
 const UpdateMeBody = z.object({
     displayName: z.string().min(1).max(64).optional(),
@@ -169,6 +170,39 @@ export default async function profileRoutes(fastify, { db, uploadsDir }) {
                     : null,
             }));
         return { views: rows };
+    });
+
+    fastify.get('/api/circles/:circleId/digest/current', { preHandler: requireAuth(db) }, async (req, reply) => {
+        const circleId = Number(req.params.circleId);
+        if (!Number.isInteger(circleId)) return reply.code(400).send({ error: 'invalid_circle' });
+        const m = db.prepare('SELECT 1 FROM circle_members WHERE circle_id = ? AND user_id = ?')
+            .get(circleId, req.auth.userId);
+        if (!m) return reply.code(403).send({ error: 'not_a_member' });
+        const row = db.prepare('SELECT summary_json, week_start, week_end FROM digest_snapshots WHERE circle_id = ? ORDER BY week_start DESC LIMIT 1')
+            .get(circleId);
+        if (!row) return { digest: null };
+        return { digest: { ...JSON.parse(row.summary_json), weekStart: row.week_start, weekEnd: row.week_end } };
+    });
+
+    fastify.get('/api/circles/:circleId/digest', { preHandler: requireAuth(db) }, async (req, reply) => {
+        const circleId = Number(req.params.circleId);
+        if (!Number.isInteger(circleId)) return reply.code(400).send({ error: 'invalid_circle' });
+        const m = db.prepare('SELECT 1 FROM circle_members WHERE circle_id = ? AND user_id = ?')
+            .get(circleId, req.auth.userId);
+        if (!m) return reply.code(403).send({ error: 'not_a_member' });
+        const since = Number(req.query.since) || 0;
+        const rows = db.prepare('SELECT summary_json, week_start, week_end FROM digest_snapshots WHERE circle_id = ? AND week_start >= ? ORDER BY week_start DESC LIMIT 12')
+            .all(circleId, since);
+        return { digests: rows.map(r => ({ ...JSON.parse(r.summary_json), weekStart: r.week_start, weekEnd: r.week_end })) };
+    });
+
+    fastify.patch('/api/users/me/digest-prefs', { preHandler: requireAuth(db) }, async (req, reply) => {
+        const enabled = req.body?.enabled;
+        if (typeof enabled !== 'boolean') return reply.code(400).send({ error: 'invalid_body' });
+        db.prepare('INSERT OR IGNORE INTO alert_prefs (user_id) VALUES (?)').run(req.auth.userId);
+        db.prepare('UPDATE alert_prefs SET weekly_digest_enabled = ? WHERE user_id = ?')
+            .run(enabled ? 1 : 0, req.auth.userId);
+        return { enabled };
     });
 
     fastify.post('/api/users/me/fcm-token', { preHandler: requireAuth(db) }, async (req, reply) => {

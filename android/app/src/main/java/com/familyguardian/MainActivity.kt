@@ -18,17 +18,22 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.familyguardian.data.Prefs
+import com.familyguardian.events.Alerts
+import com.familyguardian.events.EventBus
+import com.familyguardian.events.GuardianEvent
 import com.familyguardian.location.LocationService
 import com.familyguardian.ui.AlertHistoryScreen
 import com.familyguardian.ui.AlertSettingsScreen
 import com.familyguardian.ui.AboutScreen
 import com.familyguardian.ui.ChatScreen
+import com.familyguardian.ui.DigestScreen
 import com.familyguardian.ui.FamilyGuardianTheme
 import com.familyguardian.ui.MapScreen
 import com.familyguardian.ui.MemberDetailScreen
 import com.familyguardian.ui.MemberInfo
 import com.familyguardian.ui.OnboardingScreen
 import com.familyguardian.ui.PlacesScreen
+import com.familyguardian.ui.PlaceAnalyticsScreen
 import com.familyguardian.ui.RoutinesScreen
 import com.familyguardian.ui.ServerConfigScreen
 import com.familyguardian.ui.TripsScreen
@@ -80,6 +85,14 @@ private fun AppRoot() {
 
     val start = startRoute.value ?: return
 
+    LaunchedEffect(Unit) {
+        EventBus.events.collect { event ->
+            if (event is GuardianEvent.DigestReady) {
+                Alerts.showDigest(context.applicationContext)
+            }
+        }
+    }
+
     NavHost(navController = nav, startDestination = start) {
         composable("login") {
             ServerConfigScreen(
@@ -120,10 +133,23 @@ private fun AppRoot() {
                 onOpenAbout = { nav.navigate("about") },
                 onOpenViewLog = { nav.navigate("view-log") },
                 onOpenAccount = { nav.navigate("account") },
+                onOpenDigest = { nav.navigate("digest") },
             )
         }
         composable("places") {
-            PlacesScreen(onBack = { nav.popBackStack() })
+            PlacesScreen(
+                onBack = { nav.popBackStack() },
+                onOpenAnalytics = { placeId, placeName ->
+                    nav.navigate("place-analytics/$placeId/${java.net.URLEncoder.encode(placeName, "UTF-8")}")
+                },
+            )
+        }
+        composable("place-analytics/{placeId}/{placeName}") { backStackEntry ->
+            val placeId = backStackEntry.arguments?.getString("placeId")?.toIntOrNull() ?: return@composable Box {}
+            val placeName = java.net.URLDecoder.decode(
+                backStackEntry.arguments?.getString("placeName") ?: "Place", "UTF-8"
+            )
+            PlaceAnalyticsScreen(placeId = placeId, placeName = placeName, onBack = { nav.popBackStack() })
         }
         composable("chat") {
             ChatScreen(onBack = { nav.popBackStack() })
@@ -187,6 +213,11 @@ private fun AppRoot() {
         }
         composable("routines") {
             RoutinesScreen(onBack = { nav.popBackStack() })
+        }
+        composable("digest") {
+            val circleId by prefs.circleId.collectAsStateWithLifecycle(initialValue = null)
+            val cid = circleId ?: return@composable Box {}
+            DigestScreen(circleId = cid, onBack = { nav.popBackStack() })
         }
     }
 }

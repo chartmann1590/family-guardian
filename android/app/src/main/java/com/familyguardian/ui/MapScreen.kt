@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Build
@@ -23,7 +22,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatteryStd
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
@@ -61,6 +65,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -73,7 +79,11 @@ import com.familyguardian.data.PauseRepo
 import com.familyguardian.data.PauseState
 import com.familyguardian.data.Prefs
 import com.familyguardian.data.SosEvent
+import com.familyguardian.data.HealthRepo
+import com.familyguardian.data.MemberHealth
 import com.familyguardian.data.SosRepo
+import com.familyguardian.data.DigestData
+import com.familyguardian.data.DigestRepo
 import com.familyguardian.events.EventBus
 import com.familyguardian.events.EventStreamClient
 import com.familyguardian.events.GuardianEvent
@@ -143,16 +153,16 @@ private class InitialsMarker(
     active: Boolean,
 ) : Marker(mapView) {
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
+        color = android.graphics.Color.WHITE
         style = Paint.Style.FILL
     }
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (active) Color.parseColor("#006c49") else Color.parseColor("#76777d")
+        color = if (active) android.graphics.Color.parseColor("#006c49") else android.graphics.Color.parseColor("#76777d")
         style = Paint.Style.STROKE
         strokeWidth = 6f
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#0b1c30")
+        color = android.graphics.Color.parseColor("#0b1c30")
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         textSize = 32f
         textAlign = Paint.Align.CENTER
@@ -183,6 +193,7 @@ fun MapScreen(
     onOpenAbout: () -> Unit = {},
     onOpenViewLog: () -> Unit = {},
     onOpenAccount: () -> Unit = {},
+    onOpenDigest: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val appCtx = context.applicationContext
@@ -213,6 +224,11 @@ fun MapScreen(
     var pauseState by remember { mutableStateOf(PauseState()) }
     var pauseMessage by remember { mutableStateOf<String?>(null) }
     var overflowMenuOpen by remember { mutableStateOf(false) }
+    var healthMembers by remember { mutableStateOf<List<MemberHealth>>(emptyList()) }
+    var healthRefresh by remember { mutableStateOf(0) }
+    val healthRepo = remember { HealthRepo(prefs) }
+    val digestRepo = remember { DigestRepo(prefs) }
+    var digestSummary by remember { mutableStateOf<DigestData?>(null) }
     val wsState by EventBus.wsState.collectAsStateWithLifecycle(
         initialValue = EventStreamClient.ConnectionState.DISCONNECTED
     )
@@ -369,6 +385,17 @@ fun MapScreen(
         try {
             pauseState = pauseRepo.current()
         } catch (_: Throwable) { }
+        try {
+            val snap = prefs.snapshot()
+            val cid = snap.circleId
+            if (cid != null) digestSummary = digestRepo.getCurrent(cid)
+        } catch (_: Throwable) { }
+    }
+
+    LaunchedEffect(healthRefresh) {
+        val snap = prefs.snapshot()
+        val cid = snap.circleId ?: return@LaunchedEffect
+        healthMembers = healthRepo.fetch(cid.toInt())
     }
 
     LaunchedEffect(members) {
@@ -423,6 +450,16 @@ fun MapScreen(
                             )
                         } else m
                     }
+                }
+                if (event is GuardianEvent.LocationUpdate ||
+                    event is GuardianEvent.CheckIn ||
+                    event is GuardianEvent.PauseChanged ||
+                    event is GuardianEvent.SosActive ||
+                    event is GuardianEvent.SosResolved ||
+                    event is GuardianEvent.RoutineDeviation ||
+                    event is GuardianEvent.DrivingScoreUpdated
+                ) {
+                    healthRefresh++
                 }
             }
         }
@@ -676,6 +713,7 @@ fun MapScreen(
                 },
             )
 
+            Column(modifier = Modifier.fillMaxWidth()) {
             Surface(
                 modifier = Modifier.fillMaxWidth().padding(12.dp),
                 shape = RoundedCornerShape(16.dp),
@@ -795,6 +833,18 @@ fun MapScreen(
                         }
                     }
                 }
+            }
+            if (healthMembers.isNotEmpty()) {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp),
+                ) {
+                    items(healthMembers, key = { it.userId }) { member ->
+                        HealthPill(member)
+                    }
+                }
+            }
             }
 
             Column(
@@ -959,6 +1009,31 @@ fun MapScreen(
                     }
                 }
 
+                digestSummary?.let { dig ->
+                    Card(
+                        onClick = onOpenDigest,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                "This week",
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "${dig.totalKm} km total · ${dig.totalAlerts} alerts · ${dig.perMember.size} members",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                        }
+                    }
+                }
+
                 Button(
                     onClick = { if (!checkinInFlight) checkinDialogOpen = true },
                     modifier = Modifier.fillMaxWidth().size(width = 280.dp, height = 48.dp),
@@ -1058,4 +1133,72 @@ private suspend fun oneShotFix(context: Context): Triple<Double, Double, Double?
             }
         }
     } catch (t: Throwable) { null }
+}
+
+@Composable
+private fun HealthPill(member: MemberHealth) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(68.dp),
+    ) {
+        Box {
+            Avatar(
+                displayName = member.displayName,
+                photoPath = member.photoUrl,
+                size = 32.dp,
+            )
+            val dotColor = when {
+                member.paused -> Color.Gray
+                member.staleMinutes == null -> Color.Gray
+                member.staleMinutes <= 5 -> Color(0xFF22C55E)
+                member.staleMinutes <= 30 -> Color(0xFFF59E0B)
+                else -> Color(0xFFEF4444)
+            }
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 2.dp, y = 2.dp)
+                    .size(10.dp),
+                shape = CircleShape,
+                color = dotColor,
+            ) {}
+        }
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            member.displayName,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            member.batteryPct?.let { pct ->
+                Icon(
+                    Icons.Filled.BatteryStd,
+                    contentDescription = null,
+                    modifier = Modifier.size(10.dp),
+                )
+                Text("$pct%", style = MaterialTheme.typography.labelSmall)
+            }
+            member.drivingScore?.let { score ->
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = when {
+                        score >= 80 -> Color(0xFF22C55E)
+                        score >= 60 -> Color(0xFFF59E0B)
+                        else -> Color(0xFFEF4444)
+                    },
+                ) {
+                    Text(
+                        "$score",
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
+                        color = Color.White,
+                    )
+                }
+            }
+        }
+    }
 }

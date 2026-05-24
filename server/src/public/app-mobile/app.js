@@ -21,6 +21,8 @@
   const places = new Map((state.places || []).map((p) => [p.id, p]));
   const sosByUser = new Map((state.sosActive || []).map((s) => [s.userId, s]));
   const checkins = new Map((state.latestCheckins || []).map((c) => [c.userId, c]));
+  const healthData = new Map();
+  let healthTimer = null;
   const markers = new Map();
   const placeLayers = new Map();
   let watchId = null;
@@ -101,6 +103,40 @@
     const pts = Array.from(members.values()).filter((m) => m.lat != null && m.lng != null).map((m) => [m.lat, m.lng]);
     if (pts.length === 1) map.setView(pts[0], 14);
     if (pts.length > 1) map.fitBounds(pts, { padding: [50, 80] });
+  }
+  async function fetchHealth() {
+    try {
+      const data = await api.json(`/api/circles/${state.circleId}/health`);
+      healthData.clear();
+      for (const m of data.members || []) healthData.set(m.userId, m);
+      renderHealthStrip();
+    } catch {}
+  }
+  function scheduleHealthRefresh() {
+    if (healthTimer) return;
+    healthTimer = setTimeout(() => { healthTimer = null; fetchHealth(); }, 1000);
+  }
+  function renderHealthStrip() {
+    const strip = $('health-strip-mobile');
+    if (!strip) return;
+    const items = Array.from(healthData.values());
+    if (!items.length) { strip.style.display = 'none'; return; }
+    strip.style.display = 'flex';
+    const sorted = items.sort((a, b) => (a.displayName || '').localeCompare(b.displayName || ''));
+    strip.innerHTML = sorted.map(m => {
+      const paused = m.paused;
+      let dot = '#76777d';
+      if (!paused && m.staleMinutes != null && m.staleMinutes < 5) dot = '#006c49';
+      else if (!paused && m.staleMinutes != null && m.staleMinutes < 30) dot = '#943700';
+      else if (!paused && m.staleMinutes != null) dot = '#ba1a1a';
+      const battery = m.batteryPct != null ? `<span style="font-size:10px">${m.batteryPct}%</span>` : '';
+      const score = m.drivingScore != null ? `<span style="font-size:10px;font-weight:700;color:${m.drivingScore >= 80 ? '#006c49' : m.drivingScore >= 60 ? '#943700' : '#ba1a1a'}">${m.drivingScore}</span>` : '';
+      return `<div class="health-pill" onclick="document.getElementById('member-detail').classList.remove('hidden');document.getElementById('member-detail').innerHTML='<strong>${escapeHtml(m.displayName)}</strong><div class=meta>Loading...</div>'">
+        <div class="avatar" style="width:32px;height:32px;font-size:11px;position:relative">${avatarHtml(m)}<div style="position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;border-radius:50%;background:${dot};border:1.5px solid #fff"></div></div>
+        <span style="font-size:11px;font-weight:600;max-width:48px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(m.displayName)}</span>
+        ${battery}${score}
+      </div>`;
+    }).join('');
   }
   function fmtPauseUntil(ms) {
     if (!ms) return '';
@@ -271,13 +307,13 @@
     ws.onclose = () => { $('ws-state').textContent = 'offline'; setTimeout(connectWs, 3000); };
     ws.onmessage = (msg) => {
       const ev = JSON.parse(msg.data);
-      if (ev.type === 'location_update') { members.set(ev.userId, { ...(members.get(ev.userId) || {}), ...ev }); renderMembers(); }
+      if (ev.type === 'location_update') { members.set(ev.userId, { ...(members.get(ev.userId) || {}), ...ev }); renderMembers(); scheduleHealthRefresh(); }
       if (ev.type === 'location_address') { const m = members.get(ev.userId); if (m) { m.address = ev.address; renderMembers(); } }
       if (ev.type === 'chat_message') addMessage(ev);
-      if (ev.type === 'sos_active') { sosByUser.set(ev.userId, ev); renderMembers(); toast(`SOS active${ev.source === 'crash' ? ' (crash detected)' : ''}: ${ev.displayName || 'Member'}`); hideCrashBanner(); }
-      if (ev.type === 'sos_resolved') { for (const [uid, sos] of sosByUser) if (sos.id === ev.id) sosByUser.delete(uid); renderMembers(); toast('SOS resolved'); hideCrashBanner(); }
+      if (ev.type === 'sos_active') { sosByUser.set(ev.userId, ev); renderMembers(); toast(`SOS active${ev.source === 'crash' ? ' (crash detected)' : ''}: ${ev.displayName || 'Member'}`); hideCrashBanner(); scheduleHealthRefresh(); }
+      if (ev.type === 'sos_resolved') { for (const [uid, sos] of sosByUser) if (sos.id === ev.id) sosByUser.delete(uid); renderMembers(); toast('SOS resolved'); hideCrashBanner(); scheduleHealthRefresh(); }
       if (ev.type === 'crash_pending') { showCrashBanner(`Possible crash detected for ${ev.displayName || 'a member'} — waiting for confirmation…`); }
-      if (ev.type === 'check_in') { checkins.set(ev.userId, ev); toast(`${ev.displayName || 'Member'} checked in`); }
+      if (ev.type === 'check_in') { checkins.set(ev.userId, ev); toast(`${ev.displayName || 'Member'} checked in`); scheduleHealthRefresh(); }
       if (ev.type === 'pause_changed') {
         const existing = members.get(ev.userId) || { userId: ev.userId };
         existing.paused = !!ev.pausedUntil;
@@ -285,6 +321,7 @@
         existing.pauseReason = ev.reason ?? null;
         members.set(ev.userId, existing);
         renderMembers();
+        scheduleHealthRefresh();
         if (ev.userId === state.me.userId) renderPauseStateMobile(ev.pausedUntil);
       }
       if (ev.type && ev.type.includes('alert')) toast(`${ev.displayName || 'Member'}: ${ev.type.replaceAll('_', ' ')}`);
@@ -374,7 +411,7 @@
   api.json('/api/users/me/pause').then((d) => renderPauseStateMobile(d.pausedUntil)).catch(() => {});
 
   for (const p of places.values()) drawPlace(p);
-  renderMembers(); renderPlaces(); fitMap(); connectWs();
+  renderMembers(); renderPlaces(); fitMap(); connectWs(); fetchHealth();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/public/app-mobile/sw.js').catch(() => {});
 })();
 

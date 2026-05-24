@@ -1,6 +1,7 @@
 import { requireAuth } from '../auth.js';
 import { getCachedLabel, enqueueGeocode } from '../geocoder.js';
 import { logView } from '../audit.js';
+import { visitRowToJson } from '../payloads.js';
 
 function assertMember(db, circleId, userId, reply) {
     const m = db
@@ -8,23 +9,6 @@ function assertMember(db, circleId, userId, reply) {
         .get(circleId, userId);
     if (!m) { reply.code(403).send({ error: 'not_a_member' }); return false; }
     return true;
-}
-
-function visitRowToJson(r) {
-    return {
-        id: r.id,
-        userId: r.userId,
-        circleId: r.circleId,
-        placeId: r.placeId,
-        placeName: r.placeName,
-        lat: r.lat,
-        lng: r.lng,
-        label: r.label,
-        startedAt: r.startedAt,
-        endedAt: r.endedAt,
-        durationMs: r.endedAt != null ? r.endedAt - r.startedAt : null,
-        pointCount: r.pointCount,
-    };
 }
 
 function enrichVisitLabels(db, rows) {

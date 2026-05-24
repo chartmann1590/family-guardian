@@ -234,4 +234,8 @@ sealed interface GuardianEvent {
         val expectedMinute: Int,
         val actualMinute: Int? = null,
     ) : GuardianEvent
+
+    @Serializable
+    @SerialName("digest_ready")
+    data class DigestReady(val circleId: Int) : GuardianEvent
 }

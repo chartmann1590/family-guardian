@@ -306,4 +306,18 @@ object Alerts {
 
     private fun routineDeviationNotifId(userId: Long, placeName: String): Int =
         10_000_000 + ((userId.toInt() * 31 + placeName.hashCode()) and 0xFFFFF)
+
+    fun showDigest(context: Context) {
+        if (!canPostNotifications(context)) return
+        ensureChannels(context)
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notif = NotificationCompat.Builder(context, CHANNEL_NORMAL)
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentTitle("Weekly digest ready")
+            .setContentText("Your family's weekly summary is available.")
+            .setAutoCancel(true)
+            .setContentIntent(openAppIntent(context))
+            .build()
+        nm.notify(11_000_000, notif)
+    }
 }

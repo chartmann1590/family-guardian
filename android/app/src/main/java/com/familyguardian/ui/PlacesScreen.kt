@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -67,7 +68,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlacesScreen(onBack: () -> Unit) {
+fun PlacesScreen(onBack: () -> Unit, onOpenAnalytics: (placeId: Long, placeName: String) -> Unit = { _, _ -> }) {
     val context = LocalContext.current.applicationContext
     val prefs = remember { Prefs(context) }
     val repo = remember { PlacesRepo(prefs) }
@@ -196,6 +197,7 @@ fun PlacesScreen(onBack: () -> Unit) {
                                     }
                                 }
                             },
+                            onAnalytics = { onOpenAnalytics(p.id, p.name) },
                         )
                     }
                 }
@@ -251,6 +253,7 @@ private fun PlaceCard(
     onDelete: () -> Unit,
     onToggleSub: (memberId: Long?, onEnter: Boolean, onExit: Boolean) -> Unit,
     onDeleteSub: (subId: Long) -> Unit,
+    onAnalytics: () -> Unit,
 ) {
     var showSubs by remember { mutableStateOf(false) }
 
@@ -295,6 +298,9 @@ private fun PlaceCard(
                                 contentDescription = "Notifications",
                                 tint = if (subs.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        }
+                        IconButton(onClick = onAnalytics) {
+                            Icon(Icons.Filled.BarChart, contentDescription = "Analytics")
                         }
                         IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "Edit") }
                         IconButton(onClick = onDelete) {

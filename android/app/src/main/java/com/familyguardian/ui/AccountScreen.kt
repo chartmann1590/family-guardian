@@ -48,6 +48,7 @@ import com.familyguardian.data.AccountRepo
 import com.familyguardian.data.ApiClient
 import com.familyguardian.data.AuthRepo
 import com.familyguardian.data.CircleMember
+import com.familyguardian.data.DigestRepo
 import com.familyguardian.data.MembersResponse
 import com.familyguardian.data.Prefs
 import com.familyguardian.location.LocationService
@@ -81,6 +82,7 @@ fun AccountScreen(
     var signedInAs by remember { mutableStateOf<String?>(null) }
     var readReceiptsEnabled by remember { mutableStateOf(false) }
     var crashDetectionEnabled by remember { mutableStateOf(false) }
+    var digestEnabled by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         signedInAs = prefs.snapshot().email
@@ -94,6 +96,11 @@ fun AccountScreen(
                 readReceiptsEnabled = me["readReceiptsEnabled"]?.jsonPrimitive?.booleanOrNull == true
                 crashDetectionEnabled = me["crashDetectionEnabled"]?.jsonPrimitive?.booleanOrNull == true
             }
+        } catch (_: Exception) {}
+        try {
+            val digestRepo = DigestRepo(prefs)
+            val prefs2 = digestRepo.getPrefs()
+            if (prefs2 != null) digestEnabled = prefs2.enabled
         } catch (_: Exception) {}
     }
 
@@ -253,6 +260,31 @@ fun AccountScreen(
                     shape = RoundedCornerShape(12.dp),
                 ) {
                     Text("Open routines")
+                }
+            }
+
+            item {
+                Text("Weekly digest", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Receive a weekly summary of your family's activity including total distance, busiest places, and member stats.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val digestRepo = DigestRepo(prefs)
+                                val result = digestRepo.setEnabled(!digestEnabled)
+                                if (result != null) digestEnabled = result.enabled
+                            } catch (_: Exception) {}
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text(if (digestEnabled) "Weekly digest: ON" else "Weekly digest: OFF")
                 }
             }
 

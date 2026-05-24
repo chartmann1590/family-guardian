@@ -187,35 +187,33 @@
                     </div>
                 </div>
 
-                <!-- Visits + Trips tabs -->
                 <div class="bg-surface-container-lowest rounded-xl shadow-[0_4px_12px_rgba(15,23,42,0.08)] p-4 flex flex-col gap-3">
-                    <div class="flex gap-2">
-                        <button id="tab-visits" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-secondary text-on-secondary">Visits</button>
-                        <button id="tab-trips" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high">Trips</button>
+                    <div class="flex gap-2 flex-wrap">
+                        <button id="timeline-tab" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-secondary text-on-secondary">Timeline</button>
+                        <button id="visits-tab" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high">Visits</button>
+                        <button id="trips-tab" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high">Trips</button>
+                        <button id="routines-tab" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high">Routines</button>
+                        <button id="route-tab" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high">Route</button>
                     </div>
-                    <div id="visits-trips-list" class="flex flex-col gap-2 max-h-72 overflow-y-auto">
+                    <div id="timeline-content" class="flex flex-col gap-2 max-h-96 overflow-y-auto">
                         <p class="font-label-md text-label-md text-on-surface-variant">Loading…</p>
                     </div>
-                </div>
-
-                <!-- Routines we've noticed -->
-                <div class="bg-surface-container-lowest rounded-xl shadow-[0_4px_12px_rgba(15,23,42,0.08)] p-4 flex flex-col gap-2">
-                    <h3 class="font-headline-md text-headline-md text-primary">Routines we've noticed</h3>
-                    <div id="member-routines" class="flex flex-col gap-1">
-                        <p class="text-sm text-on-surface-variant">Loading...</p>
+                    <div id="visits-content" class="hidden flex flex-col gap-2 max-h-96 overflow-y-auto"></div>
+                    <div id="trips-content" class="hidden flex flex-col gap-2 max-h-96 overflow-y-auto"></div>
+                    <div id="routines-content" class="hidden flex flex-col gap-2">
+                        <div id="member-routines" class="flex flex-col gap-1">
+                            <p class="text-sm text-on-surface-variant">Loading...</p>
+                        </div>
                     </div>
-                </div>
-
-                <!-- Time Range Selector -->
-                <div class="bg-surface-container-lowest rounded-xl shadow-[0_4px_12px_rgba(15,23,42,0.08)] p-4 flex flex-col gap-2">
-                    <h3 class="font-headline-md text-headline-md text-primary">Route History</h3>
-                    <div class="flex flex-wrap gap-2" id="range-buttons">
-                        <button data-range="1h" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high">1 Hour</button>
-                        <button data-range="24h" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-secondary text-on-secondary">24 Hours</button>
-                        <button data-range="7d" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high">7 Days</button>
-                        <button data-range="30d" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high">30 Days</button>
+                    <div id="route-content" class="hidden flex flex-col gap-2">
+                        <div class="flex flex-wrap gap-2" id="range-buttons">
+                            <button data-range="1h" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high">1 Hour</button>
+                            <button data-range="24h" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-secondary text-on-secondary">24 Hours</button>
+                            <button data-range="7d" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high">7 Days</button>
+                            <button data-range="30d" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high">30 Days</button>
+                        </div>
+                        <p id="point-count" class="font-label-md text-label-md text-on-surface-variant mt-1"></p>
                     </div>
-                    <p id="point-count" class="font-label-md text-label-md text-on-surface-variant mt-1"></p>
                 </div>
             </div>
 

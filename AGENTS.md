@@ -26,12 +26,14 @@ server/             Fastify + SQLite backend (Docker image)
     db.js           SQLite + auto-run migrations from src/migrations/
     auth.js         argon2id hashing, session tokens, requireAuth hook
     hub.js          in-memory WebSocket pub/sub keyed by circleId
-    routes/         auth, circles, locations, messages, places, placeSubscriptions, reactions, pause, sos, checkins, visits, trips, alertPrefs, routines, ws, web, account, download, drivingScore, crashEvents
+    routes/         auth, circles, locations, messages, places, placeSubscriptions, reactions, pause, sos, checkins, visits, trips, alertPrefs, routines, ws, web, account, download, drivingScore, crashEvents, timeline
     views/          login.html, dashboard.html, chat.html, places.html, member.html, settings.html (custom {{KEY}} template engine)
     public/app.js   dashboard client (Leaflet + WebSocket)
     public/chat.js  chat client with reactions, attachments, typing, read receipts
     public/places.js places client with subscription UI
-    migrations/     001_init.sql through 023_routine_alerts.sql
+    public/member.js member detail with timeline, driving score, visits, trips
+    public/settings.js settings client with digest toggle
+    migrations/     001_init.sql through 024_digest_snapshots.sql
 
 android/            Kotlin + Jetpack Compose app (minSdk 26, compileSdk 34)
   app/src/main/java/com/familyguardian/
@@ -47,7 +49,7 @@ website/            Static HTML design prototypes (Tailwind CDN) — reference o
 - **SQLite** via better-sqlite3. WAL mode + foreign keys on by default. DB file is auto-created at `DATABASE_PATH` (default `/data/guardian.db` inside container).
 - **Migrations** auto-run on startup from `server/src/migrations/`. New SQL files are applied in lexical order, tracked in `_migrations` table. Each runs in a transaction.
 - **Auth**: first user = bootstrap admin (auto-creates a circle). After that, joining requires an invite code. Passwords hashed with argon2id. Sessions are opaque random tokens stored in `sessions` table, served as `fg_session` HttpOnly cookie (web) or `Authorization: Bearer` header (Android).
-- **WebSocket** at `/ws?token=...` or uses cookie auth. Subscribes to one circle; receives `location_update`, `geofence_enter`, `geofence_exit`, `chat_message`, `reaction_added`, `reaction_removed`, `sos_active`, `sos_resolved`, `check_in`, `pause_changed`, `visit_end`, `trip_end`, `chat_typing`, `message_read`, `crash_pending`, `driving_score_updated`, `routine_deviation` JSON events. `sos_active` now carries an optional `source: 'user' | 'crash'` field — set to `'crash'` when the SOS originated from automatic crash detection.
+- **WebSocket** at `/ws?token=...` or uses cookie auth. Subscribes to one circle; receives `location_update`, `geofence_enter`, `geofence_exit`, `chat_message`, `reaction_added`, `reaction_removed`, `sos_active`, `sos_resolved`, `check_in`, `pause_changed`, `visit_end`, `trip_end`, `chat_typing`, `message_read`, `crash_pending`, `driving_score_updated`, `routine_deviation`, `digest_ready` JSON events. `sos_active` now carries an optional `source: 'user' | 'crash'` field — set to `'crash'` when the SOS originated from automatic crash detection.
 - **Views**: minimal `{{KEY}}` / `{{{KEY}}}` replacement (HTML-escaped / raw). Templates cached in memory after first read.
 - **Docker**: multi-stage Node 20 Alpine build. `argon2` needs `python3 make g++ libstdc++` at install time (already in Dockerfile). Volume at `/data` for the SQLite file.
 

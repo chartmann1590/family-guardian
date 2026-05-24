@@ -31,6 +31,87 @@
             .replace(/'/g, '&#39;');
     }
 
+    function formatDuration(ms) {
+        if (!ms || ms <= 0) return '0m';
+        const mins = Math.floor(ms / 60000);
+        const hrs = Math.floor(mins / 60);
+        const m = mins % 60;
+        if (hrs > 0) return `${hrs}h ${m}m`;
+        return `${m}m`;
+    }
+
+    async function loadAnalytics(placeId, days) {
+        const panel = document.querySelector(`[data-analytics-panel="${placeId}"]`);
+        if (!panel) return;
+        panel.innerHTML = '<div class="text-sm text-on-surface-variant py-2">Loading\u2026</div>';
+        try {
+            const res = await fetch(`/api/places/${placeId}/analytics?days=${days}`, { credentials: 'same-origin' });
+            if (!res.ok) throw new Error(res.status);
+            const data = await res.json();
+            renderAnalytics(panel, data, days);
+        } catch {
+            panel.innerHTML = '<div class="text-sm text-error py-2">Failed to load analytics.</div>';
+        }
+    }
+
+    function renderAnalytics(panel, data, currentDays) {
+        const maxVisits = Math.max(1, ...data.perMember.map((m) => m.visitCount));
+
+        let html = '<div class="flex gap-1 mb-3">';
+        for (const d of [7, 30, 90]) {
+            const active = d === currentDays;
+            html += `<button class="analytics-days px-3 py-1 rounded text-xs font-semibold ${active ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}" data-days="${d}">${d}d</button>`;
+        }
+        html += '</div>';
+
+        if (data.weekOverWeek) {
+            const wow = data.weekOverWeek;
+            const up = wow.deltaPct >= 0;
+            const arrow = up ? 'trending_up' : 'trending_down';
+            const color = up ? 'text-secondary' : 'text-error';
+            html += `
+                <div class="flex items-center gap-2 text-sm mb-3 px-3 py-2 rounded-lg bg-surface-container-low">
+                    <span class="material-symbols-outlined text-base ${color}">${arrow}</span>
+                    <span class="${color} font-semibold">${Math.abs(wow.deltaPct).toFixed(1)}%</span>
+                    <span class="text-on-surface-variant">week over week (${wow.lastWeekCount} vs ${wow.prevWeekCount} visits)</span>
+                </div>`;
+        }
+
+        if (data.perMember.length === 0) {
+            html += '<div class="text-sm text-on-surface-variant py-2">No visits in this period.</div>';
+        } else {
+            html += '<div class="flex flex-col gap-3">';
+            for (const m of data.perMember) {
+                const barWidth = Math.round((m.visitCount / maxVisits) * 100);
+                html += `
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-primary text-xs font-bold shrink-0">${escapeHtml(m.displayName.charAt(0).toUpperCase())}</div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between text-sm">
+                                <span class="font-medium text-on-surface truncate">${escapeHtml(m.displayName)}</span>
+                                <span class="text-on-surface-variant shrink-0 ml-2">${m.visitCount} visits</span>
+                            </div>
+                            <div class="w-full bg-surface-container rounded-full h-1.5 mt-1">
+                                <div class="bg-secondary h-1.5 rounded-full" style="width:${barWidth}%"></div>
+                            </div>
+                            <div class="flex gap-3 text-xs text-on-surface-variant mt-1">
+                                <span>Avg: ${formatDuration(m.avgDwellMs)}</span>
+                                <span>Longest: ${formatDuration(m.longestDwellMs)}</span>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+            html += '</div>';
+        }
+
+        panel.innerHTML = html;
+        panel.querySelectorAll('.analytics-days').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                loadAnalytics(data.placeId, parseInt(btn.dataset.days));
+            });
+        });
+    }
+
     function colorFor(place) {
         return place.alertsOnEnter || place.alertsOnExit ? '#006c49' : '#76777d';
     }
@@ -108,6 +189,7 @@
                     </div>
                 </div>
                 <div class="flex gap-2">
+                    <button class="analytics-toggle text-on-surface-variant hover:text-secondary" title="Analytics"><span class="material-symbols-outlined">analytics</span></button>
                     <button class="notify-toggle text-on-surface-variant hover:text-secondary" title="Notifications"><span class="material-symbols-outlined">notifications</span></button>
                     <button class="edit text-on-surface-variant hover:text-primary" title="Edit"><span class="material-symbols-outlined">edit</span></button>
                     <button class="del text-on-surface-variant hover:text-error" title="Delete"><span class="material-symbols-outlined">delete</span></button>
@@ -175,6 +257,22 @@
             notifyPanel.classList.toggle('hidden');
         });
         li.appendChild(notifyPanel);
+
+        const analyticsPanel = document.createElement('div');
+        analyticsPanel.className = 'hidden border-t border-outline-variant/20 bg-surface-container-lowest px-5 py-4';
+        analyticsPanel.dataset.analyticsPanel = p.id;
+
+        card.querySelector('.analytics-toggle').addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const opening = analyticsPanel.classList.contains('hidden');
+            analyticsPanel.classList.toggle('hidden');
+            if (opening && !analyticsPanel.dataset.loaded) {
+                analyticsPanel.dataset.loaded = '1';
+                loadAnalytics(p.id, 30);
+            }
+        });
+        li.appendChild(analyticsPanel);
+
         return li;
     }
 

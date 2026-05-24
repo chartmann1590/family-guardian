@@ -266,6 +266,12 @@ interface GuardianApi {
     ): retrofit2.Response<Unit>
 
     @GET
+    suspend fun getTimeline(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): TimelineResponse
+
+    @GET
     suspend fun getDrivingScore(
         @Url url: String,
         @Header("Authorization") auth: String,
@@ -328,6 +334,37 @@ interface GuardianApi {
         @Header("Authorization") auth: String,
         @Body body: okhttp3.RequestBody,
     ): CreateRoutineResponse
+
+    @GET
+    suspend fun getHealth(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): HealthResponse
+
+    @GET
+    suspend fun getPlaceAnalytics(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): PlaceAnalytics
+
+    @GET
+    suspend fun getCurrentDigest(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): DigestResponse
+
+    @GET
+    suspend fun getDigestPrefs(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): DigestPrefsResponse
+
+    @PATCH
+    suspend fun setDigestPrefs(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: okhttp3.RequestBody,
+    ): DigestPrefsResponse
 }
 
 object ApiClient {

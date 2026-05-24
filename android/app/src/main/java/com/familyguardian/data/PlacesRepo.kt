@@ -32,4 +32,11 @@ class PlacesRepo(private val prefs: Prefs) {
         val url = ApiClient.endpoint(server, "/api/places/$id")
         ApiClient.api.deletePlace(url, auth)
     }
+
+    suspend fun getAnalytics(placeId: Int, days: Int = 30): PlaceAnalytics? {
+        val snap = prefs.snapshot()
+        val server = snap.serverUrl ?: return null
+        val url = ApiClient.endpoint(server, "/api/places/$placeId/analytics?days=$days")
+        return try { ApiClient.api.getPlaceAnalytics(url, "Bearer ${snap.token}") } catch (_: Exception) { null }
+    }
 }

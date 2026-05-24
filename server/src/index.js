@@ -32,6 +32,7 @@ import downloadRoutes from './routes/download.js';
 import drivingScoreRoutes from './routes/drivingScore.js';
 import crashEventRoutes from './routes/crashEvents.js';
 import routineRoutes from './routes/routines.js';
+import timelineRoutes from './routes/timeline.js';
 import { loadOpenVisits } from './visits.js';
 import { loadOpenTrips } from './trips.js';
 import { startScheduler } from './scheduler.js';
@@ -107,6 +108,7 @@ await fastify.register(webRoutes, { db });
 await fastify.register(accountRoutes, { db });
 await fastify.register(downloadRoutes);
 await fastify.register(drivingScoreRoutes, { db });
+await fastify.register(timelineRoutes, { db });
 await fastify.register(crashEventRoutes, { db });
 await fastify.register(routineRoutes, { db });
 

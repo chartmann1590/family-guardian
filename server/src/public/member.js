@@ -219,15 +219,15 @@
         }
         // Refresh sidebar list whenever the range changes.
         if (activeTab === 'visits') loadVisits();
-        else loadTrips();
+        else if (activeTab === 'trips') loadTrips();
     }
 
-    let activeTab = 'visits';
+    let activeTab = 'timeline';
 
     async function loadVisits() {
         const from = rangeFrom(currentRange);
         const now = Date.now();
-        const list = document.getElementById('visits-trips-list');
+        const list = document.getElementById('visits-content');
         list.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant">Loading…</p>';
         try {
             const res = await fetch(
@@ -263,7 +263,7 @@
     async function loadTrips() {
         const from = rangeFrom(currentRange);
         const now = Date.now();
-        const list = document.getElementById('visits-trips-list');
+        const list = document.getElementById('trips-content');
         list.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant">Loading…</p>';
         // Clear visit pins when switching to trips tab.
         for (const v of visitMarkers) { map.removeLayer(v); }
@@ -318,22 +318,180 @@
         }
     });
 
-    const tabVisits = document.getElementById('tab-visits');
-    const tabTrips = document.getElementById('tab-trips');
-    function selectTab(name) {
-        activeTab = name;
-        if (name === 'visits') {
-            tabVisits.className = 'px-3 py-1.5 rounded-full text-sm font-semibold bg-secondary text-on-secondary';
-            tabTrips.className = 'px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high';
-            loadVisits();
-        } else {
-            tabTrips.className = 'px-3 py-1.5 rounded-full text-sm font-semibold bg-secondary text-on-secondary';
-            tabVisits.className = 'px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high';
-            loadTrips();
+    let timelineCursor = null;
+    let timelineItems = [];
+
+    function timelineColor(kind) {
+        switch (kind) {
+            case 'visit_started': case 'visit_ended': return '#006c49';
+            case 'trip_started': case 'trip_ended': return '#6d28d9';
+            case 'check_in': return '#006c49';
+            case 'routine_deviation': return '#943700';
+            case 'alert': return '#ba1a1a';
+            default: return '#45464d';
         }
     }
-    if (tabVisits) tabVisits.addEventListener('click', () => selectTab('visits'));
-    if (tabTrips) tabTrips.addEventListener('click', () => selectTab('trips'));
+
+    function timelineIcon(kind) {
+        switch (kind) {
+            case 'visit_started': return 'location_on';
+            case 'visit_ended': return 'location_on';
+            case 'trip_started': return 'directions_car';
+            case 'trip_ended': return 'directions_car';
+            case 'check_in': return 'check_circle';
+            case 'routine_deviation': return 'warning';
+            case 'alert': return 'emergency';
+            default: return 'info';
+        }
+    }
+
+    function timelineTitle(item) {
+        const p = item.payload || {};
+        switch (item.kind) {
+            case 'visit_started': return 'Arrived at ' + (p.placeName || p.label || 'location');
+            case 'visit_ended': return 'Left ' + (p.placeName || p.label || 'location');
+            case 'trip_started': return 'Trip started';
+            case 'trip_ended': {
+                const dist = p.distanceM != null ? (window.FgUnits ? window.FgUnits.formatDistance(p.distanceM) : (p.distanceM / 1000).toFixed(1) + ' km') : '';
+                return 'Trip ended' + (dist ? ' \u2014 ' + dist : '');
+            }
+            case 'check_in': return 'Checked in' + (p.placeName ? ' at ' + p.placeName : '');
+            case 'routine_deviation': return 'Routine deviation' + (p.placeName ? ' \u2014 ' + p.placeName : '');
+            case 'alert': return 'Alert' + (p.type ? ': ' + p.type : '');
+            default: return item.kind;
+        }
+    }
+
+    function timelinePayloadInfo(item) {
+        const p = item.payload || {};
+        switch (item.kind) {
+            case 'visit_started': case 'visit_ended': {
+                const parts = [];
+                if (p.durationMs != null && window.FgUnits) parts.push(window.FgUnits.formatDuration(p.durationMs));
+                return parts.join(' \u2022 ');
+            }
+            case 'trip_ended': {
+                const parts = [];
+                if (p.durationMs != null && window.FgUnits) parts.push(window.FgUnits.formatDuration(p.durationMs));
+                if (p.maxSpeedMps != null && window.FgUnits) parts.push('max ' + window.FgUnits.formatSpeed(p.maxSpeedMps));
+                return parts.join(' \u2022 ');
+            }
+            case 'check_in': return p.note || '';
+            case 'routine_deviation': return p.details || '';
+            case 'alert': return p.message || '';
+            default: return '';
+        }
+    }
+
+    function formatTimelineDay(ms) {
+        const d = new Date(ms);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const itemDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        const diff = (today - itemDate) / 86400000;
+        if (diff === 0) return 'Today';
+        if (diff === 1) return 'Yesterday';
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    function renderTimeline() {
+        const container = document.getElementById('timeline-content');
+        if (timelineItems.length === 0) {
+            container.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant">No activity in the last 7 days.</p>';
+            return;
+        }
+        let html = '';
+        let lastDay = '';
+        for (const item of timelineItems) {
+            const day = formatTimelineDay(item.at);
+            if (day !== lastDay) {
+                html += '<p class="font-label-md text-label-md text-on-surface-variant mt-2 first:mt-0">' + esc(day) + '</p>';
+                lastDay = day;
+            }
+            const color = timelineColor(item.kind);
+            const icon = timelineIcon(item.kind);
+            const title = esc(timelineTitle(item));
+            const time = new Date(item.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const info = timelinePayloadInfo(item);
+            html += '<div class="p-2.5 rounded-lg bg-surface-container flex items-start gap-2.5" style="border-left:3px solid ' + color + '">' +
+                '<span class="material-symbols-outlined text-[18px] mt-0.5" style="color:' + color + '">' + icon + '</span>' +
+                '<div class="min-w-0 flex-1">' +
+                    '<p class="font-status-number text-status-number truncate">' + title + '</p>' +
+                    '<div class="flex items-center gap-2">' +
+                        '<span class="font-label-md text-label-md text-on-surface-variant">' + esc(time) + '</span>' +
+                        (info ? '<span class="font-label-md text-label-md text-on-surface-variant">\u2022 ' + esc(info) + '</span>' : '') +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        }
+        if (timelineCursor != null) {
+            html += '<button id="timeline-load-more" class="px-3 py-1.5 rounded-full text-sm font-semibold bg-surface-container text-on-surface-variant hover:bg-surface-container-high self-start">Load more</button>';
+        }
+        container.innerHTML = html;
+        const loadMoreBtn = document.getElementById('timeline-load-more');
+        if (loadMoreBtn) loadMoreBtn.addEventListener('click', loadTimelineMore);
+    }
+
+    async function loadTimeline() {
+        const container = document.getElementById('timeline-content');
+        timelineItems = [];
+        timelineCursor = null;
+        container.innerHTML = '<p class="font-label-md text-label-md text-on-surface-variant">Loading…</p>';
+        try {
+            const url = '/api/circles/' + state.circleId + '/members/' + state.targetUserId + '/timeline?days=7&limit=100';
+            const res = await fetch(url, { credentials: 'same-origin' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            timelineItems = data.items || [];
+            timelineCursor = data.cursor != null ? data.cursor : null;
+            renderTimeline();
+        } catch (err) {
+            container.innerHTML = '<p class="font-label-md text-label-md text-error">Failed: ' + esc(err.message) + '</p>';
+        }
+    }
+
+    async function loadTimelineMore() {
+        const btn = document.getElementById('timeline-load-more');
+        if (btn) btn.textContent = 'Loading…';
+        try {
+            const url = '/api/circles/' + state.circleId + '/members/' + state.targetUserId + '/timeline?days=7&limit=100&before=' + timelineCursor;
+            const res = await fetch(url, { credentials: 'same-origin' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            timelineItems = timelineItems.concat(data.items || []);
+            timelineCursor = data.cursor != null ? data.cursor : null;
+            renderTimeline();
+        } catch (err) {
+            if (btn) btn.textContent = 'Load more';
+        }
+    }
+
+    const TABS = ['timeline', 'visits', 'trips', 'routines', 'route'];
+    const tabButtons = {};
+    const tabContents = {};
+    TABS.forEach(t => {
+        tabButtons[t] = document.getElementById(t + '-tab');
+        tabContents[t] = document.getElementById(t + '-content');
+    });
+
+    function selectTab(name) {
+        activeTab = name;
+        TABS.forEach(t => {
+            const active = t === name;
+            if (tabButtons[t]) {
+                tabButtons[t].className = 'px-3 py-1.5 rounded-full text-sm font-semibold ' +
+                    (active ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high');
+            }
+            if (tabContents[t]) tabContents[t].classList.toggle('hidden', !active);
+        });
+        if (name === 'timeline') loadTimeline();
+        else if (name === 'visits') loadVisits();
+        else if (name === 'trips') loadTrips();
+        else if (name === 'routines') loadMemberRoutines();
+    }
+    TABS.forEach(t => {
+        if (tabButtons[t]) tabButtons[t].addEventListener('click', () => selectTab(t));
+    });
 
     // Boot
     updateHeader();
@@ -344,6 +502,7 @@
     }
 
     loadHistory('24h');
+    selectTab('timeline');
 
     // Driving Safety Score
     let dsRange = 7;

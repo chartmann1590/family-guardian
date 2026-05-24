@@ -23,6 +23,10 @@
     const places = new Map();      // placeId -> { id, name, lat, lng, radiusM }
     const sosByUser = new Map();   // userId -> sos event (active only)
     const checkins = new Map();    // userId -> { status, createdAt }
+    const healthData = new Map();  // userId -> { drivingScore, staleMinutes, ... }
+    let healthFetchTimer = null;
+    let digestData = null;
+    let digestFetchTimer = null;
 
     function initialsAvatar(name) {
         const initials = (name || '?')
@@ -153,6 +157,148 @@
         } catch {}
     }
 
+    async function fetchHealth() {
+        try {
+            const res = await fetch(`/api/circles/${state.circleId}/health`, { credentials: 'same-origin' });
+            const data = await res.json();
+            healthData.clear();
+            for (const m of data.members || []) healthData.set(m.userId, m);
+            renderHealthStrip();
+            renderMemberList();
+        } catch {}
+    }
+
+    function scheduleHealthRefresh() {
+        if (healthFetchTimer) return;
+        healthFetchTimer = setTimeout(() => {
+            healthFetchTimer = null;
+            fetchHealth();
+        }, 1000);
+    }
+
+    async function fetchDigest() {
+        try {
+            const res = await fetch(`/api/circles/${state.circleId}/digest/current`, { credentials: 'same-origin' });
+            const data = await res.json();
+            digestData = data.digest || null;
+            renderDigestCard();
+        } catch {}
+    }
+
+    function scheduleDigestRefresh() {
+        if (digestFetchTimer) return;
+        digestFetchTimer = setTimeout(() => {
+            digestFetchTimer = null;
+            fetchDigest();
+        }, 1000);
+    }
+
+    function renderDigestCard() {
+        const container = document.getElementById('digest-card');
+        if (!container) return;
+        if (!digestData) { container.classList.add('hidden'); return; }
+        container.classList.remove('hidden');
+
+        function fmtKm(km) {
+            if (km == null) return '\u2014';
+            if (window.FgUnits && window.FgUnits.isImperial()) {
+                const mi = km * 0.621371;
+                return mi < 10 ? mi.toFixed(1) + ' mi' : Math.round(mi) + ' mi';
+            }
+            return km < 10 ? km.toFixed(1) + ' km' : Math.round(km) + ' km';
+        }
+
+        const totalKm = fmtKm(digestData.totalKm);
+        const totalAlerts = digestData.totalAlerts ?? 0;
+        const busiest = digestData.busiestPlace;
+
+        let memberHtml = '';
+        if (digestData.perMember && digestData.perMember.length) {
+            memberHtml = '<div class="mt-2 flex flex-col gap-0.5">' +
+                digestData.perMember.map(m => {
+                    const parts = [];
+                    if (m.km != null) parts.push(fmtKm(m.km));
+                    if (m.alerts) parts.push(m.alerts + ' alert' + (m.alerts !== 1 ? 's' : ''));
+                    const detail = parts.length ? '<span class="text-on-surface-variant ml-1">' + parts.join(' \u00b7 ') + '</span>' : '';
+                    return '<div class="text-xs flex items-center gap-1"><span class="font-medium">' + escapeHtml(m.displayName || '?') + '</span>' + detail + '</div>';
+                }).join('') +
+                '</div>';
+        }
+
+        container.innerHTML =
+            '<div class="px-4 py-2.5 flex items-center justify-between cursor-pointer select-none" id="digest-toggle-header">' +
+                '<div class="flex items-center gap-2">' +
+                    '<span class="material-symbols-outlined text-secondary" style="font-size:18px">summarize</span>' +
+                    '<span class="font-label-md text-label-md text-on-surface font-bold">This week</span>' +
+                '</div>' +
+                '<span class="material-symbols-outlined text-on-surface-variant transition-transform" style="font-size:18px" id="digest-chevron">expand_less</span>' +
+            '</div>' +
+            '<div id="digest-body" class="px-4 pb-3">' +
+                '<div class="flex gap-4 text-xs">' +
+                    '<div class="flex items-center gap-1">' +
+                        '<span class="material-symbols-outlined text-on-surface-variant" style="font-size:14px">straighten</span>' +
+                        '<span class="font-bold text-on-surface">' + escapeHtml(totalKm) + '</span>' +
+                    '</div>' +
+                    '<div class="flex items-center gap-1">' +
+                        '<span class="material-symbols-outlined text-on-surface-variant" style="font-size:14px">notifications_active</span>' +
+                        '<span class="font-bold text-on-surface">' + totalAlerts + '</span>' +
+                    '</div>' +
+                '</div>' +
+                (busiest ? '<div class="flex items-center gap-1 text-xs mt-1"><span class="material-symbols-outlined text-secondary" style="font-size:14px">place</span><span class="font-medium">' + escapeHtml(busiest) + '</span></div>' : '') +
+                memberHtml +
+            '</div>';
+
+        document.getElementById('digest-toggle-header').addEventListener('click', () => {
+            const body = document.getElementById('digest-body');
+            const chevron = document.getElementById('digest-chevron');
+            const hidden = !body.classList.contains('hidden');
+            body.classList.toggle('hidden', hidden);
+            chevron.textContent = hidden ? 'expand_more' : 'expand_less';
+        });
+    }
+
+    function renderHealthStrip() {
+        const strip = document.getElementById('health-strip');
+        if (!strip) return;
+        const items = Array.from(healthData.values());
+        if (!items.length) { strip.classList.add('hidden'); return; }
+        strip.classList.remove('hidden');
+
+        const sorted = items.sort((a, b) => {
+            if (a.userId === state.me.userId) return -1;
+            if (b.userId === state.me.userId) return 1;
+            return (a.displayName || '').localeCompare(b.displayName || '');
+        });
+
+        strip.innerHTML = sorted.map(m => {
+            const paused = m.paused;
+            let dotColor = '#76777d';
+            if (paused) dotColor = '#76777d';
+            else if (m.staleMinutes != null && m.staleMinutes < 5) dotColor = '#006c49';
+            else if (m.staleMinutes != null && m.staleMinutes < 30) dotColor = '#943700';
+            else if (m.staleMinutes != null) dotColor = '#ba1a1a';
+
+            const battery = m.batteryPct != null
+                ? `<span class="material-symbols-outlined" style="font-size:12px;color:${batteryColor(m.batteryPct).fg}">battery_full</span>`
+                : '';
+            const scoreChip = m.drivingScore != null
+                ? `<span style="font-size:10px;font-weight:700;color:${m.drivingScore >= 80 ? '#006c49' : m.drivingScore >= 60 ? '#943700' : '#ba1a1a'};background:${m.drivingScore >= 80 ? '#6cf8bb33' : m.drivingScore >= 60 ? '#ffdbcd33' : '#ffdad633'};border-radius:9999px;padding:0 4px;line-height:16px">${m.drivingScore}</span>`
+                : '';
+            const pauseBadge = paused
+                ? `<span style="font-size:10px;color:#943700">⏸</span>`
+                : '';
+
+            return `<a href="/member/${m.userId}" class="flex flex-col items-center gap-1 px-2 py-2 rounded-xl bg-surface/90 backdrop-blur-sm border border-outline-variant/20 shadow-sm hover:bg-surface-container-high min-w-[64px]" style="text-decoration:none;color:inherit">
+                <div class="relative">
+                    <div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center font-bold text-on-surface text-xs" style="position:relative;overflow:hidden">${avatarInner(m)}</div>
+                    <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface" style="background:${dotColor};z-index:2"></div>
+                </div>
+                <span class="font-label-md text-label-md text-on-surface truncate max-w-[56px] text-center">${escapeHtml(m.displayName || '?')}</span>
+                <div class="flex items-center gap-0.5">${battery}${scoreChip}${pauseBadge}</div>
+            </a>`;
+        }).join('');
+    }
+
     function formatTime(epochMs) {
         return new Date(epochMs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     }
@@ -183,6 +329,14 @@
                 <div class="flex-1 min-w-0">
                     <div class="flex justify-between items-center mb-1">
                         <span class="font-headline-md text-headline-md text-on-surface text-base truncate">${escapeHtml(m.displayName || 'Member')}</span>
+                        ${(() => {
+                            const h = healthData.get(m.userId);
+                            if (h?.drivingScore == null) return '';
+                            const sc = h.drivingScore;
+                            const color = sc >= 80 ? '#006c49' : sc >= 60 ? '#943700' : '#ba1a1a';
+                            const bg = sc >= 80 ? '#6cf8bb33' : sc >= 60 ? '#ffdbcd33' : '#ffdad633';
+                            return `<span style="font-size:10px;font-weight:700;color:${color};background:${bg};border-radius:9999px;padding:0 4px;line-height:16px;margin-left:4px">${sc}</span>`;
+                        })()}
                         <span class="font-label-md text-label-md text-on-surface-variant whitespace-nowrap">${relativeTime(m.recordedAt)}</span>
                     </div>
                     <p class="font-body-md text-body-md text-on-surface-variant text-sm mb-2">${m.lat != null ? escapeHtml(m.address || `${m.lat.toFixed(4)}, ${m.lng.toFixed(4)}`) : 'No location yet'}</p>
@@ -478,6 +632,7 @@
                 members.set(msg.userId, updated);
                 upsertMarker(updated);
                 renderMemberList();
+                scheduleHealthRefresh();
             } else if (msg.type === 'location_address') {
                 const existing = members.get(msg.userId);
                 if (existing) {
@@ -503,6 +658,7 @@
                     toast(`${msg.displayName} left ${msg.placeName}`, 'exit');
             } else if (msg.type === 'sos_active' || msg.type === 'sos_resolved') {
                 applySosEvent(msg);
+                scheduleHealthRefresh();
                 if (msg.type === 'sos_active') {
                     toast(`🚨 ${msg.displayName} triggered SOS${msg.source === 'crash' ? ' (crash detected)' : ''}`, 'exit');
                 } else {
@@ -518,6 +674,7 @@
             } else if (msg.type === 'check_in') {
                 checkins.set(msg.userId, { status: msg.status, createdAt: msg.createdAt, photoUrl: msg.photoUrl || null });
                 renderMemberList();
+                scheduleHealthRefresh();
                 const ciLabel = checkinLabel(msg.status);
                 if (ciLabel) toast(`${msg.displayName}: ${ciLabel.text}`, 'enter');
             } else if (msg.type === 'pause_changed') {
@@ -537,6 +694,7 @@
                             toast(`${existing.displayName || 'A member'} resumed sharing`, 'enter');
                         }
                     }
+                    scheduleHealthRefresh();
                 }
                 if (msg.type === 'routine_deviation') {
                     const m = members.get(msg.userId);
@@ -544,6 +702,8 @@
                     const kindLabel = msg.kind === 'missed_arrival' ? "didn't arrive at" : msg.kind === 'overstay' ? 'stayed too long at' : 'deviated from';
                     toast(`${name} ${kindLabel} ${msg.placeName || 'a place'}`, 'exit');
                 }
+            } else if (msg.type === 'digest_ready') {
+                scheduleDigestRefresh();
             }
         });
         ws.addEventListener('close', () => {
@@ -559,6 +719,8 @@
     setInterval(refreshArrivals, 300_000);
 
     refreshArrivals();
+    fetchHealth();
+    fetchDigest();
 
     // Map needs an invalidateSize when the sidebar layout settles
     window.addEventListener('resize', () => map.invalidateSize());

@@ -1,6 +1,7 @@
 import { requireAuth } from '../auth.js';
 import { getCachedLabel, enqueueGeocode } from '../geocoder.js';
 import { logView } from '../audit.js';
+import { tripRowToJson } from '../payloads.js';
 
 function assertMember(db, circleId, userId, reply) {
     const m = db
@@ -8,27 +9,6 @@ function assertMember(db, circleId, userId, reply) {
         .get(circleId, userId);
     if (!m) { reply.code(403).send({ error: 'not_a_member' }); return false; }
     return true;
-}
-
-function tripRowToJson(r) {
-    return {
-        id: r.id,
-        userId: r.userId,
-        circleId: r.circleId,
-        startedAt: r.startedAt,
-        endedAt: r.endedAt,
-        durationMs: r.endedAt != null ? r.endedAt - r.startedAt : null,
-        mode: r.mode,
-        distanceM: r.distanceM,
-        maxSpeedMps: r.maxSpeedMps,
-        avgSpeedMps: r.avgSpeedMps,
-        startLat: r.startLat,
-        startLng: r.startLng,
-        endLat: r.endLat,
-        endLng: r.endLng,
-        startLabel: r.startLabel,
-        endLabel: r.endLabel,
-    };
 }
 
 function enrichTripLabels(db, rows) {

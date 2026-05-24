@@ -121,4 +121,55 @@ export default async function placeRoutes(fastify, { db }) {
         db.prepare('DELETE FROM places WHERE id = ?').run(placeId);
         return { ok: true };
     });
+
+    fastify.get('/api/places/:id/analytics', { preHandler: requireAuth(db) }, async (req, reply) => {
+        const placeId = Number(req.params.id);
+        if (!Number.isInteger(placeId)) return reply.code(400).send({ error: 'invalid_place' });
+        const place = db.prepare('SELECT * FROM places WHERE id = ?').get(placeId);
+        if (!place) return reply.code(404).send({ error: 'not_found' });
+        if (!assertMember(db, place.circle_id, req.auth.userId, reply)) return;
+
+        let days = parseInt(req.query.days, 10);
+        if (isNaN(days)) days = 30;
+        days = Math.max(1, Math.min(90, days));
+        const sinceMs = Date.now() - days * 86400000;
+
+        const rows = db.prepare(`
+            SELECT v.user_id AS userId, u.display_name AS displayName,
+                   COUNT(*) AS visitCount,
+                   SUM(CASE WHEN v.ended_at IS NOT NULL THEN v.ended_at - v.started_at ELSE 0 END) AS totalDwellMs,
+                   MAX(v.started_at) AS lastVisitAt,
+                   AVG(CASE WHEN v.ended_at IS NOT NULL THEN v.ended_at - v.started_at ELSE NULL END) AS avgDwellMs,
+                   MAX(CASE WHEN v.ended_at IS NOT NULL THEN v.ended_at - v.started_at ELSE 0 END) AS longestDwellMs
+            FROM visits v
+            JOIN users u ON u.id = v.user_id
+            WHERE v.place_id = ? AND v.started_at >= ?
+            GROUP BY v.user_id
+        `).all(placeId, sinceMs);
+
+        const now = Date.now();
+        const lastWeekStart = now - 7 * 86400000;
+        const prevWeekStart = now - 14 * 86400000;
+        const lastWeekCount = db.prepare('SELECT COUNT(*) AS c FROM visits WHERE place_id = ? AND started_at >= ?').get(placeId, lastWeekStart).c;
+        const prevWeekCount = db.prepare('SELECT COUNT(*) AS c FROM visits WHERE place_id = ? AND started_at >= ? AND started_at < ?').get(placeId, prevWeekStart, lastWeekStart).c;
+        const deltaPct = prevWeekCount > 0 ? Math.round((lastWeekCount - prevWeekCount) / prevWeekCount * 1000) / 10 : 0;
+
+        const perMember = rows.map((r) => ({
+            userId: r.userId,
+            displayName: r.displayName,
+            visitCount: r.visitCount,
+            totalDwellMs: r.totalDwellMs,
+            lastVisitAt: r.lastVisitAt,
+            avgDwellMs: r.avgDwellMs,
+            longestDwellMs: r.longestDwellMs,
+        }));
+
+        return {
+            placeId,
+            placeName: place.name,
+            days,
+            perMember,
+            weekOverWeek: { lastWeekCount, prevWeekCount, deltaPct },
+        };
+    });
 }

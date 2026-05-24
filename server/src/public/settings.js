@@ -464,6 +464,29 @@
             }
         });
     }
+
+    const digestToggle = $('digest-toggle');
+    if (digestToggle) {
+        fetch('/api/users/me/digest-prefs', { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(d => { digestToggle.checked = !!d.enabled; })
+            .catch(() => {});
+        digestToggle.addEventListener('change', async () => {
+            try {
+                await fetch('/api/users/me/digest-prefs', {
+                    method: 'PATCH',
+                    headers: { 'content-type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ enabled: digestToggle.checked }),
+                });
+                toast(digestToggle.checked ? 'Weekly digest enabled' : 'Weekly digest disabled', 'success');
+            } catch (err) {
+                toast('Failed: ' + err.message, 'error');
+                digestToggle.checked = !digestToggle.checked;
+            }
+        });
+    }
+
     $('view-log-refresh').addEventListener('click', loadViewLog);
     $('export-btn').addEventListener('click', exportData);
     $('delete-btn').addEventListener('click', deleteAccount);

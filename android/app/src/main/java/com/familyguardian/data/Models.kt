@@ -422,3 +422,116 @@ data class ExpectedArrival(
 
 @Serializable
 data class ExpectedArrivalsResponse(val arrivals: List<ExpectedArrival>)
+
+@Serializable
+data class MemberHealth(
+    val userId: Int,
+    val displayName: String,
+    val photoUrl: String? = null,
+    val batteryPct: Int? = null,
+    val lastFixAt: Long? = null,
+    val staleMinutes: Int? = null,
+    val activity: String? = null,
+    val paused: Boolean = false,
+    val pausedUntil: Long? = null,
+    val nextRoutine: NextRoutine? = null,
+    val drivingScore: Int? = null,
+    val checkinStatus: String? = null,
+    val checkinAt: Long? = null,
+)
+
+@Serializable
+data class NextRoutine(
+    val kind: String,
+    val placeName: String,
+    val expectedMinute: Int,
+)
+
+@Serializable
+data class HealthResponse(val members: List<MemberHealth>)
+
+@Serializable
+data class TimelineItem(
+    val kind: String,
+    val at: Long,
+    val payload: TimelinePayload
+)
+
+@Serializable
+data class TimelinePayload(
+    val id: Int? = null,
+    val placeId: Int? = null,
+    val placeName: String? = null,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    val mode: String? = null,
+    val distanceM: Double? = null,
+    val maxSpeedMps: Double? = null,
+    val status: String? = null,
+    val alertKind: String? = null,
+    val expectedMinute: Int? = null,
+    val actualMinute: Int? = null,
+    val type: String? = null,
+    val value: Double? = null,
+    val startedAt: Long? = null,
+    val endedAt: Long? = null
+)
+
+@Serializable
+data class TimelineResponse(val items: List<TimelineItem>, val cursor: Long? = null)
+
+@Serializable
+data class PlaceAnalyticsMember(
+    val userId: Int,
+    val displayName: String,
+    val visitCount: Int,
+    val totalDwellMs: Long,
+    val lastVisitAt: Long? = null,
+    val avgDwellMs: Long? = null,
+    val longestDwellMs: Long? = null,
+)
+
+@Serializable
+data class WeekOverWeek(
+    val lastWeekCount: Int,
+    val prevWeekCount: Int,
+    val deltaPct: Double,
+)
+
+@Serializable
+data class PlaceAnalytics(
+    val placeId: Int,
+    val placeName: String,
+    val days: Int,
+    val perMember: List<PlaceAnalyticsMember>,
+    val weekOverWeek: WeekOverWeek,
+)
+
+@Serializable
+data class DigestMember(
+    val userId: Int,
+    val displayName: String,
+    val tripCount: Int = 0,
+    val totalDistanceM: Long = 0,
+    val visitCount: Int = 0,
+    val routineAlerts: Int = 0,
+    val drivingScore: Int? = null,
+    val checkinCount: Int = 0,
+)
+
+@Serializable
+data class DigestData(
+    val weekStart: Long,
+    val weekEnd: Long,
+    val perMember: List<DigestMember> = emptyList(),
+    val totalKm: Int = 0,
+    val totalAlerts: Int = 0,
+    val busiestPlace: String? = null,
+    val quietestMember: String? = null,
+)
+
+@Serializable
+data class DigestResponse(val digest: DigestData? = null)
+
+@Serializable
+data class DigestPrefsResponse(val enabled: Boolean = false)

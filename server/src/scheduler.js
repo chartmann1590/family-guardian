@@ -3,6 +3,8 @@
 
 import { evaluateOfflineSweep } from './alerts.js';
 import { mineRoutines, evaluateRoutineSweep } from './routines.js';
+import { buildDigest, persistDigest } from './digest.js';
+import { fanOut } from './fcm.js';
 import { publish } from './hub.js';
 
 const OFFLINE_SWEEP_INTERVAL_MS = 60_000;
@@ -11,6 +13,7 @@ const ROUTINE_SWEEP_INTERVAL_MS = 60_000;
 const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1_000;
 const MINE_COOLDOWN_MS = 6 * 60 * 60 * 1_000;
+const DIGEST_RETENTION_MS = 12 * 7 * 24 * 60 * 60 * 1_000;
 
 function expirePauses(db) {
     const now = Date.now();
@@ -31,6 +34,31 @@ function expirePauses(db) {
         if (!circleId) continue;
         publish(circleId, { type: 'pause_changed', userId, pausedUntil: null, reason: null });
     }
+}
+
+function weeklyDigestTick(db, log) {
+    const now = Date.now();
+    const weekEnd = now;
+    const weekStart = now - 7 * 24 * 60 * 60 * 1000;
+    const circles = db.prepare('SELECT id FROM circles').all();
+    for (const c of circles) {
+        try {
+            const summary = buildDigest(db, c.id, weekStart, weekEnd);
+            persistDigest(db, c.id, weekStart, weekEnd, summary);
+            const recipients = db.prepare(
+                `SELECT DISTINCT ap.user_id FROM alert_prefs ap
+                 JOIN circle_members cm ON cm.user_id = ap.user_id
+                 WHERE cm.circle_id = ? AND ap.weekly_digest_enabled = 1`,
+            ).all(c.id);
+            if (recipients.length > 0) {
+                fanOut(c.id, { type: 'weekly_digest', weekStart: String(weekStart), weekEnd: String(weekEnd) }, db);
+            }
+        } catch (err) {
+            log?.warn?.({ err: err.message, circleId: c.id }, 'digest_build_failed');
+        }
+    }
+    db.prepare('DELETE FROM digest_snapshots WHERE created_at < ?')
+        .run(now - DIGEST_RETENTION_MS);
 }
 
 export function startScheduler(db, log) {
@@ -92,12 +120,37 @@ export function startScheduler(db, log) {
     const routineSweepHandle = setInterval(routineSweepTick, ROUTINE_SWEEP_INTERVAL_MS);
     if (routineSweepHandle.unref) routineSweepHandle.unref();
 
+    const scheduleWeeklyDigest = () => {
+        const now = new Date();
+        const next = new Date(now);
+        next.setHours(18, 0, 0, 0);
+        const dayOfWeek = next.getDay();
+        const daysUntilSunday = (7 - dayOfWeek) % 7;
+        if (daysUntilSunday === 0 && now.getHours() >= 18) {
+            next.setDate(next.getDate() + 7);
+        } else {
+            next.setDate(next.getDate() + daysUntilSunday);
+        }
+        const delay = next - now;
+        const handle = setTimeout(async () => {
+            try {
+                weeklyDigestTick(db, log);
+            } catch (err) {
+                log?.warn?.({ err: err.message }, 'weekly_digest_failed');
+            }
+            scheduleWeeklyDigest();
+        }, delay);
+        if (handle.unref) handle.unref();
+    };
+    scheduleWeeklyDigest();
+
     const cleanupTick = () => {
         const cutoff = Date.now() - RETENTION_MS;
         const tables = [
             ['locations_history', 'recorded_at'],
             ['alert_events', 'created_at'],
             ['messages', 'created_at'],
+            ['digest_snapshots', 'created_at'],
         ];
         for (const [table, col] of tables) {
             try {
