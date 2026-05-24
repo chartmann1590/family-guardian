@@ -29,6 +29,7 @@ import com.familyguardian.ui.MemberDetailScreen
 import com.familyguardian.ui.MemberInfo
 import com.familyguardian.ui.OnboardingScreen
 import com.familyguardian.ui.PlacesScreen
+import com.familyguardian.ui.RoutinesScreen
 import com.familyguardian.ui.ServerConfigScreen
 import com.familyguardian.ui.TripsScreen
 import com.familyguardian.ui.VisitsScreen
@@ -181,7 +182,11 @@ private fun AppRoot() {
                     }
                 },
                 onBack = { nav.popBackStack() },
+                onOpenRoutines = { nav.navigate("routines") },
             )
+        }
+        composable("routines") {
+            RoutinesScreen(onBack = { nav.popBackStack() })
         }
     }
 }

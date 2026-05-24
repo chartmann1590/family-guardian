@@ -63,6 +63,7 @@ fun AccountScreen(
     circleId: Long,
     onLoggedOut: () -> Unit,
     onBack: () -> Unit,
+    onOpenRoutines: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val appCtx = context.applicationContext
@@ -235,6 +236,23 @@ fun AccountScreen(
                     shape = RoundedCornerShape(12.dp),
                 ) {
                     Text(if (crashDetectionEnabled) "Crash detection: ON" else "Crash detection: OFF")
+                }
+            }
+
+            item {
+                Text("Smart routines", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Manage learned arrival/departure patterns and deviation alerts.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onOpenRoutines,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text("Open routines")
                 }
             }
 
