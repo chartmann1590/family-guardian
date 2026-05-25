@@ -47,14 +47,11 @@ async function postLocation(battery) {
     });
 }
 
-function lastAlertCount() {
-    // Cannot inspect FCM directly; use alert_events as a side-channel.
-    // Low-battery uses pub/sub + FCM only (no DB write). Verify via behavior:
-    //   subsequent identical drops should not retrigger (we test that here via state machine effects in code paths;
-    //   for true counts we exercise the publish-side via the WS hub which is stateless and not directly mockable).
-    // Instead, we test the surface that *is* observable: the response should always 200 and not error.
-    return null;
-}
+// Low-battery alerts are pub/sub + FCM only (no DB row). With FCM disabled in
+// tests, the publish side is unobservable, so we exercise the *response* surface:
+// every POST /api/locations must return 200, regardless of where in the
+// hysteresis state machine the subject is. A crash in checkLowBattery (e.g.,
+// the prior ESM-incompatible require()) would surface as a 500 here.
 
 describe('low battery push edge detection', () => {
     it('does not crash on first location post (state initialization)', async () => {

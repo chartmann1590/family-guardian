@@ -17,7 +17,7 @@ beforeEach(async () => {
     const { userId: bid } = seedSecondUser(db, circleId, 'bob@test.com', 'Bob');
     bobId = bid;
     // Charlie has his own circle — he is NOT in Alice's circle.
-    const { userId: cid2, circleId: charlieCircle } = seedUser(db, 'charlie@test.com', 'Charlie');
+    const { userId: cid2 } = seedUser(db, 'charlie@test.com', 'Charlie');
     charlieId = cid2;
 
     const future = Date.now() + 30 * 86400000;

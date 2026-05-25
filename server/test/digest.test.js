@@ -92,7 +92,7 @@ describe('buildDigest', () => {
 
     it('returns null busiestPlace when no visits', () => {
         const db = createTestDb();
-        const { userId, circleId } = seedUser(db);
+        const { circleId } = seedUser(db);
         const weekStart = Date.now() - 7 * 86400000;
         const weekEnd = Date.now();
 
@@ -105,7 +105,7 @@ describe('buildDigest', () => {
     it('computes quietestMember from lowest visit+trip sum', () => {
         const db = createTestDb();
         const { userId: aliceId, circleId } = seedUser(db);
-        const { userId: bobId } = seedSecondUser(db, circleId);
+        seedSecondUser(db, circleId);
         const placeId = seedPlace(db, circleId);
 
         const weekStart = Date.now() - 7 * 86400000;

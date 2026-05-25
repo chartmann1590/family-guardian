@@ -84,7 +84,7 @@ html { scroll-behavior: smooth; }
         <span class="text-emerald">your infrastructure.</span>
       </h1>
       <p class="text-lg text-white/60 leading-relaxed mb-8 max-w-lg">
-        Track your family's location in real-time with a platform that runs entirely on hardware you control. No cloud subscriptions. No third-party data sharing. Ever.
+        Real-time location, smart routines, driving safety, weekly digests, and SOS escalation — running entirely on hardware you control. No cloud subscriptions. No third-party data sharing. Ever.
       </p>
       <div class="flex flex-wrap gap-4">
         <a href="#download" class="inline-flex items-center gap-2 bg-emerald hover:bg-emerald-dark text-white font-semibold px-6 py-3 rounded-lg transition">
@@ -137,7 +137,7 @@ html { scroll-behavior: smooth; }
   <div class="max-w-6xl mx-auto px-6">
     <div class="text-center mb-16 fade-in">
       <h2 class="text-3xl font-bold mb-4">Everything you need,<br/>nothing you don't</h2>
-      <p class="text-navy/50 max-w-lg mx-auto">Built as a walking skeleton that works end-to-end. More features are being ported from the design prototypes every week.</p>
+      <p class="text-navy/50 max-w-lg mx-auto">Seven sprints shipped: privacy controls, smart notifications, chat polish, driving safety, smart routines, insights & visibility, and safety v2 (curfew + emergency contacts). All running on your own server.</p>
     </div>
     <div class="grid md:grid-cols-3 gap-8">
       <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
@@ -202,6 +202,90 @@ html { scroll-behavior: smooth; }
         </div>
         <h3 class="font-bold text-lg mb-2">Export &amp; Delete</h3>
         <p class="text-navy/50 text-sm leading-relaxed">Download a JSON of everything the server stores about you, or delete your account with password re-confirm. Sole-admin deletes require promoting a successor first.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-sky/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-sky">notifications_paused</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Smart Notification Subscriptions</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">Per-place, per-member alerts with independent arrive/leave toggles and quiet-hours windows. Only get pinged for the events that matter to you.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-amber-500/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-amber-600">forum</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Family Chat with Reactions</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">Voice notes, photo attachments (EXIF-stripped), typing indicators, opt-in read receipts, and emoji reactions on every message. WebSocket-backed for instant delivery.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-red-500">car_crash</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Crash Detection + Auto-SOS</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">Opt-in accelerometer monitoring on Android and iOS detects high-g impacts during driving. 30-second dismiss countdown with vibration + alarm, then auto-fires SOS if not cancelled.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-emerald/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-emerald">speed</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Driving Safety Score</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">0–100 score derived from trip data: hard brakes (Δv ≤ −3.5 m/s), speeding minutes, night-driving %. Per-member 7/30/90-day rollups with full component breakdown.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-purple-500">schedule</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Smart Routines &amp; Deviation</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">A nightly miner learns each member's arrive/leave/dwell patterns from 30 days of visits. Deviation alerts fire when a kid doesn't arrive at school on time or stays at the coffee shop past their usual.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-sky/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-sky">favorite</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Family Health Widget</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">One-row status strip above the map: battery %, last-fix age, current activity, paused flag, next upcoming routine, driving score, latest check-in — for every member at a glance.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-emerald/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-emerald">timeline</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Activity Timeline</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">Server-merged chronological feed of visits, trips, check-ins, routine deviations, and alerts per member. One unified view across all three clients.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-amber-500/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-amber-600">insights</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Place Analytics + Weekly Digest</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">Per-place visitor counts, dwell totals, and week-over-week deltas. Plus a Sunday-night digest summarizing the family's week — trips driven, routines adhered, busiest place, quietest member.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-purple-500">bedtime</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Bedtime &amp; Curfew Mode</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">Set per-user curfew windows (with midnight wrap). The server checks every 5 minutes and pings the circle if the member is anywhere but their configured home during the window.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-red-500">battery_alert</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Low-Battery Alerts</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">Opt-in per watcher. Edge-triggered with hysteresis — fires once when a member's battery crosses below the threshold, re-arms at threshold + 5%. A dead phone never looks like a paused user again.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-sky/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-sky">contact_emergency</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">Emergency Contacts</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">Invite up to 5 people outside your circle (by email) to be pinged on SOS. They get a push only — no lat/lng, no map access. Consent for escalation, not for surveillance.</p>
+      </div>
+      <div class="bg-surface rounded-xl p-8 border border-navy/5 fade-in">
+        <div class="w-12 h-12 bg-emerald/10 rounded-xl flex items-center justify-center mb-5">
+          <span class="material-symbols-outlined text-emerald">checklist</span>
+        </div>
+        <h3 class="font-bold text-lg mb-2">One-Tap Routine Templates</h3>
+        <p class="text-navy/50 text-sm leading-relaxed">Pick a baked-in template — School day, Work commute, Weekend service, Nightly home-by — pair it with one of your places, and you have a full week of routines wired in seconds.</p>
       </div>
     </div>
   </div>

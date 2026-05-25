@@ -156,7 +156,6 @@ function parseMinute(s: string): number | null { const parts = s.trim().split(':
 function dayShort(dow: number) { return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dow] || '?'; }
 function fmtDurationMs(ms: number) { const mins = Math.round(ms / 60000); if (mins < 60) return `${mins}m`; const h = Math.floor(mins / 60); const r = mins % 60; return r > 0 ? `${h}h ${r}m` : `${h}h`; }
 function fmtDist(m: number) { const km = m / 1000; return km < 1 ? `${Math.round(m)}m` : `${km.toFixed(1)} km`; }
-function fmtSpeed(mps: number) { const kph = mps * 3.6; return `${kph.toFixed(0)} km/h`; }
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
