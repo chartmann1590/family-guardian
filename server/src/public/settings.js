@@ -544,7 +544,7 @@
             <td class="py-2 pr-3">${esc(r.placeName)}</td>
             <td class="py-2 pr-3 capitalize">${r.kind}</td>
             <td class="py-2 pr-3">${DAYS[r.dayOfWeek]}</td>
-            <td class="py-2 pr-3">${minuteToTime(r.expectedMinute)}</td>
+            <td class="py-2 pr-3">${r.kind === 'dwell' && r.expectedDwellMinutes ? '~' + r.expectedDwellMinutes + ' min' : minuteToTime(r.expectedMinute)}</td>
             <td class="py-2 pr-3">${r.toleranceMinutes}m</td>
             <td class="py-2 pr-3 text-xs">${r.source === 'manual' ? 'Manual' : 'Auto'}</td>
             <td class="py-2 pr-3"><input type="checkbox" ${r.active ? 'checked' : ''} data-rid="${r.id}" class="rt-active"></td>
@@ -614,6 +614,38 @@
         $('cancel-routine-btn')?.addEventListener('click', () => $('add-routine-form')?.classList.add('hidden'));
         $('routine-tolerance')?.addEventListener('input', function () { $('tol-val').textContent = this.value; });
 
+        $('template-btn')?.addEventListener('click', async () => {
+            $('template-section')?.classList.toggle('hidden');
+            if ($('template-list')?.children.length) return;
+            try {
+                const res = await fetch('/api/routine-templates');
+                const templates = await res.json();
+                $('template-list').innerHTML = templates.map(t => `<div class="border border-outline-variant/40 rounded-lg p-3">
+                    <div class="font-semibold">${esc(t.title)}</div>
+                    <div class="text-sm text-on-surface-variant">${esc(t.description)}</div>
+                    <div class="flex gap-2 mt-2 items-center">
+                        <select class="template-place rounded border border-outline-variant/40 px-2 py-1 text-sm flex-1">
+                            <option value="">Pick place...</option>${state.places.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}
+                        </select>
+                        <button class="apply-template-btn bg-primary text-on-primary rounded-full px-3 py-1 text-sm font-semibold" data-tid="${t.id}">Apply</button>
+                    </div>
+                </div>`).join('');
+                for (const btn of $('template-list').querySelectorAll('.apply-template-btn')) {
+                    btn.addEventListener('click', async () => {
+                        const sel = btn.parentElement.querySelector('.template-place');
+                        if (!sel?.value) return;
+                        btn.disabled = true; btn.textContent = 'Applying...';
+                        await fetch('/api/users/me/routines/from-template', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                            body: JSON.stringify({ templateId: btn.dataset.tid, placeId: Number(sel.value) }),
+                        });
+                        loadRoutines();
+                        btn.textContent = 'Done'; btn.disabled = false;
+                    });
+                }
+            } catch {}
+        });
+
         $('save-routine-btn')?.addEventListener('click', async () => {
             const days = [...document.querySelectorAll('.routine-day:checked')].map(cb => Number(cb.value));
             if (!days.length || !$('routine-place')?.value || !$('routine-time')?.value) return;
@@ -633,5 +665,94 @@
 
         loadPrefs();
         loadRoutines();
+
+        const curfewToggle = $('curfew-toggle');
+        const curfewConfig = $('curfew-config');
+        const lowBatteryToggle = $('low-battery-toggle');
+        const lowBatteryConfig = $('low-battery-config');
+        const lowBatterySlider = $('low-battery-slider');
+
+        async function loadAlertPrefs() {
+            try {
+                const res = await fetch('/api/users/me/alert-prefs', { headers: authHeaders() });
+                const ap = await res.json();
+                curfewToggle.checked = ap.curfewEnabled;
+                curfewConfig.classList.toggle('hidden', !ap.curfewEnabled);
+                if (ap.curfewStart != null) $('curfew-start').value = minuteToTime(ap.curfewStart);
+                if (ap.curfewEnd != null) $('curfew-end').value = minuteToTime(ap.curfewEnd);
+                const cs = $('curfew-home-place');
+                if (cs) cs.innerHTML = '<option value="">Select place...</option>' +
+                    state.places.map(p => `<option value="${p.id}" ${ap.curfewHomePlaceId === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+                lowBatteryToggle.checked = ap.lowBatteryAlerts;
+                lowBatteryConfig.classList.toggle('hidden', !ap.lowBatteryAlerts);
+                if (ap.lowBatteryThresholdPct != null) { lowBatterySlider.value = ap.lowBatteryThresholdPct; $('low-battery-val').textContent = ap.lowBatteryThresholdPct; }
+            } catch {}
+        }
+        loadAlertPrefs();
+
+        curfewToggle?.addEventListener('change', async () => {
+            curfewConfig.classList.toggle('hidden', !curfewToggle.checked);
+            await fetch('/api/users/me/alert-prefs', { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ curfewEnabled: curfewToggle.checked }) });
+        });
+        $('curfew-save')?.addEventListener('click', async () => {
+            const cs = $('curfew-start')?.value;
+            const ce = $('curfew-end')?.value;
+            const cplace = $('curfew-home-place')?.value;
+            if (!cs || !ce || !cplace) return;
+            await fetch('/api/users/me/alert-prefs', { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                body: JSON.stringify({ curfewStart: timeToMinute(cs), curfewEnd: timeToMinute(ce), curfewHomePlaceId: Number(cplace) }),
+            });
+        });
+        lowBatteryToggle?.addEventListener('change', async () => {
+            lowBatteryConfig.classList.toggle('hidden', !lowBatteryToggle.checked);
+            await fetch('/api/users/me/alert-prefs', { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ lowBatteryAlerts: lowBatteryToggle.checked }) });
+        });
+        lowBatterySlider?.addEventListener('input', function () { $('low-battery-val').textContent = this.value; });
+        $('low-battery-save')?.addEventListener('click', async () => {
+            await fetch('/api/users/me/alert-prefs', { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ lowBatteryThresholdPct: Number(lowBatterySlider.value) }) });
+        });
+
+        async function loadEmergencyContacts() {
+            try {
+                const [ecRes, invRes] = await Promise.all([
+                    fetch('/api/users/me/emergency-contacts', { headers: authHeaders() }),
+                    fetch('/api/users/me/pending-invites', { headers: authHeaders() }),
+                ]);
+                const ecData = await ecRes.json();
+                const invData = await invRes.json();
+                $('ec-list').innerHTML = (ecData.contacts || []).filter(c => c.status !== 'revoked').map(c =>
+                    `<div class="flex items-center justify-between py-2 border-b border-outline-variant/20">
+                        <div><span class="font-semibold">${esc(c.contactDisplayName)}</span> <span class="text-xs text-on-surface-variant">${c.status}</span></div>
+                        ${c.status === 'pending' || c.status === 'accepted' ? `<button class="ec-remove text-error text-xs hover:underline" data-id="${c.id}">Remove</button>` : ''}
+                    </div>`
+                ).join('');
+                $('pending-invites-list').innerHTML = (invData.invites || []).map(inv =>
+                    `<div class="flex items-center justify-between py-2 border-b border-outline-variant/20">
+                        <span>${esc(inv.fromDisplayName)} wants you as emergency contact</span>
+                        <button class="ec-accept bg-primary text-on-primary px-3 py-1 rounded-full text-xs" data-id="${inv.id}">Accept</button>
+                    </div>`
+                ).join('');
+                for (const btn of $('ec-list').querySelectorAll('.ec-remove')) {
+                    btn.addEventListener('click', async () => {
+                        await fetch(`/api/users/me/emergency-contacts/${btn.dataset.id}`, { method: 'DELETE', headers: authHeaders() });
+                        loadEmergencyContacts();
+                    });
+                }
+                for (const btn of $('pending-invites-list').querySelectorAll('.ec-accept')) {
+                    btn.addEventListener('click', async () => {
+                        await fetch(`/api/users/me/emergency-contacts/${btn.dataset.id}/respond`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ action: 'accept' }) });
+                        loadEmergencyContacts();
+                    });
+                }
+            } catch {}
+        }
+        loadEmergencyContacts();
+        $('ec-invite-btn')?.addEventListener('click', async () => {
+            const email = $('ec-email')?.value?.trim();
+            if (!email) return;
+            $('ec-invite-btn').disabled = true;
+            try { await fetch('/api/users/me/emergency-contacts', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ email }) }); $('ec-email').value = ''; loadEmergencyContacts(); } catch {}
+            $('ec-invite-btn').disabled = false;
+        });
     }
 })();

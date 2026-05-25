@@ -29,6 +29,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Slider
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -45,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.familyguardian.data.AccountRepo
+import com.familyguardian.data.AlertPrefs
 import com.familyguardian.data.ApiClient
 import com.familyguardian.data.AuthRepo
 import com.familyguardian.data.CircleMember
@@ -83,6 +86,9 @@ fun AccountScreen(
     var readReceiptsEnabled by remember { mutableStateOf(false) }
     var crashDetectionEnabled by remember { mutableStateOf(false) }
     var digestEnabled by remember { mutableStateOf(false) }
+    var curfewEnabled by remember { mutableStateOf(false) }
+    var lowBatteryAlerts by remember { mutableStateOf(false) }
+    var lowBatteryThreshold by remember { mutableStateOf(15f) }
 
     LaunchedEffect(Unit) {
         signedInAs = prefs.snapshot().email
@@ -101,6 +107,17 @@ fun AccountScreen(
             val digestRepo = DigestRepo(prefs)
             val prefs2 = digestRepo.getPrefs()
             if (prefs2 != null) digestEnabled = prefs2.enabled
+        } catch (_: Exception) {}
+        try {
+            val s = prefs.snapshot()
+            val server = s.serverUrl; val token = s.token
+            if (server != null && token != null) {
+                val url = ApiClient.endpoint(server, "/api/users/me/alert-prefs")
+                val ap = ApiClient.api.getAlertPrefs(url, "Bearer $token")
+                curfewEnabled = ap.curfewEnabled
+                lowBatteryAlerts = ap.lowBatteryAlerts
+                lowBatteryThreshold = (ap.lowBatteryThresholdPct ?: 15).toFloat()
+            }
         } catch (_: Exception) {}
     }
 
@@ -285,6 +302,86 @@ fun AccountScreen(
                     shape = RoundedCornerShape(12.dp),
                 ) {
                     Text(if (digestEnabled) "Weekly digest: ON" else "Weekly digest: OFF")
+                }
+            }
+
+            item {
+                Text("Curfew alerts", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Alert your circle if you're not at home during set hours.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Enable", modifier = Modifier.weight(1f))
+                    Switch(checked = curfewEnabled, onCheckedChange = { next ->
+                        curfewEnabled = next
+                        scope.launch {
+                            try {
+                                val s = prefs.snapshot()
+                                val url = ApiClient.endpoint(s.serverUrl!!, "/api/users/me/alert-prefs")
+                                ApiClient.api.patchAlertPrefs(url, "Bearer ${s.token!!}", AlertPrefs(curfewEnabled = next))
+                            } catch (_: Exception) {}
+                        }
+                    })
+                }
+            }
+
+            item {
+                Text("Low-battery alerts", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Notify your circle when your battery drops below a threshold.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Enable", modifier = Modifier.weight(1f))
+                    Switch(checked = lowBatteryAlerts, onCheckedChange = { next ->
+                        lowBatteryAlerts = next
+                        scope.launch {
+                            try {
+                                val s = prefs.snapshot()
+                                val url = ApiClient.endpoint(s.serverUrl!!, "/api/users/me/alert-prefs")
+                                ApiClient.api.patchAlertPrefs(url, "Bearer ${s.token!!}", AlertPrefs(lowBatteryAlerts = next))
+                            } catch (_: Exception) {}
+                        }
+                    })
+                }
+                if (lowBatteryAlerts) {
+                    Text("Threshold: ${lowBatteryThreshold.toInt()}%")
+                    Slider(
+                        value = lowBatteryThreshold,
+                        onValueChange = { lowBatteryThreshold = it },
+                        valueRange = 5f..50f,
+                        onValueChangeFinished = {
+                            scope.launch {
+                                try {
+                                    val s = prefs.snapshot()
+                                    val url = ApiClient.endpoint(s.serverUrl!!, "/api/users/me/alert-prefs")
+                                    ApiClient.api.patchAlertPrefs(url, "Bearer ${s.token!!}", AlertPrefs(lowBatteryThresholdPct = lowBatteryThreshold.toInt()))
+                                } catch (_: Exception) {}
+                            }
+                        },
+                    )
+                }
+            }
+
+            item {
+                Text("Emergency contacts", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "People outside your circle who get notified on SOS. They won't see your location.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { /* Navigate to emergency contacts screen */ },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text("Manage emergency contacts")
                 }
             }
 

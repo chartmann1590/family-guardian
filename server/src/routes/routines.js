@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { requireAuth } from '../auth.js';
 import { logView } from '../audit.js';
 import { getUpcomingRoutines } from '../routines.js';
+import { ROUTINE_TEMPLATES } from '../routineTemplates.js';
 
 function assertMember(db, circleId, userId, reply) {
     const m = db
@@ -21,6 +22,7 @@ function routineRowToJson(r) {
         kind: r.kind,
         dayOfWeek: r.day_of_week,
         expectedMinute: r.expected_minute,
+        expectedDwellMinutes: r.expected_dwell_minutes ?? null,
         toleranceMinutes: r.tolerance_minutes,
         sampleCount: r.sample_count,
         confidence: Math.round(r.confidence * 100) / 100,
@@ -47,10 +49,11 @@ const RoutinePrefsPatch = z.object({
 
 const CreateRoutine = z.object({
     placeId: z.number().int(),
-    kind: z.enum(['arrival', 'departure']),
+    kind: z.enum(['arrival', 'departure', 'dwell']),
     daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1).max(7),
     expectedMinute: z.number().int().min(0).max(1439),
     toleranceMinutes: z.number().int().min(5).max(180),
+    expectedDwellMinutes: z.number().int().min(5).max(1439).optional(),
 });
 
 export default async function routineRoutes(fastify, { db }) {
@@ -239,11 +242,12 @@ export default async function routineRoutes(fastify, { db }) {
         const now = Date.now();
         const insertStmt = db.prepare(`
             INSERT INTO routines (user_id, circle_id, place_id, kind, day_of_week,
-                                  expected_minute, tolerance_minutes, sample_count, confidence,
+                                  expected_minute, expected_dwell_minutes, tolerance_minutes, sample_count, confidence,
                                   source, active, first_seen_at, last_seen_at, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1, 'manual', 1, NULL, NULL, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1, 'manual', 1, NULL, NULL, ?, ?)
             ON CONFLICT (user_id, place_id, kind, day_of_week) DO UPDATE SET
                 expected_minute = excluded.expected_minute,
+                expected_dwell_minutes = excluded.expected_dwell_minutes,
                 tolerance_minutes = excluded.tolerance_minutes,
                 source = 'manual',
                 active = 1,
@@ -256,7 +260,9 @@ export default async function routineRoutes(fastify, { db }) {
             for (const dow of parsed.data.daysOfWeek) {
                 const result = insertStmt.run(
                     req.auth.userId, callerCircle.circle_id, parsed.data.placeId,
-                    parsed.data.kind, dow, parsed.data.expectedMinute, parsed.data.toleranceMinutes,
+                    parsed.data.kind, dow, parsed.data.expectedMinute,
+                    parsed.data.expectedDwellMinutes ?? null,
+                    parsed.data.toleranceMinutes,
                     now, now,
                 );
                 ids.push(Number(result.lastInsertRowid));
@@ -264,5 +270,78 @@ export default async function routineRoutes(fastify, { db }) {
         })();
 
         return { ids, count: ids.length };
+    });
+
+    fastify.get('/api/routine-templates', async () => {
+        return ROUTINE_TEMPLATES;
+    });
+
+    const FromTemplate = z.object({
+        templateId: z.string(),
+        placeId: z.number().int(),
+        customizations: z.object({
+            expectedMinute: z.number().int().min(0).max(1439).optional(),
+            toleranceMinutes: z.number().int().min(5).max(180).optional(),
+        }).optional(),
+    });
+
+    fastify.post('/api/users/me/routines/from-template', {
+        preHandler: requireAuth(db),
+        config: { rateLimit: { max: 10, timeWindow: '1 hour' } },
+    }, async (req, reply) => {
+        const parsed = FromTemplate.safeParse(req.body);
+        if (!parsed.success) return reply.code(400).send({ error: 'invalid_body', details: parsed.error.flatten() });
+
+        const template = ROUTINE_TEMPLATES.find(t => t.id === parsed.data.templateId);
+        if (!template) return reply.code(404).send({ error: 'template_not_found' });
+
+        const callerCircle = db
+            .prepare('SELECT circle_id FROM circle_members WHERE user_id = ? LIMIT 1')
+            .get(req.auth.userId);
+        if (!callerCircle) return reply.code(403).send({ error: 'no_circle' });
+
+        const place = db.prepare('SELECT * FROM places WHERE id = ? AND circle_id = ?')
+            .get(parsed.data.placeId, callerCircle.circle_id);
+        if (!place) return reply.code(400).send({ error: 'invalid_place' });
+
+        const now = Date.now();
+        const insertStmt = db.prepare(`
+            INSERT INTO routines (user_id, circle_id, place_id, kind, day_of_week,
+                                  expected_minute, expected_dwell_minutes, tolerance_minutes, sample_count, confidence,
+                                  source, active, first_seen_at, last_seen_at, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 0, 1, 'manual', 1, NULL, NULL, ?, ?)
+            ON CONFLICT (user_id, place_id, kind, day_of_week) DO UPDATE SET
+                expected_minute = excluded.expected_minute,
+                tolerance_minutes = excluded.tolerance_minutes,
+                source = 'manual',
+                active = 1,
+                confidence = 1,
+                updated_at = excluded.updated_at
+        `);
+
+        const created = [];
+        const skipped = [];
+
+        db.transaction(() => {
+            for (const item of template.items) {
+                for (const dow of item.daysOfWeek) {
+                    const em = parsed.data.customizations?.expectedMinute ?? item.expectedMinute;
+                    const tm = parsed.data.customizations?.toleranceMinutes ?? item.toleranceMinutes;
+                    const existing = db.prepare(
+                        'SELECT id FROM routines WHERE user_id = ? AND place_id = ? AND kind = ? AND day_of_week = ?'
+                    ).get(req.auth.userId, parsed.data.placeId, item.kind, dow);
+
+                    const result = insertStmt.run(
+                        req.auth.userId, callerCircle.circle_id, parsed.data.placeId,
+                        item.kind, dow, em, tm, now, now,
+                    );
+
+                    if (existing) skipped.push(existing.id);
+                    else created.push(Number(result.lastInsertRowid));
+                }
+            }
+        })();
+
+        return { created, skipped, total: created.length + skipped.length };
     });
 }

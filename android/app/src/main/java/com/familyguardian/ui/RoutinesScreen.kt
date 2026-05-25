@@ -50,12 +50,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import com.familyguardian.data.ApplyTemplateResponse
 import com.familyguardian.data.CreateRoutineRequest
 import com.familyguardian.data.Place
 import com.familyguardian.data.PlacesRepo
 import com.familyguardian.data.Prefs
 import com.familyguardian.data.Routine
 import com.familyguardian.data.RoutinePrefs
+import com.familyguardian.data.RoutineTemplate
 import com.familyguardian.data.RoutinesRepo
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
@@ -79,6 +81,9 @@ fun RoutinesScreen(onBack: () -> Unit) {
     var quietStartText by remember { mutableStateOf("") }
     var quietEndText by remember { mutableStateOf("") }
     var showAddForm by remember { mutableStateOf(false) }
+    var showTemplates by remember { mutableStateOf(false) }
+    var templates by remember { mutableStateOf<List<RoutineTemplate>>(emptyList()) }
+    var templatePlace by remember { mutableStateOf<Place?>(null) }
 
     suspend fun reload() {
         val snap = prefs.snapshot()
@@ -96,6 +101,7 @@ fun RoutinesScreen(onBack: () -> Unit) {
 
     LaunchedEffect(Unit) {
         try { reload() } catch (t: Throwable) { error = t.message ?: t::class.simpleName }
+        try { templates = routinesRepo.getTemplates() } catch (_: Throwable) {}
         loaded = true
     }
 
@@ -223,7 +229,13 @@ fun RoutinesScreen(onBack: () -> Unit) {
                         onClick = { showAddForm = !showAddForm },
                         shape = RoundedCornerShape(12.dp),
                     ) {
-                        Text(if (showAddForm) "Cancel" else "+ Add")
+                        Text(if (showAddForm) "Cancel" else "+ Custom")
+                    }
+                    OutlinedButton(
+                        onClick = { showTemplates = !showTemplates },
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Text(if (showTemplates) "Cancel" else "Templates")
                     }
                 }
             }
@@ -239,6 +251,37 @@ fun RoutinesScreen(onBack: () -> Unit) {
                                 try {
                                     routinesRepo.create(Json.encodeToString(req))
                                     showAddForm = false
+                                    reload()
+                                    error = null
+                                } catch (t: Throwable) {
+                                    error = t.message ?: t::class.simpleName
+                                } finally {
+                                    saving = false
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+
+            if (showTemplates) {
+                item {
+                    TemplatePickerCard(
+                        templates = templates,
+                        places = places,
+                        selectedPlace = templatePlace,
+                        onPlaceSelected = { templatePlace = it },
+                        saving = saving,
+                        onApply = { template ->
+                            val place = templatePlace ?: return@TemplatePickerCard
+                            scope.launch {
+                                saving = true
+                                try {
+                                    routinesRepo.applyTemplate(
+                                        """{"templateId":"${template.id}","placeId":${place.id.toInt()}}"""
+                                    )
+                                    showTemplates = false
+                                    templatePlace = null
                                     reload()
                                     error = null
                                 } catch (t: Throwable) {
@@ -327,11 +370,14 @@ private fun RoutineCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "${routine.placeName} · ${if (routine.kind == "arrival") "arrives" else "leaves"}",
+                    "${routine.placeName} · ${if (routine.kind == "arrival") "arrives" else if (routine.kind == "departure") "leaves" else "stays"}",
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    "${dayOfWeekShort(routine.dayOfWeek)} · usually ${fmtMinute(routine.expectedMinute)} ± ${routine.toleranceMinutes} min",
+                    if (routine.kind == "dwell" && routine.expectedDwellMinutes != null)
+                        "${dayOfWeekShort(routine.dayOfWeek)} · ~${routine.expectedDwellMinutes} min ± ${routine.toleranceMinutes} min"
+                    else
+                        "${dayOfWeekShort(routine.dayOfWeek)} · usually ${fmtMinute(routine.expectedMinute)} ± ${routine.toleranceMinutes} min",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -411,13 +457,18 @@ private fun AddRoutineCard(
                 SegmentedButton(
                     selected = kind == "arrival",
                     onClick = { kind = "arrival" },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
                 ) { Text("Arrival") }
                 SegmentedButton(
                     selected = kind == "departure",
                     onClick = { kind = "departure" },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
                 ) { Text("Departure") }
+                SegmentedButton(
+                    selected = kind == "dwell",
+                    onClick = { kind = "dwell" },
+                    shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                ) { Text("Dwell") }
             }
 
             Text("Days", style = MaterialTheme.typography.bodySmall)
@@ -470,6 +521,79 @@ private fun AddRoutineCard(
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Text(if (saving) "Saving..." else "Create routine")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TemplatePickerCard(
+    templates: List<RoutineTemplate>,
+    places: List<Place>,
+    selectedPlace: Place?,
+    onPlaceSelected: (Place?) -> Unit,
+    saving: Boolean,
+    onApply: (RoutineTemplate) -> Unit,
+) {
+    var placeMenuOpen by remember { mutableStateOf(false) }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("Apply a template", fontWeight = FontWeight.SemiBold)
+
+            ExposedDropdownMenuBox(
+                expanded = placeMenuOpen,
+                onExpandedChange = { placeMenuOpen = !placeMenuOpen },
+            ) {
+                OutlinedTextField(
+                    value = selectedPlace?.name ?: "Pick a place",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Place") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = placeMenuOpen) },
+                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                )
+                ExposedDropdownMenu(
+                    expanded = placeMenuOpen,
+                    onDismissRequest = { placeMenuOpen = false },
+                ) {
+                    for (p in places) {
+                        DropdownMenuItem(
+                            text = { Text(p.name) },
+                            onClick = { onPlaceSelected(p); placeMenuOpen = false },
+                        )
+                    }
+                }
+            }
+
+            for (t in templates) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Text(t.title, fontWeight = FontWeight.SemiBold)
+                        Text(t.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(4.dp))
+                        Button(
+                            onClick = { onApply(t) },
+                            enabled = !saving && selectedPlace != null,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(if (saving) "Applying..." else "Apply")
+                        }
+                    }
+                }
             }
         }
     }

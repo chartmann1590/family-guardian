@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { requireAuth, getUserCircleId } from '../auth.js';
 import { publish } from '../hub.js';
-import { fanOut } from '../fcm.js';
+import { fanOut, fanOutToUsers } from '../fcm.js';
 
 const ActivateBody = z.object({
     lat: z.number().min(-90).max(90).optional(),
@@ -92,6 +92,22 @@ export default async function sosRoutes(fastify, { db }) {
         if (source) event.source = source;
         publish(circleId, { type: 'sos_active', ...event });
         fanOut(circleId, { type: 'sos_active', ...event }, db, userId);
+
+        const ecRows = db.prepare(`
+            SELECT ec.contact_user_id FROM emergency_contacts ec
+            WHERE ec.user_id = ? AND ec.status = 'accepted'
+        `).all(userId);
+        if (ecRows.length > 0) {
+            const ecPayload = {
+                type: 'sos_active',
+                userId: event.userId,
+                displayName: event.displayName,
+                activatedAt: event.startedAt,
+                viaEmergencyEscalation: true,
+            };
+            fanOutToUsers(ecRows.map(r => r.contact_user_id), ecPayload, db);
+        }
+
         return event;
     });
 

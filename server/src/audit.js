@@ -1,5 +1,5 @@
 const DEBOUNCE_MS = 5 * 60_000;
-const VALID_RESOURCES = new Set(['history', 'visits', 'trips', 'member_page', 'driving_score', 'routines']);
+const VALID_RESOURCES = new Set(['history', 'visits', 'trips', 'member_page', 'driving_score', 'routines', 'sos_escalation']);
 
 const insertStmt = (db) =>
     db.prepare(

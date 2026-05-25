@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { requireAuth, getUserCircleId } from '../auth.js';
 import { publish } from '../hub.js';
+import { fanOutToUsers } from '../fcm.js';
 import { reconcileGeofences } from '../geofence.js';
 import { onLocationFix as visitsOnFix } from '../visits.js';
 import { onLocationFix as tripsOnFix } from '../trips.js';
@@ -11,6 +12,47 @@ import { computeDrivingScore } from '../drivingScore.js';
 
 const SCORE_CACHE_TTL_MS = 5 * 60_000;
 const scoreCache = new Map();
+
+const lastBatteryState = new Map();
+
+function checkLowBattery(db, userId, circleId, batteryPct, displayName) {
+    if (batteryPct == null) return;
+    const watchers = db.prepare(`
+        SELECT ap.user_id, ap.low_battery_threshold
+        FROM alert_prefs ap
+        JOIN circle_members cm ON cm.user_id = ap.user_id AND cm.circle_id = ?
+        WHERE ap.low_battery_alerts = 1 AND cm.user_id != ?
+    `).all(circleId, userId);
+    if (watchers.length === 0) return;
+
+    const effectiveThreshold = Math.max(...watchers.map(w => w.low_battery_threshold || 15));
+    let state = lastBatteryState.get(userId);
+
+    if (!state) {
+        state = { pct: batteryPct, firedAt: null };
+        lastBatteryState.set(userId, state);
+    }
+
+    const crossed = state.pct >= effectiveThreshold && batteryPct < effectiveThreshold;
+    const canFire = state.firedAt == null || Date.now() - state.firedAt > 6 * 60 * 60 * 1000;
+
+    if (crossed && canFire) {
+        state.firedAt = Date.now();
+        state.pct = batteryPct;
+        const ev = { type: 'low_battery', userId, displayName, batteryPct, recordedAt: Date.now() };
+        publish(circleId, ev);
+        const watcherIds = watchers.filter(w => (w.low_battery_threshold || 15) >= batteryPct).map(w => w.user_id);
+        if (watcherIds.length > 0) {
+            fanOutToUsers(watcherIds, ev, db);
+        }
+        return;
+    }
+
+    if (batteryPct > effectiveThreshold + 5) {
+        state.firedAt = null;
+    }
+    state.pct = batteryPct;
+}
 
 function cachedDrivingScore(db, userId) {
     const now = Date.now();
@@ -168,6 +210,15 @@ export default async function locationRoutes(fastify, { db }) {
                 evaluateAlerts(db, { ...fix, prevBatteryPct: prevBattery });
             } catch (err) {
                 req.log.warn({ err: err.message, userId }, 'alerts_eval_failed');
+            }
+            try {
+                const circleId = getUserCircleId(db, userId);
+                if (circleId) {
+                    const uname = db.prepare('SELECT display_name FROM users WHERE id = ?').get(userId)?.display_name || '';
+                    checkLowBattery(db, userId, circleId, batteryPct, uname);
+                }
+            } catch (err) {
+                req.log.warn({ err: err.message, userId }, 'low_battery_check_failed');
             }
         }
         return { ok: true };

@@ -336,6 +336,18 @@ interface GuardianApi {
     ): CreateRoutineResponse
 
     @GET
+    suspend fun getRoutineTemplates(
+        @Url url: String,
+    ): List<RoutineTemplate>
+
+    @POST
+    suspend fun applyRoutineTemplate(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: okhttp3.RequestBody,
+    ): ApplyTemplateResponse
+
+    @GET
     suspend fun getHealth(
         @Url url: String,
         @Header("Authorization") auth: String,
@@ -365,6 +377,38 @@ interface GuardianApi {
         @Header("Authorization") auth: String,
         @Body body: okhttp3.RequestBody,
     ): DigestPrefsResponse
+
+    @GET
+    suspend fun getEmergencyContacts(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): EmergencyContactsResponse
+
+    @POST
+    suspend fun inviteEmergencyContact(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: okhttp3.RequestBody,
+    ): EmergencyContact
+
+    @POST
+    suspend fun respondEmergencyContact(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+        @Body body: okhttp3.RequestBody,
+    ): EmergencyContact
+
+    @DELETE
+    suspend fun deleteEmergencyContact(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    )
+
+    @GET
+    suspend fun getPendingInvites(
+        @Url url: String,
+        @Header("Authorization") auth: String,
+    ): PendingInvitesResponse
 }
 
 object ApiClient {

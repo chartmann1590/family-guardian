@@ -3,6 +3,7 @@
 
 import { evaluateOfflineSweep } from './alerts.js';
 import { mineRoutines, evaluateRoutineSweep } from './routines.js';
+import { evaluateCurfewSweep } from './curfew.js';
 import { buildDigest, persistDigest } from './digest.js';
 import { fanOut } from './fcm.js';
 import { publish } from './hub.js';
@@ -120,6 +121,16 @@ export function startScheduler(db, log) {
     const routineSweepHandle = setInterval(routineSweepTick, ROUTINE_SWEEP_INTERVAL_MS);
     if (routineSweepHandle.unref) routineSweepHandle.unref();
 
+    const curfewTick = () => {
+        try {
+            evaluateCurfewSweep(db);
+        } catch (err) {
+            log?.warn?.({ err: err.message }, 'curfew_sweep_failed');
+        }
+    };
+    const curfewSweepHandle = setInterval(curfewTick, 5 * 60_000);
+    if (curfewSweepHandle.unref) curfewSweepHandle.unref();
+
     const scheduleWeeklyDigest = () => {
         const now = new Date();
         const next = new Date(now);
@@ -174,6 +185,8 @@ export function startScheduler(db, log) {
     return () => {
         clearInterval(offlineHandle);
         clearInterval(pauseHandle);
+        clearInterval(routineSweepHandle);
+        clearInterval(curfewSweepHandle);
         clearInterval(cleanupHandle);
     };
 }

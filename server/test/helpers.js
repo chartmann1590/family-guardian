@@ -16,7 +16,7 @@ export function createTestDb() {
         const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf8');
         db.exec('BEGIN');
         try {
-            db.exec(sql.replace(/^PRAGMA\s+.*$/gm, ''));
+            db.exec(sql.replace(/^PRAGMA\s+.*$/gm, '').replace(/^\s*BEGIN\s*;?\s*$/gm, '').replace(/^\s*COMMIT\s*;?\s*$/gm, ''));
             insert.run(file, Date.now());
             db.exec('COMMIT');
         } catch (err) {

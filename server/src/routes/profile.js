@@ -6,7 +6,6 @@ import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { requireAuth } from '../auth.js';
 import { isFcmDisabled } from '../fcm.js';
-import { buildDigest, persistDigest } from '../digest.js';
 
 const UpdateMeBody = z.object({
     displayName: z.string().min(1).max(64).optional(),

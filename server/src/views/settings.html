@@ -223,9 +223,17 @@
                         <tbody id="routines-tbody"></tbody>
                     </table>
                 </div>
-                <button id="add-routine-btn" class="bg-primary text-on-primary px-4 py-2 rounded-lg text-sm hover:bg-primary/90 flex items-center gap-2 self-start">
-                    <span class="material-symbols-outlined text-base">add</span> Add routine
-                </button>
+                <div class="flex gap-2">
+                    <button id="add-routine-btn" class="bg-primary text-on-primary px-4 py-2 rounded-lg text-sm hover:bg-primary/90 flex items-center gap-2 self-start">
+                        <span class="material-symbols-outlined text-base">add</span> Custom
+                    </button>
+                    <button id="template-btn" class="bg-surface-container-high text-on-surface px-4 py-2 rounded-lg text-sm hover:bg-surface-container/90 flex items-center gap-2 self-start">
+                        <span class="material-symbols-outlined text-base">checklist</span> Templates
+                    </button>
+                </div>
+                <div id="template-section" class="hidden bg-surface-container rounded-lg p-4 flex flex-col gap-3">
+                    <div id="template-list" class="flex flex-col gap-3"></div>
+                </div>
                 <div id="add-routine-form" class="hidden bg-surface-container rounded-lg p-4 flex flex-col gap-3">
                     <div class="flex flex-wrap gap-3 items-end">
                         <div class="flex flex-col gap-1 flex-1 min-w-[140px]">
@@ -237,6 +245,7 @@
                             <select id="routine-kind" class="rounded-lg border border-outline-variant/40 px-3 py-2 text-sm bg-surface-container-lowest">
                                 <option value="arrival">Arrival</option>
                                 <option value="departure">Departure</option>
+                                <option value="dwell">Dwell</option>
                             </select>
                         </div>
                         <div class="flex flex-col gap-1">
@@ -281,6 +290,58 @@
             </div>
             <div id="view-log-list" class="flex flex-col divide-y divide-outline-variant/20">
                 <div class="py-4 text-sm text-on-surface-variant text-center">Loading...</div>
+            </div>
+        </section>
+
+        <!-- Curfew -->
+        <section class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">
+            <h2 class="font-headline-md text-headline-md text-on-surface mb-4">Curfew alerts</h2>
+            <p class="text-sm text-on-surface-variant mb-4">Alert your circle if you're not at home during set hours. You can pause sharing to suppress.</p>
+            <div class="flex items-center justify-between mb-4">
+                <span class="font-semibold">Enable curfew</span>
+                <input type="checkbox" id="curfew-toggle" class="w-5 h-5">
+            </div>
+            <div id="curfew-config" class="hidden flex flex-col gap-3">
+                <div class="flex gap-3">
+                    <div class="flex flex-col gap-1 flex-1">
+                        <label class="text-xs text-on-surface-variant">Start (HH:MM)</label>
+                        <input id="curfew-start" type="text" placeholder="22:00" class="rounded-lg border border-outline-variant/40 px-3 py-2 text-sm bg-surface-container-lowest">
+                    </div>
+                    <div class="flex flex-col gap-1 flex-1">
+                        <label class="text-xs text-on-surface-variant">End (HH:MM)</label>
+                        <input id="curfew-end" type="text" placeholder="06:00" class="rounded-lg border border-outline-variant/40 px-3 py-2 text-sm bg-surface-container-lowest">
+                    </div>
+                </div>
+                <label class="text-xs text-on-surface-variant">Home place</label>
+                <select id="curfew-home-place" class="rounded-lg border border-outline-variant/40 px-3 py-2 text-sm bg-surface-container-lowest"></select>
+                <button id="curfew-save" class="bg-primary text-on-primary px-4 py-2 rounded-lg text-sm hover:bg-primary/90">Save curfew</button>
+            </div>
+        </section>
+
+        <!-- Low battery -->
+        <section class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">
+            <h2 class="font-headline-md text-headline-md text-on-surface mb-4">Low-battery alerts</h2>
+            <p class="text-sm text-on-surface-variant mb-4">Notify your circle when your battery drops below a threshold.</p>
+            <div class="flex items-center justify-between mb-4">
+                <span class="font-semibold">Enable</span>
+                <input type="checkbox" id="low-battery-toggle" class="w-5 h-5">
+            </div>
+            <div id="low-battery-config" class="hidden">
+                <label class="text-sm">Threshold: <span id="low-battery-val">15</span>%</label>
+                <input id="low-battery-slider" type="range" min="5" max="50" step="5" value="15" class="w-full">
+                <button id="low-battery-save" class="bg-primary text-on-primary px-4 py-2 rounded-lg text-sm hover:bg-primary/90 mt-2">Save threshold</button>
+            </div>
+        </section>
+
+        <!-- Emergency contacts -->
+        <section class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">
+            <h2 class="font-headline-md text-headline-md text-on-surface mb-4">Emergency contacts</h2>
+            <p class="text-sm text-on-surface-variant mb-4">People outside your circle who get notified on SOS. They won't see your location.</p>
+            <div id="pending-invites-list" class="flex flex-col gap-2 mb-4"></div>
+            <div id="ec-list" class="flex flex-col gap-2 mb-4"></div>
+            <div class="flex gap-3">
+                <input id="ec-email" type="email" placeholder="Email address" class="flex-1 rounded-lg border border-outline-variant/40 px-3 py-2 text-sm bg-surface-container-lowest">
+                <button id="ec-invite-btn" class="bg-primary text-on-primary px-4 py-2 rounded-lg text-sm hover:bg-primary/90">Invite</button>
             </div>
         </section>
 

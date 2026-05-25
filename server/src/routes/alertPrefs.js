@@ -8,6 +8,12 @@ const PrefsPatch = z.object({
     lowBatteryThreshold: z.number().int().min(1).max(99).optional(),
     offlineEnabled: z.boolean().optional(),
     offlineMinutes: z.number().int().min(5).max(1440).optional(),
+    curfewEnabled: z.boolean().optional(),
+    curfewStart: z.number().int().min(0).max(1439).optional(),
+    curfewEnd: z.number().int().min(0).max(1439).optional(),
+    curfewHomePlaceId: z.number().int().nullable().optional(),
+    lowBatteryAlerts: z.boolean().optional(),
+    lowBatteryThresholdPct: z.number().int().min(5).max(50).optional(),
 });
 
 function rowToJson(r) {
@@ -22,6 +28,12 @@ function rowToJson(r) {
         routinesEnabled: !!(r.routines_enabled ?? 1),
         routinesQuietStart: r.routines_quiet_start ?? null,
         routinesQuietEnd: r.routines_quiet_end ?? null,
+        curfewEnabled: !!r.curfew_enabled,
+        curfewStart: r.curfew_start ?? null,
+        curfewEnd: r.curfew_end ?? null,
+        curfewHomePlaceId: r.curfew_home_place_id ?? null,
+        lowBatteryAlerts: !!r.low_battery_alerts,
+        lowBatteryThresholdPct: r.low_battery_threshold ?? 15,
     };
 }
 
@@ -59,6 +71,12 @@ export default async function alertPrefsRoutes(fastify, { db }) {
             lowBatteryThreshold: 'low_battery_threshold',
             offlineEnabled: 'offline_enabled',
             offlineMinutes: 'offline_minutes',
+            curfewEnabled: 'curfew_enabled',
+            curfewStart: 'curfew_start',
+            curfewEnd: 'curfew_end',
+            curfewHomePlaceId: 'curfew_home_place_id',
+            lowBatteryAlerts: 'low_battery_alerts',
+            lowBatteryThresholdPct: 'low_battery_threshold',
         };
         const updates = [];
         const params = [];

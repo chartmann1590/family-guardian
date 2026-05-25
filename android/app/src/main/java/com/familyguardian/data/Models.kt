@@ -236,6 +236,12 @@ data class AlertPrefs(
     val lowBatteryThreshold: Int = 15,
     val offlineEnabled: Boolean = true,
     val offlineMinutes: Int = 30,
+    val curfewEnabled: Boolean = false,
+    val curfewStart: Int? = null,
+    val curfewEnd: Int? = null,
+    val curfewHomePlaceId: Long? = null,
+    val lowBatteryAlerts: Boolean = false,
+    val lowBatteryThresholdPct: Int? = null,
 )
 
 @Serializable
@@ -375,6 +381,7 @@ data class Routine(
     val kind: String,
     val dayOfWeek: Int,
     val expectedMinute: Int,
+    val expectedDwellMinutes: Int? = null,
     val toleranceMinutes: Int,
     val sampleCount: Int,
     val confidence: Double,
@@ -407,6 +414,26 @@ data class CreateRoutineRequest(
 
 @Serializable
 data class CreateRoutineResponse(val ids: List<Int>, val count: Int)
+
+@Serializable
+data class RoutineTemplate(
+    val id: String,
+    val title: String,
+    val description: String,
+    val needsPlace: String? = null,
+    val items: List<RoutineTemplateItem>,
+)
+
+@Serializable
+data class RoutineTemplateItem(
+    val kind: String,
+    val daysOfWeek: List<Int>,
+    val expectedMinute: Int,
+    val toleranceMinutes: Int,
+)
+
+@Serializable
+data class ApplyTemplateResponse(val created: List<Int>, val skipped: List<Int>, val total: Int)
 
 @Serializable
 data class ExpectedArrival(
@@ -535,3 +562,28 @@ data class DigestResponse(val digest: DigestData? = null)
 
 @Serializable
 data class DigestPrefsResponse(val enabled: Boolean = false)
+
+@Serializable
+data class EmergencyContact(
+    val id: Int,
+    val contactUserId: Int,
+    val contactDisplayName: String = "",
+    val contactPhotoUrl: String? = null,
+    val status: String = "pending",
+    val invitedAt: Long,
+    val acceptedAt: Long? = null,
+)
+
+@Serializable
+data class EmergencyContactsResponse(val contacts: List<EmergencyContact> = emptyList())
+
+@Serializable
+data class PendingInvite(
+    val id: Int,
+    val fromUserId: Int,
+    val fromDisplayName: String = "",
+    val invitedAt: Long,
+)
+
+@Serializable
+data class PendingInvitesResponse(val invites: List<PendingInvite> = emptyList())

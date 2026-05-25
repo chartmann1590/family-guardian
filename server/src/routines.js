@@ -60,12 +60,17 @@ export function mineRoutines(db, opts = {}) {
     `).all(windowStart);
 
     const groups = new Map();
+    const dwellGroups = new Map();
     for (const v of visits) {
         const arr = estimateLocalMinute(v.lng, v.started_at);
         pushObs(groups, v.user_id, v.circle_id, v.place_id, 'arrival', arr.dayOfWeek, arr.minute, v.started_at);
         if (v.ended_at != null) {
             const dep = estimateLocalMinute(v.lng, v.ended_at);
             pushObs(groups, v.user_id, v.circle_id, v.place_id, 'departure', dep.dayOfWeek, dep.minute, v.ended_at);
+            if (v.ended_at - v.started_at >= 5 * 60 * 1000) {
+                const dwellMin = Math.round((v.ended_at - v.started_at) / 60000);
+                pushDwellObs(dwellGroups, v.user_id, v.circle_id, v.place_id, arr.dayOfWeek, arr.minute, dwellMin, v.started_at);
+            }
         }
     }
 
@@ -92,6 +97,23 @@ export function mineRoutines(db, opts = {}) {
             updated_at        = excluded.updated_at
     `);
 
+    const upsertDwell = db.prepare(`
+        INSERT INTO routines (user_id, circle_id, place_id, kind, day_of_week,
+                              expected_minute, expected_dwell_minutes, tolerance_minutes, sample_count, confidence,
+                              source, active, first_seen_at, last_seen_at, last_observed_at,
+                              created_at, updated_at)
+        VALUES (?, ?, ?, 'dwell', ?, ?, ?, ?, ?, ?, 'auto', 1, ?, ?, NULL, ?, ?)
+        ON CONFLICT (user_id, place_id, kind, day_of_week) DO UPDATE SET
+            expected_dwell_minutes = CASE WHEN routines.source = 'manual' THEN routines.expected_dwell_minutes ELSE excluded.expected_dwell_minutes END,
+            expected_minute        = CASE WHEN routines.source = 'manual' THEN routines.expected_minute        ELSE excluded.expected_minute END,
+            tolerance_minutes      = CASE WHEN routines.source = 'manual' THEN routines.tolerance_minutes      ELSE excluded.tolerance_minutes END,
+            sample_count           = excluded.sample_count,
+            confidence             = excluded.confidence,
+            last_seen_at           = excluded.last_seen_at,
+            active                 = 1,
+            updated_at             = excluded.updated_at
+    `);
+
     db.transaction(() => {
         for (const g of groups.values()) {
             const stats = computeStats(g.minutes);
@@ -107,6 +129,29 @@ export function mineRoutines(db, opts = {}) {
             upsert.run(
                 g.user_id, g.circle_id, g.place_id, g.kind, g.day_of_week,
                 stats.median, tolerance, g.sampleCount, confidence,
+                firstSeen, lastSeen, now, now,
+            );
+
+            if (existed) routinesUpdated++;
+            else routinesCreated++;
+        }
+
+        for (const g of dwellGroups.values()) {
+            const stats = computeStats(g.minutes);
+            if (!stats) continue;
+            const dwellStats = computeStats(g.dwellDurations);
+            if (!dwellStats) continue;
+            const confidence = computeConfidence(dwellStats.stddev, dwellStats.sampleCount);
+            if (confidence < 0.7) continue;
+
+            const tolerance = computeTolerance(dwellStats.stddev);
+            const firstSeen = Math.min(...g.epochs);
+            const lastSeen = Math.max(...g.epochs);
+            const existed = !!checkExisting.get(g.user_id, g.place_id, 'dwell', g.day_of_week);
+
+            upsertDwell.run(
+                g.user_id, g.circle_id, g.place_id, g.day_of_week,
+                stats.median, dwellStats.median, tolerance, dwellStats.sampleCount, confidence,
                 firstSeen, lastSeen, now, now,
             );
 
@@ -142,6 +187,19 @@ function pushObs(groups, userId, circleId, placeId, kind, dayOfWeek, minute, epo
     g.sampleCount++;
 }
 
+function pushDwellObs(groups, userId, circleId, placeId, dayOfWeek, startMinute, dwellDuration, epoch) {
+    const key = `${userId}:${placeId}:dwell:${dayOfWeek}`;
+    let g = groups.get(key);
+    if (!g) {
+        g = { user_id: userId, circle_id: circleId, place_id: placeId, day_of_week: dayOfWeek, minutes: [], dwellDurations: [], epochs: [], sampleCount: 0 };
+        groups.set(key, g);
+    }
+    g.minutes.push(startMinute);
+    g.dwellDurations.push(dwellDuration);
+    g.epochs.push(epoch);
+    g.sampleCount++;
+}
+
 export function evaluateRoutineSweep(db, now = Date.now()) {
     const OBSERVATION_MS = 7 * 24 * 60 * 60 * 1000;
     const FIRING_WINDOW_MIN = 60;
@@ -168,7 +226,7 @@ export function evaluateRoutineSweep(db, now = Date.now()) {
         INSERT INTO routine_alerts (routine_id, user_id, circle_id, kind, fired_at, fired_local_date,
                                     expected_minute, actual_minute, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT (routine_id, fired_local_date) DO NOTHING
+        ON CONFLICT (user_id, kind, fired_local_date) DO NOTHING
     `);
 
     const getUserLng = db.prepare(
@@ -189,10 +247,12 @@ export function evaluateRoutineSweep(db, now = Date.now()) {
 
         const tolerance = r.tolerance_minutes;
         const expected = r.expected_minute;
-        const fireStart = expected + tolerance;
-        const fireEnd = fireStart + FIRING_WINDOW_MIN;
 
-        if (local.minute < fireStart || local.minute >= fireEnd) continue;
+        if (r.kind !== 'dwell') {
+            const fireStart = expected + tolerance;
+            const fireEnd = fireStart + FIRING_WINDOW_MIN;
+            if (local.minute < fireStart || local.minute >= fireEnd) continue;
+        }
 
         const localDate = localDateFromLng(lng, now);
 
@@ -231,6 +291,45 @@ export function evaluateRoutineSweep(db, now = Date.now()) {
             );
             if (result.changes > 0) {
                 emitDeviation(db, r, 'overstay', expected, null);
+            }
+        } else if (r.kind === 'dwell') {
+            const { epochStart } = todayEpochRange(lng, now, expected, tolerance);
+            const dwellMinutes = r.expected_dwell_minutes || 120;
+            const expectedCloseEpoch = epochStart + (dwellMinutes + tolerance) * 60 * 1000;
+            const fireWindowEnd = expectedCloseEpoch + FIRING_WINDOW_MIN * 60 * 1000;
+            if (now < expectedCloseEpoch) continue;
+            if (now >= fireWindowEnd) continue;
+
+            const visit = db.prepare(`
+                SELECT started_at FROM visits
+                WHERE user_id = ? AND place_id = ? AND started_at >= ? AND started_at <= ?
+                  AND (ended_at IS NULL OR ended_at > ?)
+                LIMIT 1
+            `).get(r.user_id, r.place_id, epochStart - tolerance * 60 * 1000, epochStart + tolerance * 60 * 1000, expectedCloseEpoch);
+
+            if (!visit) continue;
+
+            const actualDwell = Math.round((now - visit.started_at) / 60000);
+            const result = insertAlert.run(
+                r.id, r.user_id, r.circle_id, 'overstay_dwell',
+                now, localDate, expected, actualDwell, now,
+            );
+            if (result.changes > 0) {
+                const ev = {
+                    type: 'routine_deviation',
+                    userId: r.user_id,
+                    displayName: r.displayName,
+                    routineId: r.id,
+                    placeId: r.place_id,
+                    placeName: r.placeName,
+                    kind: 'overstay_dwell',
+                    expectedDwellMinutes: dwellMinutes,
+                    actualDwellMinutes: actualDwell,
+                    expectedMinute: expected,
+                    actualMinute: null,
+                };
+                publish(r.circle_id, ev);
+                fanOut(r.circle_id, ev, db, r.user_id);
             }
         }
     }

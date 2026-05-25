@@ -60,4 +60,16 @@ class RoutinesRepo(private val prefs: Prefs) {
         val url = ApiClient.endpoint(server(snap), "/api/users/me/routines")
         return api.createRoutine(url, auth(snap), jsonBody(body))
     }
+
+    suspend fun getTemplates(): List<RoutineTemplate> {
+        val snap = prefs.snapshot()
+        val url = ApiClient.endpoint(server(snap), "/api/routine-templates")
+        return api.getRoutineTemplates(url)
+    }
+
+    suspend fun applyTemplate(body: String): ApplyTemplateResponse {
+        val snap = prefs.snapshot()
+        val url = ApiClient.endpoint(server(snap), "/api/users/me/routines/from-template")
+        return api.applyRoutineTemplate(url, auth(snap), jsonBody(body))
+    }
 }
