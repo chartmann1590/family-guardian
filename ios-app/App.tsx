@@ -391,7 +391,7 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
     {subScreen === 'trips' && subMemberId != null && <TripsScreen session={session} memberId={subMemberId} memberName={subMemberName} onBack={() => setSubScreen(null)} />}
     {!subScreen && <>
       {tab === 'map' && <MapTab members={members} places={places} mapRef={mapRef} onMember={setSelectedMember} onShare={startSharing} sharing={sharing} onSos={sendSos} onCheckIn={checkIn} health={health} digest={digest} onOpenDigest={() => setSubScreen('digest')} />}
-      {tab === 'members' && <MembersTab session={session} members={members} selected={selectedMember} setSelected={setSelectedMember} history={history} setHistory={setHistory} onViewTrips={(uid, name) => { setSubMemberId(uid); setSubMemberName(name); setSubScreen('trips'); }} />}
+      {tab === 'members' && <MembersTab session={session} members={members} selected={selectedMember} setSelected={setSelectedMember} history={history} setHistory={setHistory} onViewTrips={(uid: number, name: string) => { setSubMemberId(uid); setSubMemberName(name); setSubScreen('trips'); }} />}
       {tab === 'chat' && <ChatTab session={session} messages={messages} setMessages={setMessages} loadMessages={loadMessages} typingUsers={typingUsers} readQueueRef={readQueueRef} readTimerRef={readTimerRef} />}
       {tab === 'places' && <PlacesTab session={session} places={places} setPlaces={setPlaces} />}
       {tab === 'alerts' && <AlertsTab alerts={alerts} loadAlerts={loadAlerts} />}
