@@ -1,6 +1,7 @@
 // Geofence enter/exit detection. Called from POST /api/locations.
 import { publish } from './hub.js';
 import { fanOutToUsers } from './fcm.js';
+import { isSnoozed } from './lib/snooze.js';
 
 const EARTH_RADIUS_M = 6_371_000;
 
@@ -108,7 +109,7 @@ export function reconcileGeofences(db, { userId, circleId, displayName, lat, lng
     for (const ev of events) {
         const subs = findSubs.all(ev.placeId, ev.userId, ev.type, ev.type);
         ev.notifyUserIds = subs
-            .filter(s => !inQuietHours(s.quiet_start, s.quiet_end, recordedAt))
+            .filter(s => !inQuietHours(s.quiet_start, s.quiet_end, recordedAt) && !isSnoozed(db, s.user_id, ev.type))
             .map(s => s.user_id);
     }
 

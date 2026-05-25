@@ -7,6 +7,7 @@
 
 import { publish } from './hub.js';
 import { fanOut } from './fcm.js';
+import { isSnoozed } from './lib/snooze.js';
 
 const SPEEDING_REFIRE_MS = 5 * 60_000;
 
@@ -54,7 +55,11 @@ export function evaluateAlerts(db, fix) {
                     recordedAt: createdAt,
                 };
                 publish(circleId, ev);
-                fanOut(circleId, ev, db, userId);
+                const circleMembers = db.prepare('SELECT user_id FROM circle_members WHERE circle_id = ? AND user_id != ?').all(circleId, userId);
+                const unsnoozed = circleMembers.filter(m => !isSnoozed(db, m.user_id, 'speeding'));
+                if (unsnoozed.length > 0) {
+                    fanOut(circleId, ev, db, userId);
+                }
             }
         }
     }
@@ -75,7 +80,11 @@ export function evaluateAlerts(db, fix) {
             recordedAt: createdAt,
         };
         publish(circleId, ev);
-        fanOut(circleId, ev, db, userId);
+        const circleMembers = db.prepare('SELECT user_id FROM circle_members WHERE circle_id = ? AND user_id != ?').all(circleId, userId);
+        const unsnoozed = circleMembers.filter(m => !isSnoozed(db, m.user_id, 'low_battery'));
+        if (unsnoozed.length > 0) {
+            fanOut(circleId, ev, db, userId);
+        }
     }
 }
 
@@ -119,6 +128,10 @@ export function evaluateOfflineSweep(db) {
             recordedAt: createdAt,
         };
         publish(r.circleId, ev);
-        fanOut(r.circleId, ev, db, r.userId);
+        const circleMembers = db.prepare('SELECT user_id FROM circle_members WHERE circle_id = ? AND user_id != ?').all(r.circleId, r.userId);
+        const unsnoozed = circleMembers.filter(m => !isSnoozed(db, m.user_id, 'offline'));
+        if (unsnoozed.length > 0) {
+            fanOut(r.circleId, ev, db, r.userId);
+        }
     }
 }

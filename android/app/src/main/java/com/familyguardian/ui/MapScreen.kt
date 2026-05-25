@@ -194,6 +194,7 @@ fun MapScreen(
     onOpenViewLog: () -> Unit = {},
     onOpenAccount: () -> Unit = {},
     onOpenDigest: () -> Unit = {},
+    onOpenEmergencyContacts: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val appCtx = context.applicationContext
@@ -811,6 +812,11 @@ fun MapScreen(
                                             onClick = { overflowMenuOpen = false; onOpenAlertHistory() },
                                         )
                                     }
+                                    DropdownMenuItem(
+                                        text = { Text("Emergency contacts") },
+                                        leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
+                                        onClick = { overflowMenuOpen = false; onOpenEmergencyContacts() },
+                                    )
                                     DropdownMenuItem(
                                         text = { Text("About") },
                                         leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) },

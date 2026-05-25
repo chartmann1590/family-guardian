@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { requireAuth, getUserCircleId } from '../auth.js';
 import { publish } from '../hub.js';
 import { fanOutToUsers } from '../fcm.js';
+import { isSnoozed } from '../lib/snooze.js';
 import { reconcileGeofences } from '../geofence.js';
 import { onLocationFix as visitsOnFix } from '../visits.js';
 import { onLocationFix as tripsOnFix } from '../trips.js';
@@ -12,8 +13,6 @@ import { computeDrivingScore } from '../drivingScore.js';
 
 const SCORE_CACHE_TTL_MS = 5 * 60_000;
 const scoreCache = new Map();
-
-const lastBatteryState = new Map();
 
 function checkLowBattery(db, userId, circleId, batteryPct, displayName) {
     if (batteryPct == null) return;
@@ -26,32 +25,30 @@ function checkLowBattery(db, userId, circleId, batteryPct, displayName) {
     if (watchers.length === 0) return;
 
     const effectiveThreshold = Math.max(...watchers.map(w => w.low_battery_threshold || 15));
-    let state = lastBatteryState.get(userId);
+    let state = db.prepare('SELECT last_pct AS pct, last_alert_at AS firedAt FROM last_battery_state WHERE user_id = ?').get(userId);
 
     if (!state) {
         state = { pct: batteryPct, firedAt: null };
-        lastBatteryState.set(userId, state);
     }
 
     const crossed = state.pct >= effectiveThreshold && batteryPct < effectiveThreshold;
     const canFire = state.firedAt == null || Date.now() - state.firedAt > 6 * 60 * 60 * 1000;
 
     if (crossed && canFire) {
-        state.firedAt = Date.now();
-        state.pct = batteryPct;
+        db.prepare('INSERT OR REPLACE INTO last_battery_state (user_id, last_pct, last_alert_at) VALUES (?, ?, ?)')
+            .run(userId, batteryPct, Date.now());
         const ev = { type: 'low_battery', userId, displayName, batteryPct, recordedAt: Date.now() };
         publish(circleId, ev);
-        const watcherIds = watchers.filter(w => (w.low_battery_threshold || 15) >= batteryPct).map(w => w.user_id);
+        const watcherIds = watchers.filter(w => (w.low_battery_threshold || 15) >= batteryPct && !isSnoozed(db, w.user_id, 'low_battery')).map(w => w.user_id);
         if (watcherIds.length > 0) {
             fanOutToUsers(watcherIds, ev, db);
         }
         return;
     }
 
-    if (batteryPct > effectiveThreshold + 5) {
-        state.firedAt = null;
-    }
-    state.pct = batteryPct;
+    const resetCooldown = batteryPct > effectiveThreshold + 5;
+    db.prepare('INSERT OR REPLACE INTO last_battery_state (user_id, last_pct, last_alert_at) VALUES (?, ?, ?)')
+        .run(userId, batteryPct, resetCooldown ? 0 : (state.firedAt || 0));
 }
 
 function cachedDrivingScore(db, userId) {

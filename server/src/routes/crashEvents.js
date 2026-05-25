@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { requireAuth, getUserCircleId } from '../auth.js';
 import { publish } from '../hub.js';
+import { fanOut } from '../fcm.js';
 
 const CrashReportBody = z.object({
     peakAccelMps2: z.number().min(5),
@@ -54,13 +55,15 @@ export default async function crashEventRoutes(fastify, { db }) {
         const id = Number(r.lastInsertRowid);
 
         const displayName = req.auth.displayName;
-        publish(circleId, {
+        const ev = {
             type: 'crash_pending',
             userId,
             displayName,
             crashEventId: id,
             detectedAt: now,
-        });
+        };
+        publish(circleId, ev);
+        fanOut(circleId, ev, db, userId);
 
         return { id, detectedAt: now };
     });

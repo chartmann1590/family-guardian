@@ -39,6 +39,7 @@ import com.familyguardian.ui.ServerConfigScreen
 import com.familyguardian.ui.TripsScreen
 import com.familyguardian.ui.VisitsScreen
 import com.familyguardian.ui.ViewLogScreen
+import com.familyguardian.ui.EmergencyContactsScreen
 import com.familyguardian.ui.AccountScreen
 import org.osmdroid.config.Configuration
 
@@ -134,6 +135,7 @@ private fun AppRoot() {
                 onOpenViewLog = { nav.navigate("view-log") },
                 onOpenAccount = { nav.navigate("account") },
                 onOpenDigest = { nav.navigate("digest") },
+                onOpenEmergencyContacts = { nav.navigate("emergency-contacts") },
             )
         }
         composable("places") {
@@ -218,6 +220,9 @@ private fun AppRoot() {
             val circleId by prefs.circleId.collectAsStateWithLifecycle(initialValue = null)
             val cid = circleId ?: return@composable Box {}
             DigestScreen(circleId = cid, onBack = { nav.popBackStack() })
+        }
+        composable("emergency-contacts") {
+            EmergencyContactsScreen(onBack = { nav.popBackStack() })
         }
     }
 }

@@ -480,11 +480,41 @@
                     body: JSON.stringify({ enabled: digestToggle.checked }),
                 });
                 toast(digestToggle.checked ? 'Weekly digest enabled' : 'Weekly digest disabled', 'success');
+                const schedule = $('digest-schedule');
+                if (schedule) schedule.classList.toggle('hidden', !digestToggle.checked);
             } catch (err) {
                 toast('Failed: ' + err.message, 'error');
                 digestToggle.checked = !digestToggle.checked;
             }
         });
+
+        const digestSchedule = $('digest-schedule');
+        if (digestSchedule) {
+            fetch('/api/users/me/alert-prefs', { headers: authHeaders() })
+                .then(r => r.json())
+                .then(p => {
+                    if (p.digestDayOfWeek != null) $('digest-day').value = p.digestDayOfWeek;
+                    if (p.digestHourLocal != null) {
+                        const h = String(p.digestHourLocal).padStart(2, '0');
+                        $('digest-time').value = `${h}:00`;
+                    }
+                    digestSchedule.classList.toggle('hidden', !digestToggle.checked);
+                })
+                .catch(() => {});
+            $('digest-schedule-save')?.addEventListener('click', async () => {
+                const day = parseInt($('digest-day').value, 10);
+                const [h] = $('digest-time').value.split(':').map(Number);
+                const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                try {
+                    await fetch('/api/users/me/alert-prefs', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                        body: JSON.stringify({ digestDayOfWeek: day, digestHourLocal: h, digestTimezone: tz }),
+                    });
+                    toast('Digest schedule saved', 'success');
+                } catch (err) { toast('Failed: ' + err.message, 'error'); }
+            });
+        }
     }
 
     $('view-log-refresh').addEventListener('click', loadViewLog);
@@ -755,4 +785,82 @@
             $('ec-invite-btn').disabled = false;
         });
     }
+
+    const SNOOZABLE_TYPES = [
+        { key: 'geofence_enter', label: 'Place arrival' },
+        { key: 'geofence_exit', label: 'Place departure' },
+        { key: 'speeding', label: 'Speeding' },
+        { key: 'low_battery', label: 'Low battery' },
+        { key: 'offline', label: 'Offline' },
+        { key: 'routine_deviation', label: 'Routine deviation' },
+        { key: 'curfew_violation', label: 'Curfew violation' },
+    ];
+    const SNOOZE_DURATIONS = [
+        { label: '1h', minutes: 60 },
+        { label: '4h', minutes: 240 },
+        { label: '24h', minutes: 1440 },
+    ];
+
+    async function loadSnoozes() {
+        try {
+            const res = await fetch('/api/users/me/alert-snoozes', { headers: authHeaders() });
+            const data = await res.json();
+            renderSnoozes(data.snoozes || []);
+        } catch {}
+    }
+
+    function renderSnoozes(snoozes) {
+        const container = $('active-snoozes-list');
+        if (!container) return;
+        if (snoozes.length === 0) {
+            container.innerHTML = '<p style="color:#637089;font-size:14px;">No active snoozes.</p>';
+            return;
+        }
+        container.innerHTML = snoozes.map(s => {
+            const remaining = Math.max(0, Math.round((s.snoozeUntil - Date.now()) / 60000));
+            const hours = Math.floor(remaining / 60);
+            const mins = remaining % 60;
+            const label = SNOOZABLE_TYPES.find(t => t.key === s.alertType)?.label || s.alertType;
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #dde3ed;">
+                <div><span style="font-weight:500;">${esc(label)}</span><span style="color:#637089;font-size:13px;margin-left:8px;">${hours}h ${mins}m left</span></div>
+                <button class="cancel-snooze-btn" data-type="${esc(s.alertType)}" style="background:none;border:1px solid #ba1a1a;color:#ba1a1a;border-radius:8px;padding:4px 12px;cursor:pointer;font-size:13px;">Cancel</button>
+            </div>`;
+        }).join('');
+        for (const btn of container.querySelectorAll('.cancel-snooze-btn')) {
+            btn.addEventListener('click', async () => {
+                await fetch(`/api/users/me/alert-snooze/${btn.dataset.type}`, { method: 'DELETE', headers: authHeaders() });
+                loadSnoozes();
+            });
+        }
+    }
+
+    function initSnoozeUI() {
+        const container = $('snooze-chips');
+        if (!container) return;
+        container.innerHTML = SNOOZABLE_TYPES.map(t => {
+            const chips = SNOOZE_DURATIONS.map(d =>
+                `<button class="snooze-btn" data-type="${t.key}" data-minutes="${d.minutes}" style="background:#e8eef6;border:none;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:12px;margin:2px;">${d.label}</button>`
+            ).join('');
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;">
+                <span style="font-size:14px;">${esc(t.label)}</span>
+                <div>${chips}</div>
+            </div>`;
+        }).join('');
+        for (const btn of container.querySelectorAll('.snooze-btn')) {
+            btn.addEventListener('click', async () => {
+                const type = btn.dataset.type;
+                const minutes = parseInt(btn.dataset.minutes, 10);
+                await fetch('/api/users/me/alert-snooze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                    body: JSON.stringify({ alertType: type, durationMinutes: minutes }),
+                });
+                toast(`${type} snoozed for ${minutes >= 60 ? (minutes / 60) + 'h' : minutes + 'm'}`, 'success');
+                loadSnoozes();
+            });
+        }
+        loadSnoozes();
+    }
+
+    initSnoozeUI();
 })();

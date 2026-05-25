@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import { requireAuth } from '../auth.js';
+import { setSnooze, clearSnooze, listSnoozes } from '../lib/snooze.js';
+
+const SnoozeBody = z.object({
+    alertType: z.string(),
+    durationMinutes: z.number().int().min(1).max(10080),
+});
 
 const PrefsPatch = z.object({
     speedingEnabled: z.boolean().optional(),
@@ -14,6 +20,9 @@ const PrefsPatch = z.object({
     curfewHomePlaceId: z.number().int().nullable().optional(),
     lowBatteryAlerts: z.boolean().optional(),
     lowBatteryThresholdPct: z.number().int().min(5).max(50).optional(),
+    digestDayOfWeek: z.number().int().min(0).max(6).optional(),
+    digestHourLocal: z.number().int().min(0).max(23).optional(),
+    digestTimezone: z.string().max(64).optional(),
 });
 
 function rowToJson(r) {
@@ -34,6 +43,9 @@ function rowToJson(r) {
         curfewHomePlaceId: r.curfew_home_place_id ?? null,
         lowBatteryAlerts: !!r.low_battery_alerts,
         lowBatteryThresholdPct: r.low_battery_threshold ?? 15,
+        digestDayOfWeek: r.digest_day_of_week ?? 0,
+        digestHourLocal: r.digest_hour_local ?? 18,
+        digestTimezone: r.digest_timezone ?? 'Etc/UTC',
     };
 }
 
@@ -77,6 +89,9 @@ export default async function alertPrefsRoutes(fastify, { db }) {
             curfewHomePlaceId: 'curfew_home_place_id',
             lowBatteryAlerts: 'low_battery_alerts',
             lowBatteryThresholdPct: 'low_battery_threshold',
+            digestDayOfWeek: 'digest_day_of_week',
+            digestHourLocal: 'digest_hour_local',
+            digestTimezone: 'digest_timezone',
         };
         const updates = [];
         const params = [];
@@ -108,5 +123,24 @@ export default async function alertPrefsRoutes(fastify, { db }) {
              ORDER BY a.created_at DESC LIMIT ?`,
         ).all(circleId, since, limit);
         return { alerts: rows };
+    });
+
+    fastify.post('/api/users/me/alert-snooze', { preHandler: requireAuth(db) }, async (req, reply) => {
+        const parsed = SnoozeBody.safeParse(req.body);
+        if (!parsed.success) return reply.code(400).send({ error: 'invalid_body', details: parsed.error.flatten() });
+        const { alertType, durationMinutes } = parsed.data;
+        const untilMs = Date.now() + durationMinutes * 60_000;
+        const ok = setSnooze(db, req.auth.userId, alertType, untilMs);
+        if (!ok) return reply.code(400).send({ error: 'cannot_snooze_type', message: 'SOS and crash alerts cannot be snoozed.' });
+        return { ok: true, alertType, snoozeUntil: untilMs };
+    });
+
+    fastify.delete('/api/users/me/alert-snooze/:alertType', { preHandler: requireAuth(db) }, async (req) => {
+        clearSnooze(db, req.auth.userId, req.params.alertType);
+        return { ok: true };
+    });
+
+    fastify.get('/api/users/me/alert-snoozes', { preHandler: requireAuth(db) }, async (req) => {
+        return { snoozes: listSnoozes(db, req.auth.userId) };
     });
 }

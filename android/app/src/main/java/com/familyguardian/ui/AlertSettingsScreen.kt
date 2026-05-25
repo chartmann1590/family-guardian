@@ -34,10 +34,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
 import com.familyguardian.data.AlertPrefs
 import com.familyguardian.data.AlertPrefsRepo
+import com.familyguardian.data.ApiClient
 import com.familyguardian.data.Prefs
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -168,6 +172,63 @@ fun AlertSettingsScreen(onBack: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+
+            Text(
+                "Alert Snooze",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 16.dp),
+            )
+            Text(
+                "Temporarily mute alerts. SOS and crash alerts cannot be snoozed.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            val snoozeTypes = listOf(
+                "speeding" to "Speeding",
+                "low_battery" to "Low battery",
+                "offline" to "Offline",
+                "routine_deviation" to "Routine deviation",
+                "curfew_violation" to "Curfew",
+                "geofence_enter" to "Place arrival",
+                "geofence_exit" to "Place departure",
+            )
+            val snoozeDurations = listOf(60 to "1h", 240 to "4h", 1440 to "24h")
+
+            for ((type, label) in snoozeTypes) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(label, style = MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        for ((mins, durLabel) in snoozeDurations) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        try {
+                                            val url = ApiClient.endpoint(prefs.snapshot().serverUrl!!, "/api/users/me/alert-snooze")
+                                            val body = """{"alertType":"$type","durationMinutes":$mins}"""
+                                                .toRequestBody("application/json".toMediaType())
+                                            ApiClient.okHttp.newCall(
+                                                okhttp3.Request.Builder()
+                                                    .url(url)
+                                                    .header("Authorization", "Bearer ${prefs.snapshot().token!!}")
+                                                    .post(body)
+                                                    .build()
+                                            ).execute()
+                                            Toast.makeText(context, "Snoozed $label for $durLabel", Toast.LENGTH_SHORT).show()
+                                        } catch (t: Throwable) { Toast.makeText(context, t.message ?: "Failed", Toast.LENGTH_SHORT).show() }
+                                    }
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            ) { Text(durLabel, style = MaterialTheme.typography.labelSmall) }
+                        }
+                    }
+                }
             }
         }
     }

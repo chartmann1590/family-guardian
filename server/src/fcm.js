@@ -110,3 +110,13 @@ export async function fanOutToUsers(userIds, payload, db) {
         console.error(`FCM fanOutToUsers failed: ${err.message}`);
     }
 }
+
+export function cleanupStaleTokens(db, maxAgeMs = 90 * 24 * 60 * 60 * 1000) {
+    const cutoff = Date.now() - maxAgeMs;
+    try {
+        const r = db.prepare('DELETE FROM fcm_tokens WHERE updated_at < ?').run(cutoff);
+        if (r.changes > 0) console.log(`Cleaned up ${r.changes} stale FCM tokens`);
+    } catch (err) {
+        console.error(`FCM stale token cleanup failed: ${err.message}`);
+    }
+}

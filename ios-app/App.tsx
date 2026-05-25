@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createAudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -213,6 +214,26 @@ function Auth({ onSession }: { onSession: (s: Session) => void }) {
 
 function CrashCountdownModal({ crashState, onCancel, onExpire }: any) {
   const [remaining, setRemaining] = useState(Math.max(0, Math.ceil((crashState.expiresAt - Date.now()) / 1000)));
+  const playerRef = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
+
+  useEffect(() => {
+    try {
+      const source = require('./assets/sounds/crash-countdown.wav');
+      const player = createAudioPlayer(source);
+      player.loop = true;
+      player.play();
+      playerRef.current = player;
+    } catch (e) {
+      console.warn('Crash audio failed to play:', e);
+    }
+    return () => {
+      try {
+        playerRef.current?.release();
+        playerRef.current = null;
+      } catch (_) {}
+    };
+  }, []);
+
   useEffect(() => {
     if (remaining <= 0) { onExpire(); return; }
     const timer = setInterval(() => setRemaining((r: number) => r - 1), 1000);
@@ -861,6 +882,27 @@ function MoreTab({ session, onLogout, onRefresh, onOpenRoutines, onOpenDigest }:
           Alert.alert('Saved');
         }}><Text style={styles.buttonText}>Save</Text></Pressable>
       </View>}
+    </View>
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Alert snooze</Text>
+      <Text style={styles.meta}>Temporarily mute alerts. SOS and crash cannot be snoozed.</Text>
+      {[
+        ['speeding', 'Speeding'], ['low_battery', 'Low battery'], ['offline', 'Offline'],
+        ['routine_deviation', 'Routine deviation'], ['curfew_violation', 'Curfew'],
+        ['geofence_enter', 'Place arrival'], ['geofence_exit', 'Place departure'],
+      ].map(([type, label]) => (
+        <View key={type} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 }}>
+          <Text style={{ fontWeight: '500' }}>{label}</Text>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {[[60, '1h'], [240, '4h'], [1440, '24h']].map(([mins, dur]) => (
+              <Pressable key={mins} style={[styles.chip, { backgroundColor: '#e8eef6' }]} onPress={async () => {
+                await api(session, '/api/users/me/alert-snooze', { method: 'POST', body: JSON.stringify({ alertType: type, durationMinutes: mins }) });
+                Alert.alert('Snoozed', `${label} snoozed for ${dur}`);
+              }}><Text style={{ fontSize: 12 }}>{dur}</Text></Pressable>
+            ))}
+          </View>
+        </View>
+      ))}
     </View>
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Who viewed your history</Text>

@@ -1,5 +1,24 @@
 import { publish } from './hub.js';
 import { fanOut } from './fcm.js';
+import { isSnoozed } from './lib/snooze.js';
+import { BundlingBuffer } from './lib/notificationBundler.js';
+
+const deviationBundler = new BundlingBuffer(60_000);
+
+function flushBundle(circleId, events) {
+    if (events.length === 1) {
+        publish(circleId, events[0]);
+        fanOut(circleId, events[0], db_ref, events[0].userId);
+        return;
+    }
+    const ev = { type: 'routine_deviation_bundle', circleId, events, count: events.length };
+    publish(circleId, ev);
+    const members = db_ref.prepare('SELECT user_id FROM circle_members WHERE circle_id = ?').all(circleId);
+    const unsnoozed = members.filter(m => !isSnoozed(db_ref, m.user_id, 'routine_deviation'));
+    if (unsnoozed.length > 0) fanOut(circleId, ev, db_ref);
+}
+
+let db_ref = null;
 
 export function estimateLocalMinute(lng, epochMs) {
     const utcOffsetH = Math.round((lng ?? 0) / 15);
@@ -201,6 +220,7 @@ function pushDwellObs(groups, userId, circleId, placeId, dayOfWeek, startMinute,
 }
 
 export function evaluateRoutineSweep(db, now = Date.now()) {
+    db_ref = db;
     const OBSERVATION_MS = 7 * 24 * 60 * 60 * 1000;
     const FIRING_WINDOW_MIN = 60;
 
@@ -315,21 +335,7 @@ export function evaluateRoutineSweep(db, now = Date.now()) {
                 now, localDate, expected, actualDwell, now,
             );
             if (result.changes > 0) {
-                const ev = {
-                    type: 'routine_deviation',
-                    userId: r.user_id,
-                    displayName: r.displayName,
-                    routineId: r.id,
-                    placeId: r.place_id,
-                    placeName: r.placeName,
-                    kind: 'overstay_dwell',
-                    expectedDwellMinutes: dwellMinutes,
-                    actualDwellMinutes: actualDwell,
-                    expectedMinute: expected,
-                    actualMinute: null,
-                };
-                publish(r.circle_id, ev);
-                fanOut(r.circle_id, ev, db, r.user_id);
+                emitDeviation(db, r, 'overstay_dwell', expected, null);
             }
         }
     }
@@ -366,8 +372,7 @@ function emitDeviation(db, r, alertKind, expectedMinute, actualMinute) {
         expectedMinute,
         actualMinute,
     };
-    publish(r.circle_id, ev);
-    fanOut(r.circle_id, ev, db, r.user_id);
+    deviationBundler.enqueue(`routine:${r.circle_id}`, ev, flushBundle);
 }
 
 export function getUpcomingRoutines(db, circleId, withinMinutes, now = Date.now()) {

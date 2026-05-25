@@ -4,6 +4,7 @@ import { fanOutToUsers } from '../fcm.js';
 
 const InviteBody = z.object({
     email: z.string().email(),
+    autoRevokeOnCircleExit: z.boolean().optional(),
 });
 
 const RespondBody = z.object({
@@ -20,18 +21,21 @@ function rowToJson(r) {
         status: r.status,
         invitedAt: r.invited_at,
         acceptedAt: r.accepted_at,
+        autoRevokeOnCircleExit: !!r.auto_revoke_on_circle_exit,
     };
 }
 
 export default async function emergencyContactRoutes(fastify, { db }) {
     fastify.get('/api/users/me/emergency-contacts', { preHandler: requireAuth(db) }, async (req) => {
+        const now = Date.now();
         const rows = db.prepare(`
             SELECT ec.*, u.display_name AS contact_display_name, u.photo_path AS contact_photo_path
             FROM emergency_contacts ec
             JOIN users u ON u.id = ec.contact_user_id
             WHERE ec.user_id = ?
+              AND (ec.status != 'pending' OR ec.pending_expires_at IS NULL OR ec.pending_expires_at > ?)
             ORDER BY ec.invited_at DESC
-        `).all(req.auth.userId);
+        `).all(req.auth.userId, now);
         return { contacts: rows.map(rowToJson) };
     });
 
@@ -53,10 +57,12 @@ export default async function emergencyContactRoutes(fastify, { db }) {
         if (count >= 5) return reply.code(429).send({ error: 'limit_reached', message: 'Maximum 5 emergency contacts.' });
 
         const now = Date.now();
+        const expiresAt = now + 7 * 24 * 60 * 60 * 1000;
+        const autoRevoke = parsed.data.autoRevokeOnCircleExit ? 1 : 0;
         if (existing && existing.status === 'revoked') {
-            db.prepare('UPDATE emergency_contacts SET status = ?, invited_at = ?, accepted_at = NULL WHERE id = ?').run('pending', now, existing.id);
+            db.prepare('UPDATE emergency_contacts SET status = ?, invited_at = ?, accepted_at = NULL, pending_expires_at = ?, auto_revoke_on_circle_exit = ? WHERE id = ?').run('pending', now, expiresAt, autoRevoke, existing.id);
         } else if (!existing) {
-            db.prepare('INSERT INTO emergency_contacts (user_id, contact_user_id, status, invited_at) VALUES (?, ?, ?, ?)').run(req.auth.userId, contactUser.id, 'pending', now);
+            db.prepare('INSERT INTO emergency_contacts (user_id, contact_user_id, status, invited_at, pending_expires_at, auto_revoke_on_circle_exit) VALUES (?, ?, ?, ?, ?, ?)').run(req.auth.userId, contactUser.id, 'pending', now, expiresAt, autoRevoke);
         }
 
         const callerName = db.prepare('SELECT display_name FROM users WHERE id = ?').get(req.auth.userId)?.display_name || '';
@@ -84,6 +90,9 @@ export default async function emergencyContactRoutes(fastify, { db }) {
         const row = db.prepare('SELECT * FROM emergency_contacts WHERE id = ?').get(contactId);
         if (!row) return reply.code(404).send({ error: 'not_found' });
         if (row.contact_user_id !== req.auth.userId) return reply.code(403).send({ error: 'forbidden' });
+        if (row.status === 'pending' && row.pending_expires_at && row.pending_expires_at < Date.now()) {
+            return reply.code(410).send({ error: 'invite_expired' });
+        }
 
         const now = Date.now();
         if (parsed.data.action === 'accept') {
@@ -115,13 +124,15 @@ export default async function emergencyContactRoutes(fastify, { db }) {
     });
 
     fastify.get('/api/users/me/pending-invites', { preHandler: requireAuth(db) }, async (req) => {
+        const now = Date.now();
         const rows = db.prepare(`
             SELECT ec.*, u.display_name AS contact_display_name, u.photo_path AS contact_photo_path
             FROM emergency_contacts ec
             JOIN users u ON u.id = ec.user_id
             WHERE ec.contact_user_id = ? AND ec.status = 'pending'
+              AND (ec.pending_expires_at IS NULL OR ec.pending_expires_at > ?)
             ORDER BY ec.invited_at DESC
-        `).all(req.auth.userId);
+        `).all(req.auth.userId, now);
         return { invites: rows.map(r => ({
             id: r.id,
             fromUserId: r.user_id,

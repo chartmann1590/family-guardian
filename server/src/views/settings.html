@@ -178,6 +178,20 @@
                     <div class="w-11 h-6 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                 </label>
             </div>
+            <div id="digest-schedule" class="mt-4 hidden">
+                <div class="flex items-center gap-4 flex-wrap">
+                    <label class="text-sm">Day:
+                        <select id="digest-day" class="ml-1 border rounded px-2 py-1 text-sm">
+                            <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
+                        </select>
+                    </label>
+                    <label class="text-sm">Time:
+                        <input type="time" id="digest-time" value="18:00" class="ml-1 border rounded px-2 py-1 text-sm">
+                    </label>
+                </div>
+                <button id="digest-schedule-save" class="bg-primary text-on-primary px-4 py-2 rounded-lg text-sm hover:bg-primary/90 mt-3">Save schedule</button>
+            </div>
         </section>
 
         <!-- Smart Routines -->
@@ -331,6 +345,15 @@
                 <input id="low-battery-slider" type="range" min="5" max="50" step="5" value="15" class="w-full">
                 <button id="low-battery-save" class="bg-primary text-on-primary px-4 py-2 rounded-lg text-sm hover:bg-primary/90 mt-2">Save threshold</button>
             </div>
+        </section>
+
+        <!-- Alert snooze -->
+        <section class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">
+            <h2 class="font-headline-md text-headline-md text-on-surface mb-4">Alert snooze</h2>
+            <p class="text-sm text-on-surface-variant mb-4">Temporarily mute specific alert types. SOS and crash alerts cannot be snoozed.</p>
+            <div id="snooze-chips" class="mb-6"></div>
+            <h3 class="font-title-md text-title-md text-on-surface mb-2">Active snoozes</h3>
+            <div id="active-snoozes-list"></div>
         </section>
 
         <!-- Emergency contacts -->

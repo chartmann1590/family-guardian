@@ -5,8 +5,10 @@ import { evaluateOfflineSweep } from './alerts.js';
 import { mineRoutines, evaluateRoutineSweep } from './routines.js';
 import { evaluateCurfewSweep } from './curfew.js';
 import { buildDigest, persistDigest } from './digest.js';
-import { fanOut } from './fcm.js';
+import { fanOut, cleanupStaleTokens } from './fcm.js';
 import { publish } from './hub.js';
+import { BundlingBuffer } from './lib/notificationBundler.js';
+import { DateTime } from 'luxon';
 
 const OFFLINE_SWEEP_INTERVAL_MS = 60_000;
 const PAUSE_SWEEP_INTERVAL_MS = 60_000;
@@ -15,6 +17,7 @@ const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1_000;
 const MINE_COOLDOWN_MS = 6 * 60 * 60 * 1_000;
 const DIGEST_RETENTION_MS = 12 * 7 * 24 * 60 * 60 * 1_000;
+const EC_EXPIRY_SWEEP_MS = 10 * 60 * 1_000;
 
 function expirePauses(db) {
     const now = Date.now();
@@ -41,28 +44,47 @@ function weeklyDigestTick(db, log) {
     const now = Date.now();
     const weekEnd = now;
     const weekStart = now - 7 * 24 * 60 * 60 * 1000;
-    const circles = db.prepare('SELECT id FROM circles').all();
-    for (const c of circles) {
+
+    const users = db.prepare(`
+        SELECT ap.user_id, ap.digest_day_of_week, ap.digest_hour_local, ap.digest_timezone
+        FROM alert_prefs ap
+        WHERE ap.weekly_digest_enabled = 1
+          AND ap.digest_day_of_week IS NOT NULL
+          AND ap.digest_hour_local IS NOT NULL
+    `).all();
+
+    const firedCircleIds = new Set();
+    for (const u of users) {
         try {
-            const summary = buildDigest(db, c.id, weekStart, weekEnd);
-            persistDigest(db, c.id, weekStart, weekEnd, summary);
-            const recipients = db.prepare(
-                `SELECT DISTINCT ap.user_id FROM alert_prefs ap
-                 JOIN circle_members cm ON cm.user_id = ap.user_id
-                 WHERE cm.circle_id = ? AND ap.weekly_digest_enabled = 1`,
-            ).all(c.id);
-            if (recipients.length > 0) {
-                fanOut(c.id, { type: 'weekly_digest', weekStart: String(weekStart), weekEnd: String(weekEnd) }, db);
-            }
+            const localNow = DateTime.now().setZone(u.digest_timezone || 'Etc/UTC');
+            if (localNow.weekday % 7 !== u.digest_day_of_week) continue;
+            if (localNow.hour !== u.digest_hour_local) continue;
+            if (localNow.minute !== 0) continue;
+
+            const circleRow = db.prepare(
+                'SELECT cm.circle_id FROM circle_members cm WHERE cm.user_id = ? ORDER BY cm.joined_at ASC LIMIT 1'
+            ).get(u.user_id);
+            if (!circleRow) continue;
+            const circleId = circleRow.circle_id;
+
+            if (firedCircleIds.has(circleId)) continue;
+
+            const summary = buildDigest(db, circleId, weekStart, weekEnd);
+            persistDigest(db, circleId, weekStart, weekEnd, summary);
+            fanOut(circleId, { type: 'weekly_digest', weekStart: String(weekStart), weekEnd: String(weekEnd) }, db);
+            firedCircleIds.add(circleId);
         } catch (err) {
-            log?.warn?.({ err: err.message, circleId: c.id }, 'digest_build_failed');
+            log?.warn?.({ err: err.message, userId: u.user_id }, 'digest_user_failed');
         }
     }
+
     db.prepare('DELETE FROM digest_snapshots WHERE created_at < ?')
         .run(now - DIGEST_RETENTION_MS);
 }
 
 export function startScheduler(db, log) {
+    const routineBundler = new BundlingBuffer(60_000);
+
     const offlineTick = () => {
         try {
             evaluateOfflineSweep(db);
@@ -131,29 +153,15 @@ export function startScheduler(db, log) {
     const curfewSweepHandle = setInterval(curfewTick, 5 * 60_000);
     if (curfewSweepHandle.unref) curfewSweepHandle.unref();
 
-    const scheduleWeeklyDigest = () => {
-        const now = new Date();
-        const next = new Date(now);
-        next.setHours(18, 0, 0, 0);
-        const dayOfWeek = next.getDay();
-        const daysUntilSunday = (7 - dayOfWeek) % 7;
-        if (daysUntilSunday === 0 && now.getHours() >= 18) {
-            next.setDate(next.getDate() + 7);
-        } else {
-            next.setDate(next.getDate() + daysUntilSunday);
+    const digestTick = () => {
+        try {
+            weeklyDigestTick(db, log);
+        } catch (err) {
+            log?.warn?.({ err: err.message }, 'digest_tick_failed');
         }
-        const delay = next - now;
-        const handle = setTimeout(async () => {
-            try {
-                weeklyDigestTick(db, log);
-            } catch (err) {
-                log?.warn?.({ err: err.message }, 'weekly_digest_failed');
-            }
-            scheduleWeeklyDigest();
-        }, delay);
-        if (handle.unref) handle.unref();
     };
-    scheduleWeeklyDigest();
+    const digestHandle = setInterval(digestTick, 60_000);
+    if (digestHandle.unref) digestHandle.unref();
 
     const cleanupTick = () => {
         const cutoff = Date.now() - RETENTION_MS;
@@ -177,10 +185,28 @@ export function startScheduler(db, log) {
         } catch (err) {
             log?.warn?.({ err: err.message }, 'session_cleanup_failed');
         }
+        try {
+            cleanupStaleTokens(db);
+        } catch (err) {
+            log?.warn?.({ err: err.message }, 'fcm_cleanup_failed');
+        }
     };
     const cleanupHandle = setInterval(cleanupTick, CLEANUP_INTERVAL_MS);
     if (cleanupHandle.unref) cleanupHandle.unref();
     cleanupTick();
+
+    const ecExpiryTick = () => {
+        try {
+            const now = Date.now();
+            const r = db.prepare("DELETE FROM emergency_contacts WHERE status = 'pending' AND pending_expires_at IS NOT NULL AND pending_expires_at < ?").run(now);
+            if (r.changes > 0) log?.info?.({ deleted: r.changes }, 'ec_expiry_sweep');
+        } catch (err) {
+            log?.warn?.({ err: err.message }, 'ec_expiry_sweep_failed');
+        }
+    };
+    const ecExpiryHandle = setInterval(ecExpiryTick, EC_EXPIRY_SWEEP_MS);
+    if (ecExpiryHandle.unref) ecExpiryHandle.unref();
+    ecExpiryTick();
 
     return () => {
         clearInterval(offlineHandle);
@@ -188,5 +214,8 @@ export function startScheduler(db, log) {
         clearInterval(routineSweepHandle);
         clearInterval(curfewSweepHandle);
         clearInterval(cleanupHandle);
+        clearInterval(ecExpiryHandle);
+        clearInterval(digestHandle);
+        routineBundler.clear();
     };
 }

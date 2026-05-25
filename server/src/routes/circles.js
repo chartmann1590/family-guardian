@@ -57,6 +57,9 @@ export default async function circleRoutes(fastify, { db }) {
         if (target.role === 'admin') return reply.code(403).send({ error: 'cannot_remove_admin' });
 
         db.prepare('DELETE FROM circle_members WHERE circle_id = ? AND user_id = ?').run(circleId, targetUserId);
+        db.prepare(
+            "DELETE FROM emergency_contacts WHERE (user_id = ? OR contact_user_id = ?) AND auto_revoke_on_circle_exit = 1"
+        ).run(targetUserId, targetUserId);
         return { ok: true };
     });
 

@@ -372,9 +372,20 @@ Privacy notes:
 - Reverse geocoding hits the public OSM Nominatim service. Each lookup is rate-limited (≤1 req/sec) and cached in `geocode_cache`, but if you'd rather keep all addresses local set `NOMINATIM_DISABLED=1` (or point `NOMINATIM_URL` at your own Nominatim instance). When disabled, visits keep a `lat,lng` label only.
 - Android needs the `ACTIVITY_RECOGNITION` runtime permission for activity detection. Denial is non-fatal — the server falls back to inferring `walking / driving` from the GPS speed.
 
+Recently added (Sprint 8 — platform completeness & notification intelligence):
+- ✅ **Android `EmergencyContactsScreen`** — closes the last Sprint-7 parity gap. New `ui/EmergencyContactsScreen.kt` + `data/EmergencyContactsRepo.kt` give full PWA parity: list accepted contacts, accept/decline incoming invites, invite by email, revoke. Navigated to from the Map "More" menu.
+- ✅ **Per-alert-type snooze** — migration `032_alert_snoozes.sql` adds the `alert_snoozes(user_id, alert_type, snooze_until)` table. New routes (`POST/DELETE/GET /api/users/me/alert-snooze[s]`). `server/src/lib/snooze.js#isSnoozed` is checked in `alerts.js`, `geofence.js`, `curfew.js`, and `locations.js` before push dispatch. SOS and crash alerts are unconditionally non-snoozable (enforced server-side). Snooze chips (1h / 4h / 24h) + Active-snoozes management panel on PWA Settings, Android `AlertSettingsScreen`, and iOS More tab.
+- ✅ **Smart routine-deviation bundling** — new `server/src/lib/notificationBundler.js` `BundlingBuffer` collapses simultaneous routine deviations targeting the same circle into a single bundled push within a 60-second window. Three kids each missing a routine fire `1` push (not 3). Wired via `emitDeviation` in `routines.js`.
+- ✅ **Timezone-aware weekly digest** — migration `033_digest_prefs.sql` extends `alert_prefs` with `digest_day_of_week` / `digest_hour_local` / `digest_timezone` (defaults: Sunday 18:00 UTC). `scheduler.js` now runs `weeklyDigestTick` every minute, using Luxon to fire per-user at the configured local time. Picker UI on PWA Settings + Android `DigestScreen`; iOS still uses defaults (picker is a Sprint-9 polish).
+- ✅ **Pending-invite expiry for emergency contacts** — migration `029_emergency_contact_expiry.sql` adds `pending_expires_at` (default invite + 7 days). List endpoints filter expired pending rows; `respond` returns `410 Gone` on expired invites; a 10-minute scheduler sweep hard-deletes expired pendings.
+- ✅ **Persistent low-battery state** — migration `030_low_battery_state.sql` adds `last_battery_state(user_id, last_pct, last_alert_at)`. Falling-edge + hysteresis no longer reset on server restart.
+- ✅ **FCM live wire-up (still optional)** — `server/src/fcm.js` now calls `firebase-admin.messaging().sendEachForMulticast()` when `FCM_SERVICE_ACCOUNT_PATH` is set, with automatic cleanup of unregistered tokens. With the env var unset, behavior is identical to before.
+- ✅ **iOS crash-detection audio cue** — the 30-second crash countdown now plays a looping siren via `expo-audio` (asset at `ios-app/assets/sounds/crash-countdown.wav`) alongside the existing haptic + visual. Stops automatically on dismiss or auto-SOS fire.
+- ✅ **Auto-revoke emergency contacts on circle exit (opt-in)** — migration `034_emergency_contact_auto_revoke.sql` adds `auto_revoke_on_circle_exit` to `emergency_contacts`. When set, the contact is auto-revoked the moment the subject is removed from the circle.
+
 Still on the table:
-- Android `EmergencyContactsScreen` + `EmergencyContactsRepo` (Sprint 8 carryover — DTOs and API client exist, screen UI is the only gap; PWA covers contact management today)
-- FCM push notifications (optional) — would allow notifications when the Android app is killed
+- iOS digest-schedule picker + auto-revoke toggle (small UI gap; PWA/Android cover them)
+- Production-signed Android/iOS builds (current sideload story remains)
 - HTTPS termination inside the container (optional)
 
 ---

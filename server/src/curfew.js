@@ -1,5 +1,6 @@
 import { publish } from './hub.js';
 import { fanOut } from './fcm.js';
+import { isSnoozed } from './lib/snooze.js';
 import { estimateLocalMinute, inQuietHoursLocal } from './routines.js';
 
 export function evaluateCurfewSweep(db, now = Date.now()) {
@@ -69,7 +70,10 @@ export function evaluateCurfewSweep(db, now = Date.now()) {
                 actualMinute: null,
             };
             publish(u.circle_id, ev);
-            fanOut(u.circle_id, ev, db, u.user_id);
+            const members = db.prepare('SELECT user_id FROM circle_members WHERE circle_id = ? AND user_id != ?').all(u.circle_id, u.user_id);
+            if (members.some(m => !isSnoozed(db, m.user_id, 'curfew_violation'))) {
+                fanOut(u.circle_id, ev, db, u.user_id);
+            }
         }
     }
 }
