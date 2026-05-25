@@ -53,6 +53,11 @@ Thumbs.db
 *.swp
 .vscode/
 
+# Sprint planning & AI prompt files
+SPRINT_*_PLAN.md
+NEXT_SPRINT_PROMPT.md
+HANDOFF.md
+
 # Playwright e2e artifacts
 e2e/node_modules/
 e2e/playwright-report/

@@ -4,7 +4,7 @@ Self-hosted family safety platform — a Docker-deployed server, a native Kotlin
 
 📖 **Website:** <https://chartmann1590.github.io/family-guardian/> · 📦 **Releases:** [latest APK + IPA](https://github.com/chartmann1590/family-guardian/releases/latest)
 
-> **Status:** walking skeleton with all core features shipped. End-to-end flow works (Android/iOS report GPS → server stores it → web map shows the marker move live). See "What's next" below for the roadmap.
+> **Status:** actively maintained — core features stable and production-ready. End-to-end flow works (Android/iOS report GPS → server stores it → web map shows the marker move live). See "What's next" below for the roadmap.
 
 ## Screenshots
 
