@@ -438,7 +438,7 @@
       const challengeToken = loginForm.dataset.challengeToken;
       if (challengeToken && totpField) {
         try {
-          const res = await api.json('/api/auth/login/totp', { method: 'POST', body: JSON.stringify({ challengeToken, code: totpField.value.trim() }) });
+          await api.json('/api/auth/login/totp', { method: 'POST', body: JSON.stringify({ challengeToken, code: totpField.value.trim() }) });
           delete loginForm.dataset.challengeToken;
           $('totp-row')?.remove();
           window.location.reload();
