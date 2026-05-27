@@ -9,10 +9,9 @@ test.describe('Digest Timing', () => {
         });
         const admin = await loginRes.json();
 
-        const prefsRes = await request.patch(`${baseUrl}/api/users/me/digest-prefs`, {
+        const prefsRes = await request.patch(`${baseUrl}/api/users/me/alert-prefs`, {
             headers: { Authorization: `Bearer ${admin.token}` },
             data: {
-                weeklyDigestEnabled: true,
                 digestDayOfWeek: 0,
                 digestHourLocal: 18,
                 digestTimezone: 'America/Chicago',
@@ -24,8 +23,8 @@ test.describe('Digest Timing', () => {
             headers: { Authorization: `Bearer ${admin.token}` },
         });
         const prefs = await checkRes.json();
-        expect(prefs.digest_day_of_week).toBe(0);
-        expect(prefs.digest_hour_local).toBe(18);
-        expect(prefs.digest_timezone).toBe('America/Chicago');
+        expect(prefs.digestDayOfWeek).toBe(0);
+        expect(prefs.digestHourLocal).toBe(18);
+        expect(prefs.digestTimezone).toBe('America/Chicago');
     });
 });

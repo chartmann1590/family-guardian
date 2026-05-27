@@ -9,7 +9,7 @@ test.describe('Emergency Contacts', () => {
         });
         const admin = await loginRes.json();
 
-        const joinCodeRes = await request.post(`${baseUrl}/api/circles/${admin.circleId}/invites`, {
+        const joinCodeRes = await request.post(`${baseUrl}/api/circles/${admin.circleId}/invite`, {
             headers: { Authorization: `Bearer ${admin.token}` },
         });
         const joinCode = await joinCodeRes.json();
