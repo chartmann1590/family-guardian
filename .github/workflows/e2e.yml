@@ -54,6 +54,7 @@ jobs:
         env:
           SESSION_SECRET: ci-session-secret-not-for-production
           HOST_PORT: 18080
+          SIGNUP_RATE_LIMIT: 100
         run: |
           docker compose up -d
           for i in $(seq 1 45); do

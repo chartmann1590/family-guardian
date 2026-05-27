@@ -21,6 +21,7 @@ services:
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       MULTI_CIRCLE_ENABLED: ${MULTI_CIRCLE_ENABLED:-}
       AUTO_BACKUP_ENABLED: ${AUTO_BACKUP_ENABLED:-}
+      SIGNUP_RATE_LIMIT: ${SIGNUP_RATE_LIMIT:-}
 
   caddy:
     image: caddy:2-alpine

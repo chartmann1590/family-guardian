@@ -30,7 +30,7 @@ const COOKIE_OPTS = {
 
 export default async function authRoutes(fastify, { db }) {
     fastify.post('/api/auth/signup', {
-        config: { rateLimit: { max: 5, timeWindow: '1 hour' } },
+        config: { rateLimit: { max: Number(process.env.SIGNUP_RATE_LIMIT) || 5, timeWindow: '1 hour' } },
     }, async (req, reply) => {
         const parsed = SignupBody.safeParse(req.body);
         if (!parsed.success) {
