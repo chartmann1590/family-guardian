@@ -4,14 +4,10 @@ test.describe('Trip Sharing', () => {
     test('mint token, public viewer fetches location, revoke returns 410', async ({ request, page }) => {
         const baseUrl = process.env.FG_BASE_URL || 'http://127.0.0.1:18080';
 
-        const signup = async (email, name) => {
-            const r = await request.post(`${baseUrl}/api/auth/signup`, {
-                data: { email, password: 'Test1234!', displayName: name },
-            });
-            return r.json();
-        };
-
-        const admin = await signup('tripshare@test.com', 'Trip Share');
+        const loginRes = await request.post(`${baseUrl}/api/auth/login`, {
+            data: { email: 'alice@example.com', password: 'hunter2hunter' },
+        });
+        const admin = await loginRes.json();
 
         await request.post(`${baseUrl}/api/locations`, {
             headers: { Authorization: `Bearer ${admin.token}` },

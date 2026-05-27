@@ -4,14 +4,10 @@ test.describe('Alert Snoozes', () => {
     test('snooze geofence alert, verify no push while snoozed, snooze expires, push resumes; SOS not snoozable', async ({ request }) => {
         const baseUrl = process.env.FG_BASE_URL || 'http://127.0.0.1:18080';
 
-        const signup = async (email, name) => {
-            const r = await request.post(`${baseUrl}/api/auth/signup`, {
-                data: { email, password: 'Test1234!', displayName: name },
-            });
-            return r.json();
-        };
-
-        const admin = await signup('snooze-admin@test.com', 'Snooze Admin');
+        const loginRes = await request.post(`${baseUrl}/api/auth/login`, {
+            data: { email: 'alice@example.com', password: 'hunter2hunter' },
+        });
+        const admin = await loginRes.json();
 
         const snoozeRes = await request.post(`${baseUrl}/api/users/me/alert-snooze`, {
             headers: { Authorization: `Bearer ${admin.token}` },

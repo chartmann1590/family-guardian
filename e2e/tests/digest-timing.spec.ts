@@ -4,14 +4,10 @@ test.describe('Digest Timing', () => {
     test('set timezone + day-of-week + hour, verify prefs persist', async ({ request }) => {
         const baseUrl = process.env.FG_BASE_URL || 'http://127.0.0.1:18080';
 
-        const signup = async (email, name) => {
-            const r = await request.post(`${baseUrl}/api/auth/signup`, {
-                data: { email, password: 'Test1234!', displayName: name },
-            });
-            return r.json();
-        };
-
-        const admin = await signup('digest-timing@test.com', 'Digest Timing');
+        const loginRes = await request.post(`${baseUrl}/api/auth/login`, {
+            data: { email: 'alice@example.com', password: 'hunter2hunter' },
+        });
+        const admin = await loginRes.json();
 
         const prefsRes = await request.patch(`${baseUrl}/api/users/me/digest-prefs`, {
             headers: { Authorization: `Bearer ${admin.token}` },

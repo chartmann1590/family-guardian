@@ -4,15 +4,20 @@ test.describe('Emergency Contacts', () => {
     test('invite, accept, SOS triggers push-only, revoke', async ({ page, request }) => {
         const baseUrl = process.env.FG_BASE_URL || 'http://127.0.0.1:18080';
 
-        const signup = async (email, name) => {
-            const r = await request.post(`${baseUrl}/api/auth/signup`, {
-                data: { email, password: 'Test1234!', displayName: name },
-            });
-            return r.json();
-        };
+        const loginRes = await request.post(`${baseUrl}/api/auth/login`, {
+            data: { email: 'alice@example.com', password: 'hunter2hunter' },
+        });
+        const admin = await loginRes.json();
 
-        const admin = await signup('ec-admin@test.com', 'EC Admin');
-        const contact = await signup('ec-contact@test.com', 'EC Contact');
+        const inviteCodeRes = await request.post(`${baseUrl}/api/circles/${admin.circleId}/invites`, {
+            headers: { Authorization: `Bearer ${admin.token}` },
+        });
+        const invite = await inviteCodeRes.json();
+
+        const contactSignup = await request.post(`${baseUrl}/api/auth/signup`, {
+            data: { email: 'ec-contact@test.com', password: 'Test1234!', displayName: 'EC Contact', inviteCode: invite.code },
+        });
+        const contact = await contactSignup.json();
 
         const inviteRes = await request.post(`${baseUrl}/api/users/me/emergency-contacts`, {
             headers: { Authorization: `Bearer ${admin.token}` },
