@@ -9,13 +9,13 @@ test.describe('Emergency Contacts', () => {
         });
         const admin = await loginRes.json();
 
-        const inviteCodeRes = await request.post(`${baseUrl}/api/circles/${admin.circleId}/invites`, {
+        const joinCodeRes = await request.post(`${baseUrl}/api/circles/${admin.circleId}/invites`, {
             headers: { Authorization: `Bearer ${admin.token}` },
         });
-        const invite = await inviteCodeRes.json();
+        const joinCode = await joinCodeRes.json();
 
         const contactSignup = await request.post(`${baseUrl}/api/auth/signup`, {
-            data: { email: 'ec-contact@test.com', password: 'Test1234!', displayName: 'EC Contact', inviteCode: invite.code },
+            data: { email: 'ec-contact@test.com', password: 'Test1234!', displayName: 'EC Contact', inviteCode: joinCode.code },
         });
         const contact = await contactSignup.json();
 
