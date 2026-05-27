@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -24,6 +25,8 @@ class Prefs(private val context: Context) {
     private val keyOnboarded   = booleanPreferencesKey("onboarded")
     private val keyFcmToken    = stringPreferencesKey("fcm_token")
     private val keyCrashDetectionEnabled = booleanPreferencesKey("pref_crash_detection_enabled")
+    private val keyCircleIds      = stringPreferencesKey("circle_ids")
+    private val keyActiveCircleId = intPreferencesKey("active_circle_id")
 
     val serverUrl: Flow<String?>   = context.dataStore.data.map { it[keyServerUrl] }
     val token:     Flow<String?>   = context.dataStore.data.map { it[keyToken] }
@@ -34,6 +37,8 @@ class Prefs(private val context: Context) {
     val onboarded: Flow<Boolean>   = context.dataStore.data.map { it[keyOnboarded] ?: false }
     val fcmToken: Flow<String?>    = context.dataStore.data.map { it[keyFcmToken] }
     val crashDetectionEnabled: Flow<Boolean> = context.dataStore.data.map { it[keyCrashDetectionEnabled] ?: false }
+    val circleIds: Flow<String?>      = context.dataStore.data.map { it[keyCircleIds] }
+    val activeCircleId: Flow<Int>     = context.dataStore.data.map { it[keyActiveCircleId] ?: -1 }
 
     suspend fun snapshot(): Snapshot = context.dataStore.data.map {
         Snapshot(
@@ -45,6 +50,8 @@ class Prefs(private val context: Context) {
             userId      = it[keyUserId],
             onboarded   = it[keyOnboarded] ?: false,
             crashDetectionEnabled = it[keyCrashDetectionEnabled] ?: false,
+            circleIds             = it[keyCircleIds],
+            activeCircleId        = it[keyActiveCircleId] ?: -1,
         )
     }.first()
 
@@ -63,6 +70,10 @@ class Prefs(private val context: Context) {
     suspend fun setFcmToken(token: String) = context.dataStore.edit { it[keyFcmToken] = token }
 
     suspend fun setCrashDetectionEnabled(enabled: Boolean) = context.dataStore.edit { it[keyCrashDetectionEnabled] = enabled }
+
+    suspend fun setCircleIds(ids: String) = context.dataStore.edit { it[keyCircleIds] = ids }
+
+    suspend fun setActiveCircleId(id: Int) = context.dataStore.edit { it[keyActiveCircleId] = id }
 
     suspend fun saveSession(
         token: String,
@@ -89,6 +100,8 @@ class Prefs(private val context: Context) {
         prefs.remove(keyUserId)
         prefs.remove(keyOnboarded)
         prefs.remove(keyFcmToken)
+        prefs.remove(keyCircleIds)
+        prefs.remove(keyActiveCircleId)
     }
 
     data class Snapshot(
@@ -100,5 +113,7 @@ class Prefs(private val context: Context) {
         val userId: Long?,
         val onboarded: Boolean = false,
         val crashDetectionEnabled: Boolean = false,
+        val circleIds: String? = null,
+        val activeCircleId: Int = -1,
     )
 }

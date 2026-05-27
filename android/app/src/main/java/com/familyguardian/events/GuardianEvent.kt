@@ -3,6 +3,7 @@ package com.familyguardian.events
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
+import kotlinx.serialization.json.JsonObject
 
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
@@ -238,4 +239,31 @@ sealed interface GuardianEvent {
     @Serializable
     @SerialName("digest_ready")
     data class DigestReady(val circleId: Int) : GuardianEvent
+
+    @Serializable
+    @SerialName("eta_updated")
+    data class EtaUpdated(
+        val userId: Long,
+        val displayName: String? = null,
+        val placeId: Long,
+        val placeName: String,
+        val etaMinutes: Int,
+    ) : GuardianEvent
+
+    @Serializable
+    @SerialName("arrived_safely")
+    data class ArrivedSafely(
+        val userId: Long,
+        val displayName: String? = null,
+        val placeId: Long,
+        val placeName: String,
+    ) : GuardianEvent
+
+    @Serializable
+    @SerialName("break_suggested")
+    data class BreakSuggested(
+        val userId: Long,
+        val displayName: String? = null,
+        val drivingMinutes: Int,
+    ) : GuardianEvent
 }

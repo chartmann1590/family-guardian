@@ -34,6 +34,11 @@ import crashEventRoutes from './routes/crashEvents.js';
 import routineRoutes from './routes/routines.js';
 import timelineRoutes from './routes/timeline.js';
 import emergencyContactRoutes from './routes/emergencyContacts.js';
+import placeSuggestionRoutes from './routes/placeSuggestions.js';
+import tripShareRoutes from './routes/tripShares.js';
+import webPushRoutes from './routes/webPush.js';
+import totpRoutes from './routes/totp.js';
+import webhookRoutes from './routes/webhooks.js';
 import { loadOpenVisits } from './visits.js';
 import { loadOpenTrips } from './trips.js';
 import { startScheduler } from './scheduler.js';
@@ -79,7 +84,7 @@ await fastify.register(cookie, { secret: COOKIE_SECRET });
 await fastify.register(formbody);
 // Per-route opt-in so location/chat traffic isn't accidentally throttled.
 await fastify.register(rateLimit, { global: false });
-await fastify.register(multipart, { limits: { fileSize: 2 * 1024 * 1024, files: 1 } });
+await fastify.register(multipart, { limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
 await fastify.register(websocket);
 await fastify.register(staticPlugin, {
     root: join(__dirname, 'public'),
@@ -113,6 +118,11 @@ await fastify.register(timelineRoutes, { db });
 await fastify.register(crashEventRoutes, { db });
 await fastify.register(routineRoutes, { db });
 await fastify.register(emergencyContactRoutes, { db });
+await fastify.register(placeSuggestionRoutes, { db });
+await fastify.register(tripShareRoutes, { db });
+await fastify.register(webPushRoutes, { db });
+await fastify.register(totpRoutes, { db });
+await fastify.register(webhookRoutes, { db });
 
 fastify.get('/healthz', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req, reply) => {
     try {

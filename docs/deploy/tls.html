@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HTTPS Setup — Family Guardian</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+<div class="max-w-2xl mx-auto px-4 py-12">
+<h1 class="text-3xl font-bold mb-6">HTTPS / TLS Setup</h1>
+<div class="bg-white rounded-lg shadow p-6 space-y-4">
+<p class="text-gray-700">Family Guardian can use Caddy as a TLS-terminating reverse proxy with automatic Let's Encrypt certificates.</p>
+<h2 class="text-xl font-semibold mt-4">Quick Start</h2>
+<ol class="list-decimal list-inside space-y-2 text-gray-700">
+<li>Copy <code class="bg-gray-100 px-1 rounded">docs/deploy/Caddyfile.example</code> to <code class="bg-gray-100 px-1 rounded">docs/deploy/Caddyfile</code></li>
+<li>Edit the <code>Caddyfile</code> — replace <code>your.domain</code> with your actual domain</li>
+<li>Ensure DNS points to your server</li>
+<li>Open port 80 and 443 on your firewall</li>
+<li>Run: <code class="bg-gray-100 px-2 py-1 rounded block mt-2">docker compose --profile tls up -d</code></li>
+</ol>
+<h2 class="text-xl font-semibold mt-6">Environment Variables</h2>
+<table class="w-full text-left mt-2">
+<tr class="border-b"><th class="py-2">Variable</th><th>Purpose</th></tr>
+<tr class="border-b"><td class="py-2 font-mono text-sm">VAPID_PUBLIC_KEY</td><td>Web Push public key</td></tr>
+<tr class="border-b"><td class="py-2 font-mono text-sm">VAPID_PRIVATE_KEY</td><td>Web Push private key</td></tr>
+<tr class="border-b"><td class="py-2 font-mono text-sm">SESSION_SECRET</td><td>Cookie encryption secret (required in prod)</td></tr>
+</table>
+<h2 class="text-xl font-semibold mt-6">Generating VAPID Keys</h2>
+<pre class="bg-gray-100 p-3 rounded text-sm overflow-x-auto">npx web-push generate-vapid-keys</pre>
+</div>
+</div>
+</body>
+</html>

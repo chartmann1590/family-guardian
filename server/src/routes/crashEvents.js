@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { requireAuth, getUserCircleId } from '../auth.js';
 import { publish } from '../hub.js';
 import { fanOut } from '../fcm.js';
+import { fanOut as webPushFanOut } from '../webPush.js';
+import { dispatchWebhook } from '../webhooks.js';
 
 const CrashReportBody = z.object({
     peakAccelMps2: z.number().min(5),
@@ -64,6 +66,8 @@ export default async function crashEventRoutes(fastify, { db }) {
         };
         publish(circleId, ev);
         fanOut(circleId, ev, db, userId);
+        webPushFanOut(circleId, ev, db, userId);
+        dispatchWebhook(circleId, ev);
 
         return { id, detectedAt: now };
     });

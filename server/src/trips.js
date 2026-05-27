@@ -6,7 +6,10 @@ import { haversineMeters } from './geofence.js';
 import { getOpenVisit } from './visits.js';
 import { enqueueGeocode } from './geocoder.js';
 import { publish } from './hub.js';
+import { fanOut as webPushFanOut } from './webPush.js';
 import { recordTripEvents } from './drivingScore.js';
+import { coachingSummary } from './eta.js';
+import { dispatchWebhook } from './webhooks.js';
 
 const MOVING_SPEED_MPS = 1.4;
 const MIN_TRIP_DURATION_MS = 60_000;
@@ -137,9 +140,19 @@ function closeTrip(db, userId, endedAt) {
         return;
     }
     const mode = pickMode(live.activityCounts, live.maxSpeed);
+
+    const tripEvents = db.prepare(
+        'SELECT kind, recorded_at, distance_m FROM trip_events WHERE trip_id = ?'
+    ).all(live.id);
+    const coaching = coachingSummary(
+        { distance_m: live.distance, duration_ms: duration, max_speed_mps: live.maxSpeed },
+        tripEvents,
+    );
+    const coachingJson = JSON.stringify(coaching);
+
     db.prepare(
-        `UPDATE trips SET ended_at = ?, mode = ? WHERE id = ?`,
-    ).run(endedAt, mode, live.id);
+        `UPDATE trips SET ended_at = ?, mode = ?, coaching_json = ? WHERE id = ?`,
+    ).run(endedAt, mode, coachingJson, live.id);
 
     // Geocode start + end labels asynchronously.
     enqueueGeocode(db, live.startLat, live.startLng, (label) => {
@@ -163,6 +176,8 @@ function closeTrip(db, userId, endedAt) {
             endedAt,
         });
         publish(live.circleId, { type: 'driving_score_updated', userId });
+        webPushFanOut(live.circleId, { type: 'trip_end', userId }, db, userId);
+        dispatchWebhook(live.circleId, { type: 'trip_end', userId });
     }
 }
 

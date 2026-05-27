@@ -307,6 +307,33 @@ object Alerts {
     private fun routineDeviationNotifId(userId: Long, placeName: String): Int =
         10_000_000 + ((userId.toInt() * 31 + placeName.hashCode()) and 0xFFFFF)
 
+    fun showEta(context: Context, displayName: String, etaMinutes: Int, destLabel: String) {
+        show(context, "eta_${displayName}", "ETA Update", "$displayName · $etaMinutes min to $destLabel", CHANNEL_NORMAL)
+    }
+
+    fun showArrivedSafely(context: Context, displayName: String, placeName: String) {
+        show(context, "arrived_${displayName}", "Arrived Safely", "$displayName arrived at $placeName", CHANNEL_NORMAL)
+    }
+
+    fun showBreakNudge(context: Context, drivingHours: Int) {
+        show(context, "break_nudge", "Break Reminder", "You've been driving ${drivingHours}hr+. Time for a quick break?", CHANNEL_NORMAL)
+    }
+
+    private fun show(context: Context, tag: String, title: String, text: String, channel: String) {
+        if (!canPostNotifications(context)) return
+        ensureChannels(context)
+        val notif = NotificationCompat.Builder(context, channel)
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setPriority(if (channel == CHANNEL_HIGH) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setContentIntent(openAppIntent(context))
+            .build()
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(tag.hashCode(), notif)
+    }
+
     fun showDigest(context: Context) {
         if (!canPostNotifications(context)) return
         ensureChannels(context)

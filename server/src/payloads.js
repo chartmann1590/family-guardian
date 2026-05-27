@@ -33,6 +33,7 @@ export function tripRowToJson(r) {
         endLng: r.endLng,
         startLabel: r.startLabel,
         endLabel: r.endLabel,
+        coachingJson: r.coachingJson ? JSON.parse(r.coachingJson) : null,
     };
 }
 

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { requireAuth } from '../auth.js';
 import { fanOutToUsers } from '../fcm.js';
+import { fanOutToUsers as webPushFanOutUsers } from '../webPush.js';
 
 const InviteBody = z.object({
     email: z.string().email(),
@@ -67,6 +68,11 @@ export default async function emergencyContactRoutes(fastify, { db }) {
 
         const callerName = db.prepare('SELECT display_name FROM users WHERE id = ?').get(req.auth.userId)?.display_name || '';
         fanOutToUsers([contactUser.id], {
+            type: 'emergency_contact_invite',
+            fromUserId: req.auth.userId,
+            fromDisplayName: callerName,
+        }, db);
+        webPushFanOutUsers([contactUser.id], {
             type: 'emergency_contact_invite',
             fromUserId: req.auth.userId,
             fromDisplayName: callerName,

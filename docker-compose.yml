@@ -10,14 +10,35 @@ services:
       - guardian-data:/data
     environment:
       DATABASE_PATH: /data/guardian.db
-      # Generate a real secret with: openssl rand -hex 32 (or set it in .env)
       SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production-please}
       LOG_LEVEL: info
-      # Optional first-boot bootstrap. Leave blank to use the /setup wizard.
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
       BOOTSTRAP_ADMIN_DISPLAY_NAME: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:-}
       BOOTSTRAP_CIRCLE_NAME: ${BOOTSTRAP_CIRCLE_NAME:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      MULTI_CIRCLE_ENABLED: ${MULTI_CIRCLE_ENABLED:-}
+      AUTO_BACKUP_ENABLED: ${AUTO_BACKUP_ENABLED:-}
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: family-guardian-caddy
+    profiles:
+      - tls
+    restart: unless-stopped
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./docs/deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - guardian
 
 volumes:
   guardian-data:
+  caddy_data:
+  caddy_config:

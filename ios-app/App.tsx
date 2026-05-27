@@ -14,7 +14,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 type Session = { serverUrl: string; token: string; userId: number; circleId: number; displayName: string; email: string; readReceiptsEnabled?: boolean; crashDetectionEnabled?: boolean };
 type Member = { userId: number; displayName: string; email?: string; role?: string; lat?: number; lng?: number; accuracyM?: number; speedMps?: number; batteryPct?: number; bearing?: number; altitudeM?: number; activity?: string; activityConfidence?: number; recordedAt?: number; photoUrl?: string; address?: string; paused?: boolean; pausedUntil?: number | null; pauseReason?: string | null };
-type Place = { id: number; circleId: number; name: string; address?: string | null; lat: number; lng: number; radiusM: number; alertsOnEnter: boolean; alertsOnExit: boolean };
+type Place = { id: number; circleId: number; name: string; address?: string | null; lat: number; lng: number; radiusM: number; alertsOnEnter: boolean; alertsOnExit: boolean; kind: string };
 type Message = { id: number; circleId?: number; userId: number; displayName?: string; body?: string; createdAt: number; reactions?: { emoji: string; userIds: number[] }[]; attachmentKind?: string; attachmentUrl?: string; attachmentMime?: string; attachmentBytes?: number; attachmentDurationMs?: number; readers?: { userId: number; readAt: number }[] };
 type AlertEvent = { id: number; userId: number; displayName?: string; circleId: number; type: string; value?: number; createdAt: number };
 type PlaceSubscription = { id: number; userId: number; placeId: number; memberId: number | null; placeName?: string; memberName?: string; onEnter: boolean; onExit: boolean; quietStart?: number | null; quietEnd?: number | null };
@@ -65,6 +65,14 @@ type DigestSnapshot = {
 type Trip = { id: number; startedAt: number; endedAt: number; mode: string; distanceM: number; maxSpeedMps: number | null; avgSpeedMps: number | null; startLabel: string | null; endLabel: string | null; pointCount: number; eventCount: number; durationMs: number };
 type Tab = 'map' | 'members' | 'chat' | 'places' | 'alerts' | 'more';
 type SubScreen = 'routines' | 'digest' | 'trips' | null;
+type PlaceSuggestion = {
+  id: number; userId: number; lat: number; lng: number;
+  label: string | null; visitCount: number; totalDwellMs: number;
+  status: string;
+};
+type TripShareResponse = { token: string; url: string; expiresAt: number };
+type CircleInfo = { circleId: number; name?: string; role: string };
+type WebhookItem = { id: number; url: string; events: string; active: boolean };
 
 const LOCATION_TASK = 'family-guardian-background-location';
 const TOKEN_KEY = 'fg_session_token';
@@ -183,6 +191,9 @@ function Auth({ onSession }: { onSession: (s: Session) => void }) {
   const [inviteCode, setInviteCode] = useState('');
   const [joining, setJoining] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [totpStep, setTotpStep] = useState(false);
+  const [totpCode, setTotpCode] = useState('');
+  const [challengeToken, setChallengeToken] = useState('');
 
   async function finish(payload: any, normalized: string) {
     const s: Session = { serverUrl: normalized, token: payload.token, userId: payload.userId, circleId: payload.circleId, displayName: payload.displayName, email };
@@ -199,16 +210,39 @@ function Auth({ onSession }: { onSession: (s: Session) => void }) {
       const body = joining ? { email, password, displayName, inviteCode } : { email, password };
       const res = await fetch(`${normalized}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `${res.status}`);
-      await finish(await res.json(), normalized);
+      const data = await res.json();
+      if (data.requiresTotp) {
+        setChallengeToken(data.challengeToken);
+        setTotpStep(true);
+        setBusy(false);
+        return;
+      }
+      await finish(data, normalized);
     } catch (err: any) { Alert.alert('Sign in failed', err.message); } finally { setBusy(false); }
   }
+  async function submitTotp() {
+    setBusy(true);
+    try {
+      const normalized = normalizeServer(serverUrl);
+      const res = await fetch(`${normalized}/api/auth/login/totp`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ challengeToken, code: totpCode }) });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `${res.status}`);
+      await finish(await res.json(), normalized);
+    } catch (err: any) { Alert.alert('TOTP failed', err.message); } finally { setBusy(false); }
+  }
   return <SafeAreaView style={styles.auth}><Text style={styles.brand}>Family Guardian</Text><Text style={styles.subtitle}>Native iOS client for your self-hosted server.</Text>
-    <TextInput style={styles.input} value={serverUrl} onChangeText={setServerUrl} placeholder="Server URL" autoCapitalize="none" />
-    <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" autoCapitalize="none" keyboardType="email-address" />
-    <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Password" secureTextEntry />
-    {joining && <><TextInput style={styles.input} value={displayName} onChangeText={setDisplayName} placeholder="Display name" /><TextInput style={styles.input} value={inviteCode} onChangeText={setInviteCode} placeholder="Invite code" autoCapitalize="characters" /></>}
-    <Pressable style={styles.primaryButton} onPress={submit} disabled={busy}><Text style={styles.buttonText}>{busy ? 'Working...' : joining ? 'Join circle' : 'Sign in'}</Text></Pressable>
-    <Pressable style={styles.secondaryButton} onPress={() => setJoining(!joining)}><Text style={styles.secondaryText}>{joining ? 'I already have an account' : 'Join with invite code'}</Text></Pressable>
+    {!totpStep ? <>
+      <TextInput style={styles.input} value={serverUrl} onChangeText={setServerUrl} placeholder="Server URL" autoCapitalize="none" />
+      <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" autoCapitalize="none" keyboardType="email-address" />
+      <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Password" secureTextEntry />
+      {joining && <><TextInput style={styles.input} value={displayName} onChangeText={setDisplayName} placeholder="Display name" /><TextInput style={styles.input} value={inviteCode} onChangeText={setInviteCode} placeholder="Invite code" autoCapitalize="characters" /></>}
+      <Pressable style={styles.primaryButton} onPress={submit} disabled={busy}><Text style={styles.buttonText}>{busy ? 'Working...' : joining ? 'Join circle' : 'Sign in'}</Text></Pressable>
+      <Pressable style={styles.secondaryButton} onPress={() => setJoining(!joining)}><Text style={styles.secondaryText}>{joining ? 'I already have an account' : 'Join with invite code'}</Text></Pressable>
+    </> : <>
+      <Text style={{ fontWeight: '700', fontSize: 16, marginBottom: 8 }}>Enter authenticator code</Text>
+      <TextInput style={styles.input} value={totpCode} onChangeText={setTotpCode} placeholder="6-digit code" keyboardType="number-pad" maxLength={6} autoFocus />
+      <Pressable style={styles.primaryButton} onPress={submitTotp} disabled={busy || totpCode.length < 6}><Text style={styles.buttonText}>{busy ? 'Verifying...' : 'Verify'}</Text></Pressable>
+      <Pressable style={styles.secondaryButton} onPress={() => { setTotpStep(false); setTotpCode(''); }}><Text style={styles.secondaryText}>Back</Text></Pressable>
+    </>}
   </SafeAreaView>;
 }
 
@@ -365,6 +399,22 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
           trigger: null,
         });
       }
+      if (msg.type === 'eta_updated') {
+        Notifications.scheduleNotificationAsync({
+          content: { title: 'ETA updated', body: `${msg.displayName || 'Member'} arriving at ${msg.placeName || 'destination'} in ${msg.etaMinutes != null ? msg.etaMinutes + ' min' : 'unknown'}`, sound: false },
+          trigger: null,
+        });
+      }
+      if (msg.type === 'arrived_safely') {
+        Alert.alert('Arrived safely', `${msg.displayName || 'Member'} has arrived at ${msg.placeName || 'their destination'}.`);
+      }
+      if (msg.type === 'break_suggested') {
+        Alert.alert('Break suggested', `${msg.displayName || 'Member'} has been driving for a while. Consider taking a break.`);
+      }
+      if (msg.type === 'driving_score_updated') {
+        if (healthDebounceRef.current) clearTimeout(healthDebounceRef.current);
+        healthDebounceRef.current = setTimeout(() => { loadHealth().catch(() => {}); }, 1000);
+      }
       if (['location_update', 'check_in', 'pause_changed', 'sos_active', 'sos_resolved', 'routine_deviation'].includes(msg.type)) {
         if (healthDebounceRef.current) clearTimeout(healthDebounceRef.current);
         healthDebounceRef.current = setTimeout(() => { loadHealth().catch(() => {}); }, 2000);
@@ -410,7 +460,7 @@ function Guardian({ session, onLogout }: { session: Session; onLogout: () => voi
     {subScreen === 'digest' && <DigestScreen session={session} digest={digest} onBack={() => setSubScreen(null)} />}
     {subScreen === 'trips' && subMemberId != null && <TripsScreen session={session} memberId={subMemberId} memberName={subMemberName} onBack={() => setSubScreen(null)} />}
     {!subScreen && <>
-      {tab === 'map' && <MapTab members={members} places={places} mapRef={mapRef} onMember={setSelectedMember} onShare={startSharing} sharing={sharing} onSos={sendSos} onCheckIn={checkIn} health={health} digest={digest} onOpenDigest={() => setSubScreen('digest')} />}
+      {tab === 'map' && <MapTab session={session} members={members} places={places} mapRef={mapRef} onMember={setSelectedMember} onShare={startSharing} sharing={sharing} onSos={sendSos} onCheckIn={checkIn} health={health} digest={digest} onOpenDigest={() => setSubScreen('digest')} />}
       {tab === 'members' && <MembersTab session={session} members={members} selected={selectedMember} setSelected={setSelectedMember} history={history} setHistory={setHistory} onViewTrips={(uid: number, name: string) => { setSubMemberId(uid); setSubMemberName(name); setSubScreen('trips'); }} />}
       {tab === 'chat' && <ChatTab session={session} messages={messages} setMessages={setMessages} loadMessages={loadMessages} typingUsers={typingUsers} readQueueRef={readQueueRef} readTimerRef={readTimerRef} />}
       {tab === 'places' && <PlacesTab session={session} places={places} setPlaces={setPlaces} />}
@@ -451,11 +501,19 @@ function HealthStrip({ health }: { health: MemberHealth[] }) {
   </ScrollView>;
 }
 
-function MapTab({ members, places, mapRef, onMember, onShare, sharing, onSos, onCheckIn, health, digest, onOpenDigest }: any) {
+function MapTab({ members, places, mapRef, onMember, onShare, sharing, onSos, onCheckIn, health, digest, onOpenDigest, session }: any) {
   const first = members.find((m: Member) => m.lat && m.lng);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  async function shareLive() {
+    try {
+      const res = await api<TripShareResponse>(session, '/api/users/me/trip-shares', { method: 'POST', body: '{}' });
+      setShareUrl(res.url);
+      Alert.alert('Link copied', `Share link: ${res.url}`);
+    } catch (e: any) { Alert.alert('Share failed', e.message); }
+  }
   return <View style={styles.flex}><HealthStrip health={health} />
     {digest && digest.summary && <Pressable style={styles.digestCard} onPress={onOpenDigest}><Text style={styles.digestCardTitle}>This week</Text>{digest.summary.members.slice(0, 4).map((m: any) => <Text key={m.userId} style={styles.digestCardLine}>{m.displayName}: {m.tripCount} trips, {fmtDist(m.totalDistanceM)}</Text>)}</Pressable>}
-    <MapView ref={mapRef} style={styles.map} initialRegion={{ latitude: first?.lat || 37.7749, longitude: first?.lng || -122.4194, latitudeDelta: 0.08, longitudeDelta: 0.08 }}>{places.map((p: Place) => <Circle key={p.id} center={{ latitude: p.lat, longitude: p.lng }} radius={p.radiusM} strokeColor="#006c49" fillColor="rgba(0,108,73,.10)" />)}{members.filter((m: Member) => m.lat && m.lng).map((m: Member) => <Marker key={m.userId} coordinate={{ latitude: m.lat!, longitude: m.lng! }} title={m.displayName + (m.paused ? ' (paused)' : '')} description={m.paused ? `Paused${m.pausedUntil ? ' until ' + formatPauseUntil(m.pausedUntil) : ''}` : rel(m.recordedAt)} pinColor={m.paused ? 'gray' : 'red'} opacity={m.paused ? 0.7 : 1} onPress={() => onMember(m)} />)}</MapView><View style={styles.floating}><Text style={styles.cardTitle}>{members.length} members</Text><View style={styles.row}><Pressable style={styles.primaryButton} onPress={onShare}><Text style={styles.buttonText}>{sharing ? 'Stop GPS' : 'Share GPS'}</Text></Pressable><Pressable style={styles.dangerButton} onPress={onSos}><Text style={styles.buttonText}>SOS</Text></Pressable></View><View style={styles.row}><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('safe_home')}><Text>Safe home</Text></Pressable><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('heading_home')}><Text>Heading home</Text></Pressable></View></View></View>;
+    <MapView ref={mapRef} style={styles.map} initialRegion={{ latitude: first?.lat || 37.7749, longitude: first?.lng || -122.4194, latitudeDelta: 0.08, longitudeDelta: 0.08 }}>{places.map((p: Place) => <Circle key={p.id} center={{ latitude: p.lat, longitude: p.lng }} radius={p.radiusM} strokeColor="#006c49" fillColor="rgba(0,108,73,.10)" />)}{members.filter((m: Member) => m.lat && m.lng).map((m: Member) => <Marker key={m.userId} coordinate={{ latitude: m.lat!, longitude: m.lng! }} title={m.displayName + (m.paused ? ' (paused)' : '')} description={m.paused ? `Paused${m.pausedUntil ? ' until ' + formatPauseUntil(m.pausedUntil) : ''}` : rel(m.recordedAt)} pinColor={m.paused ? 'gray' : 'red'} opacity={m.paused ? 0.7 : 1} onPress={() => onMember(m)} />)}</MapView><View style={styles.floating}><Text style={styles.cardTitle}>{members.length} members</Text><View style={styles.row}><Pressable style={styles.primaryButton} onPress={onShare}><Text style={styles.buttonText}>{sharing ? 'Stop GPS' : 'Share GPS'}</Text></Pressable><Pressable style={styles.dangerButton} onPress={onSos}><Text style={styles.buttonText}>SOS</Text></Pressable></View><View style={styles.row}><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('safe_home')}><Text>Safe home</Text></Pressable><Pressable style={styles.secondaryButton} onPress={() => onCheckIn('heading_home')}><Text>Heading home</Text></Pressable></View><View style={styles.row}><Pressable style={[styles.secondaryButton, { flex: 1 }]} onPress={shareLive}><Text>🔗 Share live</Text></Pressable>{shareUrl && <Pressable style={[styles.secondaryButton, { flex: 1 }]} onPress={() => { Alert.alert('Share link', shareUrl); }}><Text style={{ fontSize: 11 }} numberOfLines={1}>Link active</Text></Pressable>}</View></View></View>;
 }
 function MembersTab({ session, members, selected, setSelected, history, setHistory, onViewTrips }: any) {
   const [ds, setDs] = useState<any>(null);
@@ -575,18 +633,33 @@ function PlacesTab({ session, places, setPlaces }: any) {
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
   const [radius, setRadius] = useState('150');
+  const [placeKind, setPlaceKind] = useState('other');
   const [members, setMembers] = useState<Member[]>([]);
   const [subs, setSubs] = useState<PlaceSubscription[]>([]);
   const [expandedPlace, setExpandedPlace] = useState<number | null>(null);
   const [analyticsPlace, setAnalyticsPlace] = useState<number | null>(null);
   const [analyticsData, setAnalyticsData] = useState<PlaceAnalytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [subDays, setSubDays] = useState<Map<number, Set<number>>>(new Map());
+  const [subTimeStart, setSubTimeStart] = useState<Map<number, string>>(new Map());
+  const [subTimeEnd, setSubTimeEnd] = useState<Map<number, string>>(new Map());
+
+  const KIND_OPTIONS = [
+    { value: 'home', label: '🏠 Home' },
+    { value: 'school', label: '🏫 School' },
+    { value: 'work', label: '💼 Work' },
+    { value: 'other', label: '📍 Other' },
+  ];
+  const KIND_EMOJI: Record<string, string> = { home: '🏠', school: '🏫', work: '💼', other: '📍' };
 
   useEffect(() => {
     api<{ members: Member[] }>(session, `/api/circles/${session.circleId}/members`)
       .then((d) => setMembers(d.members)).catch(() => {});
     api<{ subscriptions: PlaceSubscription[] }>(session, `/api/circles/${session.circleId}/place-subscriptions`)
       .then((d) => setSubs(d.subscriptions || [])).catch(() => {});
+    api<{ suggestions: PlaceSuggestion[] }>(session, '/api/users/me/place-suggestions')
+      .then((d) => setSuggestions(d.suggestions || [])).catch(() => {});
   }, [session]);
 
   async function loadAnalytics(placeId: number) {
@@ -618,7 +691,7 @@ function PlacesTab({ session, places, setPlaces }: any) {
     });
   }
 
-  async function save() { const p = await api<Place>(session, `/api/circles/${session.circleId}/places`, { method: 'POST', body: JSON.stringify({ name, lat: Number(lat), lng: Number(lng), radiusM: Number(radius), alertsOnEnter: true, alertsOnExit: true }) }); setPlaces((cur: Place[]) => [...cur, p]); setName(''); }
+  async function save() { const p = await api<Place>(session, `/api/circles/${session.circleId}/places`, { method: 'POST', body: JSON.stringify({ name, lat: Number(lat), lng: Number(lng), radiusM: Number(radius), alertsOnEnter: true, alertsOnExit: true, kind: placeKind }) }); setPlaces((cur: Place[]) => [...cur, p]); setName(''); setPlaceKind('other'); }
   function fmtMs(ms: number) {
     const mins = Math.round(ms / 60000);
     if (mins < 60) return `${mins}m`;
@@ -631,13 +704,13 @@ function PlacesTab({ session, places, setPlaces }: any) {
     if (pct >= -10) return '#F57F17';
     return '#ba1a1a';
   }
-  return <ScrollView style={styles.content}><View style={styles.card}><TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Place name" /><TextInput style={styles.input} value={lat} onChangeText={setLat} placeholder="Latitude" keyboardType="decimal-pad" /><TextInput style={styles.input} value={lng} onChangeText={setLng} placeholder="Longitude" keyboardType="decimal-pad" /><TextInput style={styles.input} value={radius} onChangeText={setRadius} placeholder="Radius meters" keyboardType="decimal-pad" /><Pressable style={styles.primaryButton} onPress={save}><Text style={styles.buttonText}>Save place</Text></Pressable></View>{places.map((p: Place) => {
+  return <ScrollView style={styles.content}><View style={styles.card}><TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Place name" /><TextInput style={styles.input} value={lat} onChangeText={setLat} placeholder="Latitude" keyboardType="decimal-pad" /><TextInput style={styles.input} value={lng} onChangeText={setLng} placeholder="Longitude" keyboardType="decimal-pad" /><TextInput style={styles.input} value={radius} onChangeText={setRadius} placeholder="Radius meters" keyboardType="decimal-pad" /><View style={{ flexDirection: 'row', gap: 8, marginVertical: 4 }}>{KIND_OPTIONS.map(o => <Pressable key={o.value} style={[styles.chip, placeKind === o.value && styles.chipActive]} onPress={() => setPlaceKind(o.value)}><Text>{o.label}</Text></Pressable>)}</View><Pressable style={styles.primaryButton} onPress={save}><Text style={styles.buttonText}>Save place</Text></Pressable></View>{suggestions.length > 0 && <View style={styles.card}><Text style={styles.cardTitle}>Suggestions</Text><Text style={styles.meta}>Frequently visited locations detected by the server.</Text>{suggestions.map((s) => <View key={s.id} style={{ backgroundColor: '#FFF8E1', borderRadius: 12, padding: 10, marginTop: 6 }}><Text style={{ fontWeight: '600' }}>{s.label || `Location near ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}`}</Text><Text style={styles.meta}>{s.visitCount} visits · {fmtDurationMs(s.totalDwellMs)} total</Text><Pressable style={[styles.secondaryButton, { marginTop: 4 }]} onPress={async () => { try { const p = await api<Place>(session, `/api/circles/${session.circleId}/places`, { method: 'POST', body: JSON.stringify({ name: s.label || 'Unnamed', lat: s.lat, lng: s.lng, radiusM: 150, alertsOnEnter: true, alertsOnExit: true, kind: 'other' }) }); setPlaces((cur: Place[]) => [...cur, p]); setSuggestions(prev => prev.filter(x => x.id !== s.id)); } catch (e: any) { Alert.alert('Failed', e.message); } }}><Text>Save as place</Text></Pressable></View>)}</View>}{places.map((p: Place) => {
     const placeSubs = subs.filter((s) => s.placeId === p.id);
     const isExpanded = expandedPlace === p.id;
     const isAnalyticsOpen = analyticsPlace === p.id;
     const allTargets: { id: number | null; name: string }[] = [{ id: null, name: 'Anyone' }, ...members.map((m) => ({ id: m.userId, name: m.displayName }))];
     return <View style={styles.card} key={p.id}>
-      <Text style={styles.cardTitle}>{p.name}</Text>
+      <Text style={styles.cardTitle}>{KIND_EMOJI[p.kind] || '📍'} {p.name}</Text>
       <Text style={styles.meta}>{p.address || `${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}`} · {Math.round(p.radiusM)}m</Text>
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
         <Pressable style={[styles.secondaryButton, { flex: 1 }]} onPress={() => setExpandedPlace(isExpanded ? null : p.id)}><Text>{isExpanded ? 'Hide notifications' : '🔔 Notify me when…'}</Text></Pressable>
@@ -645,10 +718,29 @@ function PlacesTab({ session, places, setPlaces }: any) {
       </View>
       {isExpanded && allTargets.map((t) => {
         const sub = placeSubs.find((s) => s.memberId === t.id);
-        return <View key={t.id ?? 'any'} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 }}>
-          <Text style={{ flex: 1, fontWeight: '600' }}>{t.name}</Text>
-          <Pressable style={[styles.chip, sub?.onEnter && styles.chipActive]} onPress={() => toggleSub(p.id, t.id, !(sub?.onEnter ?? false), sub?.onExit ?? false)}><Text>{sub?.onEnter ? '✅' : '◻️'} Arrives</Text></Pressable>
-          <Pressable style={[styles.chip, sub?.onExit && styles.chipActive]} onPress={() => toggleSub(p.id, t.id, sub?.onEnter ?? false, !(sub?.onExit ?? false))}><Text>{sub?.onExit ? '✅' : '◻️'} Leaves</Text></Pressable>
+        return <View key={t.id ?? 'any'} style={{ paddingVertical: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ flex: 1, fontWeight: '600' }}>{t.name}</Text>
+            <Pressable style={[styles.chip, sub?.onEnter && styles.chipActive]} onPress={() => toggleSub(p.id, t.id, !(sub?.onEnter ?? false), sub?.onExit ?? false)}><Text>{sub?.onEnter ? '✅' : '◻️'} Arrives</Text></Pressable>
+            <Pressable style={[styles.chip, sub?.onExit && styles.chipActive]} onPress={() => toggleSub(p.id, t.id, sub?.onEnter ?? false, !(sub?.onExit ?? false))}><Text>{sub?.onExit ? '✅' : '◻️'} Leaves</Text></Pressable>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+            {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => {
+              const days = subDays.get(p.id) || new Set();
+              const active = days.has(i);
+              return <Pressable key={i} style={[styles.chip, { paddingHorizontal: 8, paddingVertical: 2 }, active && styles.chipActive]} onPress={() => {
+                const next = new Map(subDays);
+                const s = new Set(next.get(p.id) || []);
+                s.has(i) ? s.delete(i) : s.add(i);
+                next.set(p.id, s);
+                setSubDays(next);
+              }}><Text style={{ fontSize: 11 }}>{d}</Text></Pressable>;
+            })}
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+            <TextInput style={[styles.input, { flex: 1, marginBottom: 0, paddingVertical: 8 }]} value={subTimeStart.get(p.id) || ''} onChangeText={t => { const next = new Map(subTimeStart); next.set(p.id, t); setSubTimeStart(next); }} placeholder="From HH:MM" />
+            <TextInput style={[styles.input, { flex: 1, marginBottom: 0, paddingVertical: 8 }]} value={subTimeEnd.get(p.id) || ''} onChangeText={t => { const next = new Map(subTimeEnd); next.set(p.id, t); setSubTimeEnd(next); }} placeholder="To HH:MM" />
+          </View>
         </View>;
       })}
       {isAnalyticsOpen && (analyticsLoading ? <Text style={styles.meta}>Loading analytics...</Text> : analyticsData ? <View style={{ marginTop: 8, gap: 8 }}>
@@ -695,6 +787,15 @@ function MoreTab({ session, onLogout, onRefresh, onOpenRoutines, onOpenDigest }:
   const [emergencyContacts, setEmergencyContacts] = useState<any[]>([]);
   const [pendingInvites, setPendingInvites] = useState<any[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [totpEnrolled, setTotpEnrolled] = useState(false);
+  const [totpEnrolling, setTotpEnrolling] = useState(false);
+  const [totpSecret, setTotpSecret] = useState('');
+  const [totpUri, setTotpUri] = useState('');
+  const [totpConfirmCode, setTotpConfirmCode] = useState('');
+  const [circles, setCircles] = useState<CircleInfo[]>([]);
+  const [digestDow, setDigestDow] = useState(1);
+  const [digestHour, setDigestHour] = useState(9);
+  const [digestTimezone, setDigestTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
   const RESOURCE_LABELS: Record<string, string> = { history: 'Location history', visits: 'Visits', trips: 'Trips', member_page: 'Profile page' };
   useEffect(() => {
     api<{ pausedUntil: number | null }>(session, '/api/users/me/pause')
@@ -727,6 +828,19 @@ function MoreTab({ session, onLogout, onRefresh, onOpenRoutines, onOpenDigest }:
       .catch(() => {});
     api<{ invites: any[] }>(session, '/api/users/me/pending-invites')
       .then((d) => setPendingInvites(d.invites || []))
+      .catch(() => {});
+    api<{ enrolled: boolean }>(session, '/api/users/me/totp/status')
+      .then((d) => setTotpEnrolled(d.enrolled))
+      .catch(() => {});
+    api<{ circles: CircleInfo[] }>(session, '/api/users/me/circles')
+      .then((d) => setCircles(d.circles || []))
+      .catch(() => {});
+    api<any>(session, '/api/users/me/alert-prefs')
+      .then((d) => {
+        if (d.digestDayOfWeek != null) setDigestDow(d.digestDayOfWeek);
+        if (d.digestHourLocal != null) setDigestHour(d.digestHourLocal);
+        if (d.digestTimezone != null) setDigestTimezone(d.digestTimezone);
+      })
       .catch(() => {});
   }, [session]);
   const isPaused = !!(pauseUntil && pauseUntil > Date.now());
@@ -801,6 +915,88 @@ function MoreTab({ session, onLogout, onRefresh, onOpenRoutines, onOpenDigest }:
           } catch (e: any) { Alert.alert('Failed', e.message); }
         }}><Text style={styles.buttonText}>Invite</Text></Pressable>
       </View>
+    </View>
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Two-factor authentication</Text>
+      {totpEnrolling ? <>
+        <Text style={styles.meta}>Scan this secret in your authenticator app:</Text>
+        <Text style={{ fontWeight: '700', marginVertical: 8, fontSize: 13 }}>{totpSecret}</Text>
+        <TextInput style={styles.input} value={totpConfirmCode} onChangeText={setTotpConfirmCode} placeholder="6-digit code" keyboardType="number-pad" maxLength={6} />
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Pressable style={styles.primaryButton} onPress={async () => {
+            try {
+              await api(session, '/api/users/me/totp/enroll-confirm', { method: 'POST', body: JSON.stringify({ code: totpConfirmCode }) });
+              setTotpEnrolled(true); setTotpEnrolling(false); setTotpConfirmCode(''); setTotpSecret('');
+              Alert.alert('2FA enabled');
+            } catch (e: any) { Alert.alert('Failed', e.message); }
+          }}><Text style={styles.buttonText}>Confirm</Text></Pressable>
+          <Pressable style={styles.secondaryButton} onPress={() => { setTotpEnrolling(false); setTotpSecret(''); }}><Text>Cancel</Text></Pressable>
+        </View>
+      </> : totpEnrolled ? <>
+        <Text style={styles.meta}>Authenticator is enabled.</Text>
+        <Pressable style={styles.dangerButton} onPress={async () => {
+          Alert.alert('Disable 2FA?', 'This reduces account security.', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Disable', style: 'destructive', onPress: async () => {
+              try { await api(session, '/api/users/me/totp', { method: 'DELETE' }); setTotpEnrolled(false); Alert.alert('2FA disabled'); } catch (e: any) { Alert.alert('Failed', e.message); }
+            }},
+          ]);
+        }}><Text style={styles.buttonText}>Disable 2FA</Text></Pressable>
+      </> : <>
+        <Text style={styles.meta}>Add an extra layer of security with an authenticator app.</Text>
+        <Pressable style={styles.primaryButton} onPress={async () => {
+          try {
+            const res = await api<{ secret: string; uri: string }>(session, '/api/users/me/totp/enroll-start', { method: 'POST' });
+            setTotpSecret(res.secret); setTotpUri(res.uri); setTotpEnrolling(true);
+          } catch (e: any) { Alert.alert('Failed', e.message); }
+        }}><Text style={styles.buttonText}>Enable 2FA</Text></Pressable>
+      </>}
+    </View>
+    {circles.length > 1 && <View style={styles.card}>
+      <Text style={styles.cardTitle}>Switch circle</Text>
+      {circles.map(c => <Pressable key={c.circleId} style={[styles.chip, c.circleId === session.circleId && styles.chipActive, { marginBottom: 4 }]} onPress={async () => {
+        if (c.circleId === session.circleId) return;
+        try {
+          const res = await api<any>(session, '/api/auth/switch-circle', { method: 'POST', body: JSON.stringify({ circleId: c.circleId }) });
+          await SecureStore.setItemAsync(TOKEN_KEY, res.token);
+          const meta = { serverUrl: session.serverUrl, token: res.token, userId: session.userId, circleId: c.circleId, displayName: session.displayName, email: session.email };
+          await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(meta));
+          Alert.alert('Switched', `Now in ${c.name || 'circle'}`);
+          onRefresh();
+        } catch (e: any) { Alert.alert('Failed', e.message); }
+      }}><Text>{c.name || `Circle ${c.circleId}`} ({c.role})</Text></Pressable>)}
+    </View>}
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Emergency contact auto-revoke</Text>
+      <Text style={styles.meta}>Automatically remove contacts if they don't respond to SOS alerts.</Text>
+      {emergencyContacts.filter(c => c.status === 'accepted').map(c => <View key={c.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
+        <Text style={{ fontWeight: '500' }}>{c.contactDisplayName}</Text>
+        <Switch value={!!c.autoRevoke} onValueChange={async (v) => {
+          try {
+            await api(session, `/api/users/me/emergency-contacts/${c.id}`, { method: 'PATCH', body: JSON.stringify({ autoRevoke: v }) });
+            setEmergencyContacts((prev: any[]) => prev.map(x => x.id === c.id ? { ...x, autoRevoke: v } : x));
+          } catch (e: any) { Alert.alert('Failed', e.message); }
+        }} />
+      </View>)}
+    </View>
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Digest schedule</Text>
+      <Text style={styles.meta}>Choose when to receive the weekly digest.</Text>
+      <View style={{ flexDirection: 'row', gap: 4, marginVertical: 4, flexWrap: 'wrap' }}>
+        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => <Pressable key={i} style={[styles.chip, { paddingHorizontal: 10 }, digestDow === i && styles.chipActive]} onPress={() => setDigestDow(i)}><Text style={{ fontSize: 12 }}>{d}</Text></Pressable>)}
+      </View>
+      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 }}>
+        <Text style={styles.meta}>Hour:</Text>
+        <TextInput style={[styles.input, { width: 60, marginBottom: 0 }]} value={String(digestHour)} onChangeText={t => setDigestHour(parseInt(t) || 9)} keyboardType="number-pad" />
+        <Text style={styles.meta}>(0-23)</Text>
+      </View>
+      <TextInput style={[styles.input, { marginTop: 8 }]} value={digestTimezone} onChangeText={setDigestTimezone} placeholder="Timezone e.g. America/New_York" autoCapitalize="none" />
+      <Pressable style={styles.primaryButton} onPress={async () => {
+        try {
+          await api(session, '/api/users/me/alert-prefs', { method: 'PATCH', body: JSON.stringify({ digestDayOfWeek: digestDow, digestHourLocal: digestHour, digestTimezone }) });
+          Alert.alert('Digest schedule saved');
+        } catch (e: any) { Alert.alert('Failed', e.message); }
+      }}><Text style={styles.buttonText}>Save schedule</Text></Pressable>
     </View>
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Read receipts</Text>
@@ -1212,6 +1408,8 @@ function TripsScreen({ session, memberId, memberName, onBack }: { session: Sessi
       const modeIcon = t.mode === 'driving' ? '🚗' : t.mode === 'walking' ? '🚶' : t.mode === 'running' ? '🏃' : '🚴';
       const maxKph = t.maxSpeedMps ? t.maxSpeedMps * 3.6 : null;
       const speedColor = maxKph == null ? '#66737f' : maxKph < 50 ? '#006c49' : maxKph < 70 ? '#F57F17' : '#ba1a1a';
+      const coaching = (t as any).coachingJson ? JSON.parse((t as any).coachingJson) : null;
+      const coachingColor = coaching?.overallRating === 'green' ? '#006c49' : coaching?.overallRating === 'yellow' ? '#F57F17' : coaching?.overallRating === 'red' ? '#ba1a1a' : null;
       return <View key={t.id} style={styles.card}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Text style={{ fontSize: 24 }}>{modeIcon}</Text>
@@ -1221,6 +1419,11 @@ function TripsScreen({ session, memberId, memberName, onBack }: { session: Sessi
             {maxKph != null && <Text style={{ color: speedColor, fontWeight: '600', fontSize: 12 }}>Max {maxKph.toFixed(0)} km/h</Text>}
           </View>
         </View>
+        {coaching && coachingColor && <View style={{ marginTop: 8, borderLeftWidth: 4, borderLeftColor: coachingColor, paddingLeft: 10 }}>
+          <Text style={{ fontWeight: '700', color: coachingColor }}>Coaching</Text>
+          {coaching.tips?.length > 0 && coaching.tips.map((tip: string, i: number) => <Text key={i} style={{ fontSize: 12, color: '#333', marginTop: 2 }}>💡 {tip}</Text>)}
+          {coaching.strengths?.length > 0 && coaching.strengths.map((s: string, i: number) => <Text key={i} style={{ fontSize: 12, color: '#006c49', marginTop: 2 }}>👍 {s}</Text>)}
+        </View>}
       </View>;
     })}
     <View style={{ height: 40 }} />

@@ -38,6 +38,12 @@
 
   function $(id) { return document.getElementById(id); }
   function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    return Uint8Array.from(rawData, (c) => c.charCodeAt(0));
+  }
   function initials(name) { return (name || '?').split(/\s+/).map((p) => p[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?'; }
   function rel(ms) {
     if (!ms) return 'No fix yet';
@@ -197,6 +203,8 @@
     }
     $('active-count').textContent = `${active} active`;
   }
+  const PLACE_KIND_EMOJI = { home: '\u{1F3E0}', school: '\u{1F3EB}', work: '\u{1F4BC}', gym: '\u{1F3CB}', hospital: '\u{1F3E5}', park: '\u{1F3DE}', store: '\u{1F3EA}', restaurant: '\u{1F37D}', other: '\u{1F4CD}' };
+  function kindEmoji(kind) { return PLACE_KIND_EMOJI[kind] || PLACE_KIND_EMOJI.other; }
   function renderPlaces() {
     const list = $('places-list');
     list.innerHTML = '';
@@ -204,7 +212,8 @@
       drawPlace(p);
       const div = document.createElement('div');
       div.className = 'card';
-      div.innerHTML = `<strong>${escapeHtml(p.name)}</strong><div class="meta">${escapeHtml(p.address || `${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}`)} · ${Math.round(p.radiusM)}m</div><button class="danger" data-delete-place="${p.id}" style="margin-top:10px">Delete</button>`;
+      const emoji = kindEmoji(p.kind);
+      div.innerHTML = `<strong>${emoji} ${escapeHtml(p.name)}</strong><div class="meta">${escapeHtml(p.address || `${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}`)} · ${Math.round(p.radiusM)}m</div><button class="danger" data-delete-place="${p.id}" style="margin-top:10px">Delete</button>`;
       list.appendChild(div);
     }
     list.querySelectorAll('[data-delete-place]').forEach((btn) => btn.addEventListener('click', async () => {
@@ -410,8 +419,64 @@
   $('pause-unpause-mobile').addEventListener('click', unpauseMobile);
   api.json('/api/users/me/pause').then((d) => renderPauseStateMobile(d.pausedUntil)).catch(() => {});
 
+  $('share-trip-btn').onclick = async () => {
+    try {
+      const data = await api.json('/api/users/me/trip-shares', { method: 'POST', body: JSON.stringify({}) });
+      const url = `${location.origin}/shared/trip/${data.shareId}`;
+      await navigator.clipboard.writeText(url);
+      toast('Trip share link copied!');
+    } catch (err) { toast(`Share failed: ${err.message}`); }
+  };
+
+  const loginForm = $('login-form');
+  if (loginForm) {
+    loginForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const email = $('login-email').value.trim();
+      const password = $('login-password').value;
+      const totpField = $('login-totp-code');
+      const challengeToken = loginForm.dataset.challengeToken;
+      if (challengeToken && totpField) {
+        try {
+          const res = await api.json('/api/auth/login/totp', { method: 'POST', body: JSON.stringify({ challengeToken, code: totpField.value.trim() }) });
+          delete loginForm.dataset.challengeToken;
+          $('totp-row')?.remove();
+          window.location.reload();
+        } catch (err) { toast(`TOTP failed: ${err.message}`); }
+        return;
+      }
+      try {
+        const res = await api.json('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+        if (res.requiresTotp) {
+          loginForm.dataset.challengeToken = res.challengeToken;
+          const row = document.createElement('div');
+          row.id = 'totp-row';
+          row.className = 'stack';
+          row.innerHTML = '<label for="login-totp-code">Authenticator code</label><input id="login-totp-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" required autocomplete="one-time-code">';
+          loginForm.insertBefore(row, loginForm.querySelector('button[type="submit"]'));
+          $('login-totp-code').focus();
+          toast('Enter your authenticator code');
+          return;
+        }
+        window.location.reload();
+      } catch (err) { toast(`Login failed: ${err.message}`); }
+    };
+  }
+
   for (const p of places.values()) drawPlace(p);
   renderMembers(); renderPlaces(); fitMap(); connectWs(); fetchHealth();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/public/app-mobile/sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/public/app-mobile/sw.js').then(async (registration) => {
+      try {
+        const res = await fetch('/api/web-push/public-key');
+        if (!res.ok) return;
+        const { publicKey } = await res.json();
+        if (!publicKey) return;
+        if (Notification.permission === 'default') await Notification.requestPermission();
+        if (Notification.permission !== 'granted') return;
+        const subscription = await registration.pushManager.subscribe({ applicationServerKey: urlBase64ToUint8Array(publicKey), userVisibleOnly: true });
+        await api.json('/api/web-push/subscriptions', { method: 'POST', body: JSON.stringify(subscription.toJSON()) });
+      } catch {}
+    }).catch(() => {});
 })();
 

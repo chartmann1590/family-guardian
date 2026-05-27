@@ -1,7 +1,9 @@
 import { publish } from './hub.js';
 import { fanOut } from './fcm.js';
+import { fanOut as webPushFanOut } from './webPush.js';
 import { isSnoozed } from './lib/snooze.js';
 import { BundlingBuffer } from './lib/notificationBundler.js';
+import { dispatchWebhook } from './webhooks.js';
 
 const deviationBundler = new BundlingBuffer(60_000);
 
@@ -9,13 +11,19 @@ function flushBundle(circleId, events) {
     if (events.length === 1) {
         publish(circleId, events[0]);
         fanOut(circleId, events[0], db_ref, events[0].userId);
+        webPushFanOut(circleId, events[0], db_ref, events[0].userId);
+        dispatchWebhook(circleId, events[0]);
         return;
     }
     const ev = { type: 'routine_deviation_bundle', circleId, events, count: events.length };
     publish(circleId, ev);
     const members = db_ref.prepare('SELECT user_id FROM circle_members WHERE circle_id = ?').all(circleId);
     const unsnoozed = members.filter(m => !isSnoozed(db_ref, m.user_id, 'routine_deviation'));
-    if (unsnoozed.length > 0) fanOut(circleId, ev, db_ref);
+    if (unsnoozed.length > 0) {
+        fanOut(circleId, ev, db_ref);
+        webPushFanOut(circleId, ev, db_ref);
+    }
+    dispatchWebhook(circleId, ev);
 }
 
 let db_ref = null;

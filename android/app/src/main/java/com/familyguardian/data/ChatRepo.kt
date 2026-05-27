@@ -27,18 +27,15 @@ class ChatRepo(private val prefs: Prefs) {
         return ApiClient.api.sendMessage(url, auth, SendMessageBody(body.trim()))
     }
 
-    suspend fun sendAttachment(circleId: Long, file: File, kind: String, body: String? = null, durationMs: Long? = null): ChatMessage {
+    suspend fun sendAttachment(circleId: Long, file: File, kind: String, body: String? = null, durationMs: Long? = null, mimeType: String? = null): ChatMessage {
         val (server, auth) = bearer() ?: error("not signed in")
         val url = ApiClient.endpoint(server, "/api/circles/$circleId/messages/attachment")
-        val mimeType = when (kind) {
+        val resolvedMime = mimeType ?: when (kind) {
             "image" -> "image/jpeg"
             "audio" -> "audio/mp4"
             else -> "application/octet-stream"
         }
-        val fileBody = file.asRequestBody(mimeType.toMediaTypeOrNull())
-        val filePart = MultipartBody.Part.createFormData("file", file.name, fileBody)
-        val kindBody = kind.toRequestBody("text/plain".toMediaTypeOrNull())
-        val parts = mutableListOf<Pair<String, okhttp3.RequestBody>>()
+        val fileBody = file.asRequestBody(resolvedMime.toMediaTypeOrNull())
         val multipartBuilder = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart("kind", kind)

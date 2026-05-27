@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { requireAuth, getUserCircleId } from '../auth.js';
 import { publish } from '../hub.js';
 import { fanOutToUsers } from '../fcm.js';
+import { fanOutToUsers as webPushFanOutUsers } from '../webPush.js';
 import { isSnoozed } from '../lib/snooze.js';
 import { reconcileGeofences } from '../geofence.js';
 import { onLocationFix as visitsOnFix } from '../visits.js';
@@ -42,6 +43,7 @@ function checkLowBattery(db, userId, circleId, batteryPct, displayName) {
         const watcherIds = watchers.filter(w => (w.low_battery_threshold || 15) >= batteryPct && !isSnoozed(db, w.user_id, 'low_battery')).map(w => w.user_id);
         if (watcherIds.length > 0) {
             fanOutToUsers(watcherIds, ev, db);
+            webPushFanOutUsers(watcherIds, ev, db);
         }
         return;
     }

@@ -1,10 +1,14 @@
 package com.familyguardian.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,6 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
@@ -28,11 +34,15 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -51,20 +61,32 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.familyguardian.data.AcceptSuggestionBody
+import com.familyguardian.data.ApiClient
 import com.familyguardian.data.CircleMember
 import com.familyguardian.data.Place
 import com.familyguardian.data.PlaceBody
+import com.familyguardian.data.PlaceSuggestion
 import com.familyguardian.data.PlaceSubBody
 import com.familyguardian.data.PlaceSubscription
 import com.familyguardian.data.PlaceSubscriptionsRepo
 import com.familyguardian.data.PlacesRepo
 import com.familyguardian.data.Prefs
 import kotlinx.coroutines.launch
+
+private val KIND_OPTIONS = listOf("home", "school", "work", "medical", "social", "gym", "shopping", "transit", "other")
+private val KIND_LABELS = mapOf(
+    "home" to "🏠 Home", "school" to "🏫 School", "work" to "🏢 Work",
+    "medical" to "🏥 Medical", "social" to "☕ Social", "gym" to "🏋 Gym",
+    "shopping" to "🛒 Shopping", "transit" to "🚌 Transit", "other" to "📍 Other",
+)
+private fun kindEmoji(kind: String): String = KIND_LABELS[kind]?.take(2)?.trim() ?: "📍"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,6 +107,8 @@ fun PlacesScreen(onBack: () -> Unit, onOpenAnalytics: (placeId: Long, placeName:
 
     var editing by remember { mutableStateOf<Place?>(null) }
     var addingNew by remember { mutableStateOf(false) }
+    var suggestions by remember { mutableStateOf<List<PlaceSuggestion>>(emptyList()) }
+    var suggestionsLoading by remember { mutableStateOf(false) }
 
     LaunchedEffect(circleId) {
         val cid = circleId ?: return@LaunchedEffect
@@ -105,6 +129,13 @@ fun PlacesScreen(onBack: () -> Unit, onOpenAnalytics: (placeId: Long, placeName:
         } finally {
             loading = false
         }
+        suggestionsLoading = true
+        try {
+            val snap = prefs.snapshot()
+            val url = ApiClient.endpoint(snap.serverUrl!!, "/api/users/me/place-suggestions")
+            suggestions = ApiClient.api.getPlaceSuggestions(url, "Bearer ${snap.token!!}").suggestions
+        } catch (_: Throwable) { }
+        suggestionsLoading = false
     }
 
     Scaffold(
@@ -157,6 +188,39 @@ fun PlacesScreen(onBack: () -> Unit, onOpenAnalytics: (placeId: Long, placeName:
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    if (suggestions.isNotEmpty()) {
+                        item {
+                            Text("Suggestions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        }
+                        items(suggestions, key = { "sug-${it.id}" }) { sug ->
+                            SuggestionCard(
+                                suggestion = sug,
+                                onSave = { name ->
+                                    scope.launch {
+                                        try {
+                                            val snap = prefs.snapshot()
+                                            val url = ApiClient.endpoint(snap.serverUrl!!, "/api/users/me/place-suggestions/${sug.id}/accept")
+                                            ApiClient.api.acceptPlaceSuggestion(url, "Bearer ${snap.token!!}", AcceptSuggestionBody(name = name))
+                                            suggestions = suggestions.filterNot { it.id == sug.id }
+                                            val cid = circleId ?: return@launch
+                                            places = repo.list(cid).sortedBy { it.name.lowercase() }
+                                        } catch (t: Throwable) { error = t.message }
+                                    }
+                                },
+                                onDismiss = {
+                                    scope.launch {
+                                        try {
+                                            val snap = prefs.snapshot()
+                                            val url = ApiClient.endpoint(snap.serverUrl!!, "/api/users/me/place-suggestions/${sug.id}/dismiss")
+                                            ApiClient.api.dismissPlaceSuggestion(url, "Bearer ${snap.token!!}")
+                                            suggestions = suggestions.filterNot { it.id == sug.id }
+                                        } catch (t: Throwable) { error = t.message }
+                                    }
+                                },
+                            )
+                        }
+                        item { Spacer(modifier = Modifier.height(4.dp)) }
+                    }
                     items(places, key = { it.id }) { p ->
                         PlaceCard(
                             place = p,
@@ -278,7 +342,7 @@ private fun PlaceCard(
                     }
                 }
                 Column(modifier = Modifier.padding(start = 12.dp).fillMaxWidth(0.6f)) {
-                    Text(place.name, style = MaterialTheme.typography.headlineSmall)
+                    Text("${kindEmoji(place.kind)} ${place.name}", style = MaterialTheme.typography.headlineSmall)
                     Text(
                         place.address ?: "${"%.4f".format(place.lat)}, ${"%.4f".format(place.lng)}",
                         style = MaterialTheme.typography.bodyMedium,
@@ -341,6 +405,9 @@ private fun PlaceCard(
                             val existing = subs.find { it.memberId == targetId }
                             var enterOn by remember { mutableStateOf(existing?.onEnter ?: false) }
                             var exitOn by remember { mutableStateOf(existing?.onExit ?: false) }
+                            var selectedDays by remember { mutableStateOf(existing?.quietStart?.let { "" } ?: "") }
+                            var windowStart by remember { mutableStateOf("") }
+                            var windowEnd by remember { mutableStateOf("") }
 
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -384,6 +451,27 @@ private fun PlaceCard(
                                 }
                             }
                         }
+
+                        DayOfWeekChips()
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            OutlinedTextField(
+                                value = "",
+                                onValueChange = {},
+                                label = { Text("From (HH:mm)") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                            )
+                            OutlinedTextField(
+                                value = "",
+                                onValueChange = {},
+                                label = { Text("To (HH:mm)") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                 }
             }
@@ -391,9 +479,11 @@ private fun PlaceCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlaceFormDialog(initial: Place?, onCancel: () -> Unit, onSave: (PlaceBody) -> Unit) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
+    var kind by remember { mutableStateOf(initial?.kind ?: "other") }
     var address by remember { mutableStateOf(initial?.address ?: "") }
     var lat by remember { mutableStateOf(initial?.lat?.toString() ?: "") }
     var lng by remember { mutableStateOf(initial?.lng?.toString() ?: "") }
@@ -401,6 +491,7 @@ private fun PlaceFormDialog(initial: Place?, onCancel: () -> Unit, onSave: (Plac
     var alertEnter by remember { mutableStateOf(initial?.alertsOnEnter ?: true) }
     var alertExit by remember { mutableStateOf(initial?.alertsOnExit ?: true) }
     var validationError by remember { mutableStateOf<String?>(null) }
+    var kindExpanded by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onCancel,
@@ -417,6 +508,7 @@ private fun PlaceFormDialog(initial: Place?, onCancel: () -> Unit, onSave: (Plac
                     onSave(
                         PlaceBody(
                             name = name.trim(),
+                            kind = kind,
                             address = address.trim().takeIf { it.isNotEmpty() },
                             lat = latD,
                             lng = lngD,
@@ -436,10 +528,32 @@ private fun PlaceFormDialog(initial: Place?, onCancel: () -> Unit, onSave: (Plac
         title = { Text(if (initial == null) "New safety place" else "Edit place") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Clear any prior validation error on the next keystroke so it
-                // disappears when the user starts fixing the offending field.
                 val clearErr: (String) -> String = { v -> validationError = null; v }
                 OutlinedTextField(name, { name = clearErr(it) }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                ExposedDropdownMenuBox(
+                    expanded = kindExpanded,
+                    onExpandedChange = { kindExpanded = !kindExpanded },
+                ) {
+                    OutlinedTextField(
+                        value = KIND_LABELS[kind] ?: kind,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Kind") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = kindExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = kindExpanded,
+                        onDismissRequest = { kindExpanded = false },
+                    ) {
+                        for (opt in KIND_OPTIONS) {
+                            DropdownMenuItem(
+                                text = { Text(KIND_LABELS[opt] ?: opt) },
+                                onClick = { kind = opt; kindExpanded = false },
+                            )
+                        }
+                    }
+                }
                 OutlinedTextField(address, { address = clearErr(it) }, label = { Text("Address (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -481,4 +595,84 @@ private fun PlaceFormDialog(initial: Place?, onCancel: () -> Unit, onSave: (Plac
             }
         },
     )
+}
+
+@Composable
+private fun SuggestionCard(
+    suggestion: PlaceSuggestion,
+    onSave: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf(suggestion.label ?: "") }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4)),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                suggestion.label ?: "Unnamed location",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "${suggestion.visitCount} visits • ${"%.4f".format(suggestion.lat)}, ${"%.4f".format(suggestion.lng)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Place name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { if (name.isNotBlank()) onSave(name.trim()) },
+                    enabled = name.isNotBlank(),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.size(4.dp))
+                    Text("Save")
+                }
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.size(4.dp))
+                    Text("Dismiss")
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DayOfWeekChips() {
+    val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    var selected by remember { mutableStateOf(days.indices.toSet()) }
+    Text("Active days", style = MaterialTheme.typography.labelMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for ((i, day) in days.withIndex()) {
+            val on = i in selected
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.clickable {
+                    selected = if (on) selected - i else selected + i
+                },
+            ) {
+                Text(
+                    day,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    color = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+        }
+    }
 }

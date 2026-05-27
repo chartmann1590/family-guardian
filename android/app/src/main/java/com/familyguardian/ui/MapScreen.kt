@@ -1,14 +1,16 @@
 package com.familyguardian.ui
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Context.CLIPBOARD_SERVICE
 import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,6 +71,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.familyguardian.data.ApiClient
@@ -111,6 +115,12 @@ private fun initials(name: String?): String {
 
 private fun memberActive(recordedAt: Long?): Boolean {
     return recordedAt != null && (System.currentTimeMillis() - recordedAt) < 5 * 60_000L
+}
+
+private fun kindEmoji(kind: String): String = when (kind) {
+    "home" -> "🏠"; "school" -> "🏫"; "work" -> "🏢"; "medical" -> "🏥"
+    "social" -> "☕"; "gym" -> "🏋"; "shopping" -> "🛒"; "transit" -> "🚌"
+    else -> "📍"
 }
 
 private fun minutesUntilTonight(): Int {
@@ -227,6 +237,8 @@ fun MapScreen(
     var overflowMenuOpen by remember { mutableStateOf(false) }
     var healthMembers by remember { mutableStateOf<List<MemberHealth>>(emptyList()) }
     var healthRefresh by remember { mutableStateOf(0) }
+    var placeOverlays by remember { mutableStateOf<List<com.familyguardian.data.Place>>(emptyList()) }
+    var shareLiveInFlight by remember { mutableStateOf(false) }
     val healthRepo = remember { HealthRepo(prefs) }
     val digestRepo = remember { DigestRepo(prefs) }
     var digestSummary by remember { mutableStateOf<DigestData?>(null) }
@@ -347,6 +359,26 @@ fun MapScreen(
             }
         }
         for (old in toRemove) mv.overlays.remove(old)
+
+        val existingPlaceIds = mv.overlays.filterIsInstance<Marker>()
+            .filter { it.id?.startsWith("place-") == true }
+            .associate { it.id to it }
+        for (p in placeOverlays) {
+            val pid = "place-${p.id}"
+            val point = GeoPoint(p.lat, p.lng)
+            val existing = existingPlaceIds[pid]
+            if (existing != null) {
+                existing.position = point
+            } else {
+                val pm = Marker(mv)
+                pm.id = pid
+                pm.position = point
+                pm.title = kindEmoji(p.kind) + " " + p.name
+                pm.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                mv.overlays.add(pm)
+            }
+        }
+
         mv.invalidate()
     }
 
@@ -385,6 +417,16 @@ fun MapScreen(
         } catch (_: Throwable) { }
         try {
             pauseState = pauseRepo.current()
+        } catch (_: Throwable) { }
+        try {
+            val snap = prefs.snapshot()
+            val cid = snap.circleId
+            val token = snap.token
+            val server = snap.serverUrl
+            if (cid != null && token != null && server != null) {
+                val url = ApiClient.endpoint(server, "/api/circles/$cid/places")
+                placeOverlays = ApiClient.api.listPlaces(url, "Bearer $token").places
+            }
         } catch (_: Throwable) { }
         try {
             val snap = prefs.snapshot()
@@ -451,6 +493,15 @@ fun MapScreen(
                             )
                         } else m
                     }
+                } else if (event is GuardianEvent.EtaUpdated) {
+                    val name = event.displayName ?: "Someone"
+                    Toast.makeText(appCtx, "$name arriving at ${event.placeName} in ~${event.etaMinutes} min", Toast.LENGTH_SHORT).show()
+                } else if (event is GuardianEvent.ArrivedSafely) {
+                    val name = event.displayName ?: "Someone"
+                    Toast.makeText(appCtx, "$name arrived safely at ${event.placeName}", Toast.LENGTH_SHORT).show()
+                } else if (event is GuardianEvent.BreakSuggested) {
+                    val name = event.displayName ?: "Someone"
+                    Toast.makeText(appCtx, "Break suggested for $name (${event.drivingMinutes} min driving)", Toast.LENGTH_LONG).show()
                 }
                 if (event is GuardianEvent.LocationUpdate ||
                     event is GuardianEvent.CheckIn ||
@@ -785,6 +836,28 @@ fun MapScreen(
                                                 membersLoading = true
                                                 fetchMembers()
                                                 membersLoading = false
+                                            }
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(if (shareLiveInFlight) "Sharing..." else "Share live") },
+                                        leadingIcon = { Icon(Icons.Filled.Visibility, contentDescription = null) },
+                                        onClick = {
+                                            overflowMenuOpen = false
+                                            shareLiveInFlight = true
+                                            scope.launch {
+                                                try {
+                                                    val snap = prefs.snapshot()
+                                                    val url = ApiClient.endpoint(snap.serverUrl!!, "/api/users/me/trip-shares")
+                                                    val resp = ApiClient.api.createTripShare(url, "Bearer ${snap.token!!}", com.familyguardian.data.TripShareCreateBody())
+                                                    val clipboard = appCtx.getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                                                    clipboard.setPrimaryClip(ClipData.newPlainText("Trip share", resp.url))
+                                                    Toast.makeText(appCtx, "Link copied to clipboard", Toast.LENGTH_SHORT).show()
+                                                } catch (t: Throwable) {
+                                                    Toast.makeText(appCtx, "Failed: ${t.message}", Toast.LENGTH_SHORT).show()
+                                                } finally {
+                                                    shareLiveInFlight = false
+                                                }
                                             }
                                         },
                                     )

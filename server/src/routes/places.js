@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { requireAuth } from '../auth.js';
 
+const KINDS = ['home', 'school', 'work', 'medical', 'social', 'gym', 'shopping', 'transit', 'other'];
+
 const PlaceBody = z.object({
     name: z.string().min(1).max(64),
     address: z.string().max(256).optional(),
@@ -9,6 +11,7 @@ const PlaceBody = z.object({
     radiusM: z.number().positive().max(50_000),
     alertsOnEnter: z.boolean().optional().default(true),
     alertsOnExit: z.boolean().optional().default(true),
+    kind: z.enum(KINDS).optional().default('other'),
 });
 
 const PlacePatch = PlaceBody.partial();
@@ -35,6 +38,7 @@ function rowToPlace(r) {
         radiusM: r.radius_m,
         alertsOnEnter: !!r.alerts_on_enter,
         alertsOnExit: !!r.alerts_on_exit,
+        kind: r.kind || 'other',
         createdBy: r.created_by,
         createdAt: r.created_at,
     };
@@ -64,8 +68,8 @@ export default async function placeRoutes(fastify, { db }) {
         const result = db
             .prepare(
                 `INSERT INTO places
-                 (circle_id, name, address, lat, lng, radius_m, alerts_on_enter, alerts_on_exit, created_by, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                 (circle_id, name, address, lat, lng, radius_m, alerts_on_enter, alerts_on_exit, kind, created_by, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
             )
             .run(
                 circleId,
@@ -76,6 +80,7 @@ export default async function placeRoutes(fastify, { db }) {
                 p.radiusM,
                 p.alertsOnEnter ? 1 : 0,
                 p.alertsOnExit ? 1 : 0,
+                p.kind,
                 req.auth.userId,
                 Date.now(),
             );
@@ -100,12 +105,14 @@ export default async function placeRoutes(fastify, { db }) {
             radius_m:       p.radiusM        ?? existing.radius_m,
             alerts_on_enter: p.alertsOnEnter !== undefined ? (p.alertsOnEnter ? 1 : 0) : existing.alerts_on_enter,
             alerts_on_exit:  p.alertsOnExit  !== undefined ? (p.alertsOnExit  ? 1 : 0) : existing.alerts_on_exit,
+            kind:           p.kind           ?? existing.kind,
         };
         db.prepare(
             `UPDATE places SET
                 name = @name, address = @address,
                 lat = @lat, lng = @lng, radius_m = @radius_m,
-                alerts_on_enter = @alerts_on_enter, alerts_on_exit = @alerts_on_exit
+                alerts_on_enter = @alerts_on_enter, alerts_on_exit = @alerts_on_exit,
+                kind = @kind
              WHERE id = @id`
         ).run({ ...merged, id: placeId });
         const row = db.prepare('SELECT * FROM places WHERE id = ?').get(placeId);

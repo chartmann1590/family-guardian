@@ -112,8 +112,15 @@
         });
     }
 
+    const KIND_EMOJI = { home: '🏠', school: '🏫', work: '🏢', medical: '🏥', social: '☕', gym: '🏋️', shopping: '🛒', transit: '🚌', other: '📍' };
+    const KIND_COLORS = { home: '#006c49', school: '#1a73e8', work: '#5f6368', medical: '#ba1a1a', social: '#e91e63', gym: '#ff6d00', shopping: '#7b1fa2', transit: '#00bcd4', other: '#76777d' };
+
+    function kindEmoji(kind) {
+        return KIND_EMOJI[kind] || KIND_EMOJI.other;
+    }
+
     function colorFor(place) {
-        return place.alertsOnEnter || place.alertsOnExit ? '#006c49' : '#76777d';
+        return KIND_COLORS[place.kind] || KIND_COLORS.other;
     }
 
     function drawPlace(place) {
@@ -127,7 +134,7 @@
         const marker = L.marker([place.lat, place.lng], {
             icon: L.divIcon({
                 className: 'fg-place-marker',
-                html: `<div style="background:${color};color:#fff;font-family:Inter,sans-serif;font-size:12px;font-weight:600;padding:4px 8px;border-radius:9999px;box-shadow:0 4px 12px rgba(15,23,42,0.2);white-space:nowrap;">${escapeHtml(place.name)}</div>`,
+                html: `<div style="background:${color};color:#fff;font-family:Inter,sans-serif;font-size:12px;font-weight:600;padding:4px 8px;border-radius:9999px;box-shadow:0 4px 12px rgba(15,23,42,0.2);white-space:nowrap;">${kindEmoji(place.kind)} ${escapeHtml(place.name)}</div>`,
                 iconSize: null,
                 iconAnchor: [0, 0],
             }),
@@ -181,7 +188,7 @@
                     <span class="material-symbols-outlined">distance</span>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <h3 class="font-headline-md text-[16px] text-on-surface leading-tight">${escapeHtml(p.name)}</h3>
+                    <h3 class="font-headline-md text-[16px] text-on-surface leading-tight">${kindEmoji(p.kind)} ${escapeHtml(p.name)}</h3>
                     <p class="font-body-md text-body-md text-on-surface-variant text-sm mt-0.5">${escapeHtml(p.address || `${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}`)} · ${Math.round(p.radiusM)}m</p>
                     <div class="flex gap-3 text-xs text-on-surface-variant mt-2">
                         <span>Arrival: ${p.alertsOnEnter ? '🟢 on' : '⚪ off'}</span>
@@ -226,9 +233,43 @@
             const enterCb = row.querySelector('.sub-enter');
             const exitCb = row.querySelector('.sub-exit');
 
+            const scheduleRow = document.createElement('div');
+            scheduleRow.className = 'flex flex-wrap items-center gap-2 text-xs text-on-surface-variant ml-0 mt-1';
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const dayBits = [1, 2, 4, 8, 16, 32, 64];
+            const savedDays = s?.daysOfWeek ?? 127;
+            for (let i = 0; i < days.length; i++) {
+                const checked = (savedDays & dayBits[i]) !== 0 ? 'checked' : '';
+                scheduleRow.innerHTML += `<label class="flex items-center gap-0.5 cursor-pointer px-1.5 py-0.5 rounded ${checked ? 'bg-primary/10 text-primary' : 'bg-surface-container text-on-surface-variant'} day-chip" data-bit="${dayBits[i]}"><input type="checkbox" class="day-cb sr-only" ${checked} />${days[i]}</label>`;
+            }
+            scheduleRow.innerHTML += `
+                <input type="time" class="win-start border border-outline-variant/30 rounded px-1 py-0.5 text-xs bg-transparent" value="${s?.windowStart ?? ''}" placeholder="Start" />
+                <span>–</span>
+                <input type="time" class="win-end border border-outline-variant/30 rounded px-1 py-0.5 text-xs bg-transparent" value="${s?.windowEnd ?? ''}" placeholder="End" />`;
+            row.appendChild(scheduleRow);
+
+            scheduleRow.querySelectorAll('.day-cb').forEach((cb) => {
+                cb.addEventListener('change', () => {
+                    const label = cb.closest('.day-chip');
+                    if (cb.checked) {
+                        label.classList.add('bg-primary/10', 'text-primary');
+                        label.classList.remove('bg-surface-container', 'text-on-surface-variant');
+                    } else {
+                        label.classList.remove('bg-primary/10', 'text-primary');
+                        label.classList.add('bg-surface-container', 'text-on-surface-variant');
+                    }
+                });
+            });
+
             const sync = async () => {
                 const onEnter = enterCb.checked;
                 const onExit = exitCb.checked;
+                let daysOfWeek = 0;
+                scheduleRow.querySelectorAll('.day-cb:checked').forEach((cb) => {
+                    daysOfWeek |= parseInt(cb.closest('.day-chip').dataset.bit);
+                });
+                const windowStart = scheduleRow.querySelector('.win-start').value || undefined;
+                const windowEnd = scheduleRow.querySelector('.win-end').value || undefined;
                 if (!onEnter && !onExit) {
                     if (subs.has(k)) {
                         await fetch(`/api/place-subscriptions/${subs.get(k).id}`, { method: 'DELETE', credentials: 'same-origin' });
@@ -240,7 +281,7 @@
                     method: 'POST',
                     headers: { 'content-type': 'application/json' },
                     credentials: 'same-origin',
-                    body: JSON.stringify({ placeId: p.id, memberId: m.userId, onEnter, onExit }),
+                    body: JSON.stringify({ placeId: p.id, memberId: m.userId, onEnter, onExit, daysOfWeek, windowStart, windowEnd }),
                 });
                 if (res.ok) {
                     const data = await res.json();
@@ -299,6 +340,7 @@
         $('edit-radius').value = '150';
         $('edit-enter').checked = true;
         $('edit-exit').checked = true;
+        $('edit-kind').value = 'other';
         const center = map.getCenter();
         $('edit-lat').value = center.lat.toFixed(6);
         $('edit-lng').value = center.lng.toFixed(6);
@@ -318,6 +360,7 @@
         $('edit-radius').value = p.radiusM;
         $('edit-enter').checked = !!p.alertsOnEnter;
         $('edit-exit').checked = !!p.alertsOnExit;
+        $('edit-kind').value = p.kind || 'other';
         showDraft(p.lat, p.lng, p.radiusM);
     }
 
@@ -348,6 +391,7 @@
             radiusM: parseFloat($('edit-radius').value),
             alertsOnEnter: $('edit-enter').checked,
             alertsOnExit: $('edit-exit').checked,
+            kind: $('edit-kind').value || 'other',
         };
         const id = $('edit-id').value;
         const url = id ? `/api/places/${id}` : `/api/circles/${state.circleId}/places`;
@@ -411,6 +455,71 @@
                 }
                 renderList();
             }
+        } catch {}
+    })();
+
+    (async () => {
+        try {
+            const res = await fetch('/api/users/me/place-suggestions', { credentials: 'same-origin' });
+            if (!res.ok) return;
+            const suggestions = await res.json();
+            if (!suggestions || suggestions.length === 0) return;
+
+            const banner = document.createElement('div');
+            banner.className = 'mb-3 flex flex-col gap-2';
+            banner.dataset.suggestionsBanner = '';
+
+            for (const sug of suggestions) {
+                const card = document.createElement('div');
+                card.className = 'flex items-center gap-3 p-3 rounded-lg bg-yellow-50 border border-yellow-300';
+                card.innerHTML = `
+                    <span class="material-symbols-outlined text-yellow-600">lightbulb</span>
+                    <div class="flex-1 min-w-0">
+                        <span class="font-medium text-yellow-900 text-sm">${escapeHtml(sug.name || sug.address || 'Suggested place')}</span>
+                        <span class="text-yellow-700 text-xs ml-2">${escapeHtml(sug.address || '')}</span>
+                    </div>
+                    <input type="text" class="sug-name border border-yellow-300 rounded px-2 py-1 text-xs bg-white" placeholder="Name" value="${escapeHtml(sug.name || '')}" />
+                    <select class="sug-kind border border-yellow-300 rounded px-2 py-1 text-xs bg-white">
+                        ${Object.keys(KIND_EMOJI).map((k) => `<option value="${k}" ${k === 'other' ? 'selected' : ''}>${KIND_EMOJI[k]} ${k}</option>`).join('')}
+                    </select>
+                    <input type="number" class="sug-radius border border-yellow-300 rounded px-2 py-1 text-xs bg-white w-20" placeholder="Radius (m)" value="150" min="10" />
+                    <button class="sug-save px-3 py-1 rounded text-xs font-semibold bg-yellow-600 text-white hover:bg-yellow-700">Save as place</button>
+                    <button class="sug-dismiss px-3 py-1 rounded text-xs font-semibold bg-yellow-200 text-yellow-800 hover:bg-yellow-300">Dismiss</button>`;
+
+                card.querySelector('.sug-save').addEventListener('click', async () => {
+                    const name = card.querySelector('.sug-name').value.trim();
+                    const kind = card.querySelector('.sug-kind').value;
+                    const radiusM = parseFloat(card.querySelector('.sug-radius').value) || 150;
+                    const acceptRes = await fetch(`/api/place-suggestions/${sug.id}/accept`, {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/json' },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ name, kind, radiusM }),
+                    });
+                    if (acceptRes.ok) {
+                        const place = await acceptRes.json();
+                        state.places.push(place);
+                        state.places.sort((a, b) => a.name.localeCompare(b.name));
+                        drawPlace(place);
+                        renderList();
+                        card.remove();
+                        if (banner.children.length === 0) banner.remove();
+                    }
+                });
+
+                card.querySelector('.sug-dismiss').addEventListener('click', async () => {
+                    await fetch(`/api/place-suggestions/${sug.id}/dismiss`, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                    });
+                    card.remove();
+                    if (banner.children.length === 0) banner.remove();
+                });
+
+                banner.appendChild(card);
+            }
+
+            list.parentElement.insertBefore(banner, list);
         } catch {}
     })();
 })();

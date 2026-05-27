@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -27,6 +28,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -49,6 +51,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.familyguardian.data.ApiClient
 import com.familyguardian.data.AuthRepo
 import com.familyguardian.data.Prefs
 import kotlinx.coroutines.launch
@@ -70,8 +73,10 @@ fun ServerConfigScreen(onLoggedIn: () -> Unit) {
     var inviteCode by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    // mode: 0 = sign in (existing user), 1 = sign up (first user), 2 = join with invite
     var mode by remember { mutableStateOf(0) }
+    var showTotpStep by remember { mutableStateOf(false) }
+    var totpCode by remember { mutableStateOf("") }
+    var totpChallengeToken by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(savedUrl, savedEmail) {
         if (serverUrl.isBlank() && !savedUrl.isNullOrBlank()) serverUrl = savedUrl!!
@@ -264,11 +269,19 @@ fun ServerConfigScreen(onLoggedIn: () -> Unit) {
                                 scope.launch {
                                     try {
                                         when (mode) {
-                                            0 -> repo.login(
-                                                serverUrl = url,
-                                                email = email.trim(),
-                                                password = password,
-                                            )
+                                            0 -> {
+                                                val resp = repo.login(
+                                                    serverUrl = url,
+                                                    email = email.trim(),
+                                                    password = password,
+                                                )
+                                                if (resp.requiresTotp && resp.challengeToken != null) {
+                                                    totpChallengeToken = resp.challengeToken
+                                                    showTotpStep = true
+                                                    loading = false
+                                                    return@launch
+                                                }
+                                            }
                                             1 -> repo.signup(
                                                 serverUrl = url,
                                                 email = email.trim(),
@@ -335,6 +348,100 @@ fun ServerConfigScreen(onLoggedIn: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
+            }
+        }
+    }
+
+    if (showTotpStep) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background,
+        ) {
+            Box(modifier = Modifier.fillMaxSize().imePadding().padding(20.dp), contentAlignment = Alignment.Center) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 440.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Surface(
+                            modifier = Modifier.size(80.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(
+                                    Icons.Filled.Lock,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(40.dp),
+                                )
+                            }
+                        }
+                        Text("Two-factor authentication", style = MaterialTheme.typography.headlineMedium)
+                        Text("Enter the code from your authenticator app.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    OutlinedTextField(
+                        value = totpCode,
+                        onValueChange = { totpCode = it },
+                        label = { Text("6-digit code") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                    if (error != null) {
+                        Text(text = error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = { showTotpStep = false; totpCode = ""; totpChallengeToken = null; error = null },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(28.dp),
+                        ) { Text("Back") }
+                        Button(
+                            onClick = {
+                                error = null
+                                loading = true
+                                scope.launch {
+                                    try {
+                                        val challenge = totpChallengeToken
+                                        if (challenge == null) {
+                                            error = "No challenge token"
+                                            loading = false
+                                            return@launch
+                                        }
+                                        val url = ApiClient.endpoint(serverUrl.trim(), "/api/auth/login/totp")
+                                        val body = mapOf("challengeToken" to challenge, "code" to totpCode)
+                                        val resp = ApiClient.api.totpLogin(url, body)
+                                        prefs.saveSession(
+                                            token = resp.token,
+                                            email = email.trim(),
+                                            displayName = resp.displayName,
+                                            circleId = resp.circleId,
+                                            userId = resp.userId,
+                                        )
+                                        prefs.setOnboarded(true)
+                                        onLoggedIn()
+                                    } catch (t: Throwable) {
+                                        error = "Verification failed: ${t.message ?: t::class.simpleName}"
+                                    } finally {
+                                        loading = false
+                                    }
+                                }
+                            },
+                            enabled = !loading && totpCode.length == 6,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(28.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                            ),
+                        ) {
+                            if (loading) CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                            else Text("Verify")
+                        }
+                    }
+                }
             }
         }
     }

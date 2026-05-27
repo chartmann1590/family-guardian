@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { requireAuth, getUserCircleId } from '../auth.js';
 import { publish } from '../hub.js';
 import { fanOut, fanOutToUsers } from '../fcm.js';
+import { fanOut as webPushFanOut, fanOutToUsers as webPushFanOutUsers } from '../webPush.js';
+import { dispatchWebhook } from '../webhooks.js';
 
 const ActivateBody = z.object({
     lat: z.number().min(-90).max(90).optional(),
@@ -92,6 +94,8 @@ export default async function sosRoutes(fastify, { db }) {
         if (source) event.source = source;
         publish(circleId, { type: 'sos_active', ...event });
         fanOut(circleId, { type: 'sos_active', ...event }, db, userId);
+        webPushFanOut(circleId, { type: 'sos_active', ...event }, db, userId);
+        dispatchWebhook(circleId, { type: 'sos_active', ...event });
 
         const ecRows = db.prepare(`
             SELECT ec.contact_user_id FROM emergency_contacts ec
@@ -106,6 +110,7 @@ export default async function sosRoutes(fastify, { db }) {
                 viaEmergencyEscalation: true,
             };
             fanOutToUsers(ecRows.map(r => r.contact_user_id), ecPayload, db);
+            webPushFanOutUsers(ecRows.map(r => r.contact_user_id), ecPayload, db);
         }
 
         return event;
@@ -146,6 +151,8 @@ export default async function sosRoutes(fastify, { db }) {
         const event = rowToEvent(row);
         publish(existing.circle_id, { type: 'sos_resolved', ...event });
         fanOut(existing.circle_id, { type: 'sos_resolved', ...event }, db, userId);
+        webPushFanOut(existing.circle_id, { type: 'sos_resolved', ...event }, db, userId);
+        dispatchWebhook(existing.circle_id, { type: 'sos_resolved', ...event });
         return event;
     });
 

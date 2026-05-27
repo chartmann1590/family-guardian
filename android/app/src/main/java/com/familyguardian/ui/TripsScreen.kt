@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.TipsAndUpdates
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -48,6 +50,10 @@ import com.familyguardian.data.Trip
 import com.familyguardian.data.TripsRepo
 import com.familyguardian.events.EventBus
 import com.familyguardian.events.GuardianEvent
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -169,7 +175,63 @@ fun TripsScreen(circleId: Long, userId: Long, displayName: String, onBack: () ->
                                 }
                             }
                         }
+                        t.coachingJson?.let { json ->
+                            CoachingCard(coachingJson = json)
+                        }
                     }
+                }
+            }
+        }
+    }
+}
+
+private val coachingJsonParser = Json { ignoreUnknownKeys = true }
+
+@Composable
+private fun CoachingCard(coachingJson: String) {
+    val data = remember(coachingJson) {
+        try {
+            coachingJsonParser.parseToJsonElement(coachingJson).jsonObject
+        } catch (_: Exception) { null }
+    }
+    if (data == null) return
+
+    val level = data["level"]?.jsonPrimitive?.content ?: return
+    val tips = data["tips"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+    val strengths = data["strengths"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+
+    val borderColor = when (level) {
+        "green" -> Color(0xFF2E7D32)
+        "yellow" -> Color(0xFFF57F17)
+        "red" -> Color(0xFFC62828)
+        else -> Color.Gray
+    }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth().background(borderColor, RoundedCornerShape(12.dp)).padding(1.dp),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(
+                    Icons.Filled.TipsAndUpdates,
+                    contentDescription = null,
+                    tint = borderColor,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text("Trip coaching", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            }
+            if (tips.isNotEmpty()) {
+                Text("Tips:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                for (tip in tips) {
+                    Text("• $tip", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            if (strengths.isNotEmpty()) {
+                Text("Strengths:", style = MaterialTheme.typography.labelMedium, color = Color(0xFF2E7D32))
+                for (s in strengths) {
+                    Text("• $s", style = MaterialTheme.typography.bodySmall)
                 }
             }
         }

@@ -7,7 +7,9 @@
 
 import { publish } from './hub.js';
 import { fanOut } from './fcm.js';
+import { fanOut as webPushFanOut } from './webPush.js';
 import { isSnoozed } from './lib/snooze.js';
+import { dispatchWebhook } from './webhooks.js';
 
 const SPEEDING_REFIRE_MS = 5 * 60_000;
 
@@ -59,7 +61,9 @@ export function evaluateAlerts(db, fix) {
                 const unsnoozed = circleMembers.filter(m => !isSnoozed(db, m.user_id, 'speeding'));
                 if (unsnoozed.length > 0) {
                     fanOut(circleId, ev, db, userId);
+                    webPushFanOut(circleId, ev, db, userId);
                 }
+                dispatchWebhook(circleId, ev);
             }
         }
     }
@@ -84,7 +88,9 @@ export function evaluateAlerts(db, fix) {
         const unsnoozed = circleMembers.filter(m => !isSnoozed(db, m.user_id, 'low_battery'));
         if (unsnoozed.length > 0) {
             fanOut(circleId, ev, db, userId);
+            webPushFanOut(circleId, ev, db, userId);
         }
+        dispatchWebhook(circleId, ev);
     }
 }
 
@@ -132,6 +138,8 @@ export function evaluateOfflineSweep(db) {
         const unsnoozed = circleMembers.filter(m => !isSnoozed(db, m.user_id, 'offline'));
         if (unsnoozed.length > 0) {
             fanOut(r.circleId, ev, db, r.userId);
+            webPushFanOut(r.circleId, ev, db, r.userId);
         }
+        dispatchWebhook(r.circleId, ev);
     }
 }

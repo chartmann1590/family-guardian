@@ -252,9 +252,9 @@
 
     async function sendAttachment(file, kind, body) {
         const form = new FormData();
-        form.append('file', file);
         form.append('kind', kind);
         if (body) form.append('body', body);
+        form.append('file', file);
         const res = await fetch(`/api/circles/${state.circleId}/messages/attachment`, {
             method: 'POST',
             credentials: 'same-origin',

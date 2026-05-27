@@ -6,9 +6,15 @@ import { mineRoutines, evaluateRoutineSweep } from './routines.js';
 import { evaluateCurfewSweep } from './curfew.js';
 import { buildDigest, persistDigest } from './digest.js';
 import { fanOut, cleanupStaleTokens } from './fcm.js';
+import { fanOut as webPushFanOut } from './webPush.js';
 import { publish } from './hub.js';
 import { BundlingBuffer } from './lib/notificationBundler.js';
 import { DateTime } from 'luxon';
+import { minePlaceSuggestions } from './placeSuggestions.js';
+import { evaluateEtaTick } from './eta.js';
+import { initWebhooks } from './webhooks.js';
+import { dirname, join } from 'node:path';
+import { mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 
 const OFFLINE_SWEEP_INTERVAL_MS = 60_000;
 const PAUSE_SWEEP_INTERVAL_MS = 60_000;
@@ -16,8 +22,11 @@ const ROUTINE_SWEEP_INTERVAL_MS = 60_000;
 const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1_000;
 const MINE_COOLDOWN_MS = 6 * 60 * 60 * 1_000;
+const SUGGESTION_COOLDOWN_MS = 12 * 60 * 60 * 1_000;
 const DIGEST_RETENTION_MS = 12 * 7 * 24 * 60 * 60 * 1_000;
 const EC_EXPIRY_SWEEP_MS = 10 * 60 * 1_000;
+const BREAK_SWEEP_MS = 5 * 60 * 1_000;
+const TRIP_SHARE_EXPIRY_MS = 60 * 60 * 1_000;
 
 function expirePauses(db) {
     const now = Date.now();
@@ -72,6 +81,7 @@ function weeklyDigestTick(db, log) {
             const summary = buildDigest(db, circleId, weekStart, weekEnd);
             persistDigest(db, circleId, weekStart, weekEnd, summary);
             fanOut(circleId, { type: 'weekly_digest', weekStart: String(weekStart), weekEnd: String(weekEnd) }, db);
+            webPushFanOut(circleId, { type: 'weekly_digest', weekStart: String(weekStart), weekEnd: String(weekEnd) }, db);
             firedCircleIds.add(circleId);
         } catch (err) {
             log?.warn?.({ err: err.message, userId: u.user_id }, 'digest_user_failed');
@@ -208,6 +218,129 @@ export function startScheduler(db, log) {
     if (ecExpiryHandle.unref) ecExpiryHandle.unref();
     ecExpiryTick();
 
+    initWebhooks(db);
+
+    // Place suggestion mining (mirrors routine mining pattern)
+    let lastSuggestionTime = 0;
+    const suggestionTick = () => {
+        const now = Date.now();
+        if (now - lastSuggestionTime < SUGGESTION_COOLDOWN_MS) return;
+        try {
+            const result = minePlaceSuggestions(db);
+            lastSuggestionTime = now;
+            log?.info?.(result, 'place_suggestions_mine_complete');
+        } catch (err) {
+            log?.warn?.({ err: err.message }, 'place_suggestions_mine_failed');
+        }
+    };
+
+    const scheduleNextSuggestion = () => {
+        const now = new Date();
+        const next = new Date(now);
+        next.setHours(4, 0, 0, 0);
+        if (next <= now) next.setDate(next.getDate() + 1);
+        const delay = next - now;
+        const handle = setTimeout(() => {
+            suggestionTick();
+            scheduleNextSuggestion();
+        }, delay);
+        if (handle.unref) handle.unref();
+    };
+    scheduleNextSuggestion();
+    suggestionTick();
+
+    // ETA evaluation tick (every 60s)
+    const etaTick = () => {
+        try { evaluateEtaTick(db); } catch (err) { log?.warn?.({ err: err.message }, 'eta_tick_failed'); }
+    };
+    const etaHandle = setInterval(etaTick, 60_000);
+    if (etaHandle.unref) etaHandle.unref();
+
+    // Break nudge sweep (every 5 min)
+    const breakSweepTick = () => {
+        try {
+            const now = Date.now();
+            const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+            const openTrips = db.prepare(`
+                SELECT t.id, t.user_id, t.circle_id, t.started_at, t.break_nudged_at
+                FROM trips t
+                JOIN locations l ON l.user_id = t.user_id
+                WHERE t.ended_at IS NULL AND t.started_at < ?
+            `).all(now - TWO_HOURS_MS);
+
+            for (const trip of openTrips) {
+                if (trip.break_nudged_at) continue;
+
+                const recentFixes = db.prepare(`
+                    SELECT activity, recorded_at FROM locations
+                    WHERE user_id = ? AND recorded_at > ?
+                    ORDER BY recorded_at DESC
+                `).all(trip.user_id, now - TWO_HOURS_MS);
+
+                const hasStill = recentFixes.some(f =>
+                    f.activity === 'still' || f.activity === 'walking'
+                );
+                if (hasStill) continue;
+
+                const displayName = db.prepare('SELECT display_name FROM users WHERE id = ?').get(trip.user_id)?.display_name;
+                const circleId = trip.circle_id;
+                if (!circleId) continue;
+
+                const ev = {
+                    type: 'break_suggested',
+                    userId: trip.user_id,
+                    displayName,
+                    tripId: trip.id,
+                    drivingDurationMs: now - trip.started_at,
+                };
+                publish(circleId, ev);
+                fanOut(circleId, ev, db, trip.user_id);
+                webPushFanOut(circleId, ev, db, trip.user_id);
+                db.prepare('UPDATE trips SET break_nudged_at = ? WHERE id = ?').run(now, trip.id);
+            }
+        } catch (err) { log?.warn?.({ err: err.message }, 'break_sweep_failed'); }
+    };
+    const breakHandle = setInterval(breakSweepTick, BREAK_SWEEP_MS);
+    if (breakHandle.unref) breakHandle.unref();
+
+    // Trip share token expiry sweep (hourly)
+    const shareExpiryTick = () => {
+        try {
+            const now = Date.now();
+            db.prepare('UPDATE trip_share_tokens SET revoked = 1 WHERE revoked = 0 AND expires_at < ?').run(now);
+        } catch (err) { log?.warn?.({ err: err.message }, 'share_expiry_failed'); }
+    };
+    const shareExpiryHandle = setInterval(shareExpiryTick, TRIP_SHARE_EXPIRY_MS);
+    if (shareExpiryHandle.unref) shareExpiryHandle.unref();
+    shareExpiryTick();
+
+    // Auto-backup (nightly if enabled)
+    if (process.env.AUTO_BACKUP_ENABLED === '1') {
+        const backupDir = join(dirname(process.env.DATABASE_PATH || ''), 'backups');
+        try { mkdirSync(backupDir, { recursive: true }); } catch { /* ignore */ }
+
+        const autoBackupTick = () => {
+            try {
+                const backupPath = join(backupDir, `guardian-${new Date().toISOString().replace(/[:.]/g, '-')}.db`);
+                db.prepare(`VACUUM INTO ?`).run(backupPath);
+                const backups = readdirSync(backupDir).filter(f => f.endsWith('.db')).sort();
+                while (backups.length > 7) {
+                    unlinkSync(join(backupDir, backups.shift()));
+                }
+                log?.info?.({ path: backupPath }, 'auto_backup_complete');
+            } catch (err) { log?.warn?.({ err: err.message }, 'auto_backup_failed'); }
+        };
+        const scheduleBackup = () => {
+            const now = new Date();
+            const next = new Date(now);
+            next.setHours(3, 30, 0, 0);
+            if (next <= now) next.setDate(next.getDate() + 1);
+            const handle = setTimeout(() => { autoBackupTick(); scheduleBackup(); }, next - now);
+            if (handle.unref) handle.unref();
+        };
+        scheduleBackup();
+    }
+
     return () => {
         clearInterval(offlineHandle);
         clearInterval(pauseHandle);
@@ -216,6 +349,9 @@ export function startScheduler(db, log) {
         clearInterval(cleanupHandle);
         clearInterval(ecExpiryHandle);
         clearInterval(digestHandle);
+        clearInterval(etaHandle);
+        clearInterval(breakHandle);
+        clearInterval(shareExpiryHandle);
         routineBundler.clear();
     };
 }

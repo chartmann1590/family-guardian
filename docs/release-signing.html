@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Release Signing — Family Guardian</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+<div class="max-w-2xl mx-auto px-4 py-12">
+<h1 class="text-3xl font-bold mb-6">Release Signing</h1>
+<div class="bg-white rounded-lg shadow p-6 space-y-6">
+<h2 class="text-xl font-semibold">Android Signed APK</h2>
+<ol class="list-decimal list-inside space-y-2 text-gray-700">
+<li>Generate a keystore: <code class="bg-gray-100 px-1 rounded">keytool -genkey -v -keystore release.keystore -alias family-guardian -keyalg RSA -keysize 2048 -validity 10000</code></li>
+<li>Base64-encode it: <code class="bg-gray-100 px-1 rounded">base64 release.keystore > keystore.b64</code></li>
+<li>Add GitHub secrets: <code>ANDROID_KEYSTORE_BASE64</code>, <code>ANDROID_KEYSTORE_PASSWORD</code>, <code>ANDROID_KEY_ALIAS</code>, <code>ANDROID_KEY_PASSWORD</code></li>
+<li>Push a tag — the <code>android-release.yml</code> workflow produces a signed APK</li>
+</ol>
+<h2 class="text-xl font-semibold mt-4">iOS Signed IPA</h2>
+<ol class="list-decimal list-inside space-y-2 text-gray-700">
+<li>Requires an Apple Developer Program membership</li>
+<li>Add GitHub secrets: certificate + provisioning profile via <code>apple-actions/import-codesign-certs</code></li>
+<li>Push a tag — the <code>ios-release.yml</code> workflow produces a signed IPA</li>
+<li>Without Apple secrets, the workflow falls back to an unsigned IPA</li>
+</ol>
+</div>
+</div>
+</body>
+</html>

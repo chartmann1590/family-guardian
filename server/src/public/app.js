@@ -424,20 +424,28 @@
         }
     }
 
+    const PLACE_KIND_COLORS = {
+        home: '#006c49', school: '#1a73e8', work: '#5f6368', medical: '#ba1a1a',
+        social: '#e91e63', gym: '#ff6d00', shopping: '#7b1fa2', transit: '#00bcd4',
+        other: '#006c49',
+    };
+
     function drawPlace(p) {
+        const c = PLACE_KIND_COLORS[p.kind] || PLACE_KIND_COLORS.other;
         const existing = placeLayers.get(p.id);
         if (existing) {
             existing.setLatLng([p.lat, p.lng]);
             existing.setRadius(p.radiusM);
+            existing.setStyle({ color: c, fillColor: c });
             return;
         }
         const layer = L.circle([p.lat, p.lng], {
             radius: p.radiusM,
-            color: '#006c49',
+            color: c,
             weight: 2,
             opacity: 0.8,
             dashArray: '6 6',
-            fillColor: '#006c49',
+            fillColor: c,
             fillOpacity: 0.08,
             interactive: false,
         }).addTo(map);
@@ -550,6 +558,33 @@
                     alert('Failed to activate SOS: ' + (e.error || res.status));
                 }
             } finally { sosBtn.disabled = false; }
+        });
+    }
+
+    const shareLiveBtn = document.getElementById('share-live-btn');
+    if (shareLiveBtn) {
+        shareLiveBtn.addEventListener('click', async () => {
+            shareLiveBtn.disabled = true;
+            try {
+                const res = await fetch('/api/users/me/trip-shares', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ durationMinutes: 60 }),
+                });
+                if (!res.ok) {
+                    const e = await res.json().catch(() => ({}));
+                    alert('Failed to share live: ' + (e.error || res.status));
+                    return;
+                }
+                const data = await res.json();
+                if (data.url) {
+                    await navigator.clipboard.writeText(data.url);
+                    toast('Link copied!');
+                }
+            } catch (err) {
+                alert('Failed to share live: ' + err.message);
+            } finally { shareLiveBtn.disabled = false; }
         });
     }
 
@@ -704,6 +739,24 @@
                 }
             } else if (msg.type === 'digest_ready') {
                 scheduleDigestRefresh();
+            } else if (msg.type === 'eta_updated') {
+                const m = members.get(msg.userId);
+                const name = msg.displayName || (m ? m.displayName : 'A member');
+                const etaMin = msg.etaMinutes != null ? msg.etaMinutes + ' min' : 'soon';
+                toast(`${name} · ETA ${etaMin} to ${msg.placeName || 'a place'}`);
+            } else if (msg.type === 'arrived_safely') {
+                const m = members.get(msg.userId);
+                const name = msg.displayName || (m ? m.displayName : 'A member');
+                toast(`${name} arrived safely at ${msg.placeName || 'a place'}`, 'enter');
+            } else if (msg.type === 'break_suggested') {
+                const m = members.get(msg.userId);
+                const name = msg.displayName || (m ? m.displayName : 'A member');
+                const dur = msg.driveMinutes ? `${Math.round(msg.driveMinutes / 60)}hr+` : 'a while';
+                toast(`${name}, you've been driving ${dur}. Time for a break?`);
+            } else if (msg.type === 'routine_deviation_bundle') {
+                toast('Multiple routine alerts');
+            } else if (msg.type === 'driving_score_updated') {
+                scheduleHealthRefresh();
             }
         });
         ws.addEventListener('close', () => {

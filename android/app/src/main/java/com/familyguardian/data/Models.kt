@@ -19,6 +19,8 @@ data class LoginResponse(
     val userId: Long,
     val circleId: Long? = null,
     val displayName: String,
+    val requiresTotp: Boolean = false,
+    val challengeToken: String? = null,
 )
 
 @Serializable
@@ -84,6 +86,7 @@ data class Place(
     val id: Long,
     val circleId: Long,
     val name: String,
+    val kind: String = "other",
     val address: String? = null,
     val lat: Double,
     val lng: Double,
@@ -98,6 +101,7 @@ data class PlacesResponse(val places: List<Place>)
 @Serializable
 data class PlaceBody(
     val name: String,
+    val kind: String = "other",
     val address: String? = null,
     val lat: Double,
     val lng: Double,
@@ -222,6 +226,7 @@ data class Trip(
     val endLng: Double? = null,
     val startLabel: String? = null,
     val endLabel: String? = null,
+    val coachingJson: String? = null,
 )
 
 @Serializable
@@ -321,6 +326,9 @@ data class PlaceSubBody(
     val onExit: Boolean = true,
     val quietStart: Int? = null,
     val quietEnd: Int? = null,
+    val daysOfWeek: String? = null,
+    val windowStart: String? = null,
+    val windowEnd: String? = null,
 )
 
 @Serializable
@@ -587,3 +595,97 @@ data class PendingInvite(
 
 @Serializable
 data class PendingInvitesResponse(val invites: List<PendingInvite> = emptyList())
+
+@Serializable
+data class PlaceSuggestion(
+    val id: Int,
+    val userId: Int,
+    val lat: Double,
+    val lng: Double,
+    val label: String? = null,
+    val visitCount: Int,
+    val totalDwellMs: Long,
+    val firstSeen: Long,
+    val lastSeen: Long,
+    val status: String,
+    val createdAt: Long,
+)
+
+@Serializable
+data class PlaceSuggestionsResponse(val suggestions: List<PlaceSuggestion>)
+
+@Serializable
+data class AcceptSuggestionBody(val name: String, val kind: String = "other", val radiusM: Double = 100.0)
+
+@Serializable
+data class TripShareCreateBody(
+    val durationMinutes: Int = 60,
+    val destination: TripShareDestination? = null,
+    val maxViews: Int? = null,
+)
+
+@Serializable
+data class TripShareDestination(val lat: Double, val lng: Double, val label: String? = null)
+
+@Serializable
+data class TripShareResponse(val token: String, val url: String, val expiresAt: Long)
+
+@Serializable
+data class TripSharesResponse(val shares: List<TripShareItem>)
+
+@Serializable
+data class TripShareItem(
+    val token: String,
+    val userId: Int,
+    val createdAt: Long,
+    val expiresAt: Long,
+    val destination: TripShareDestination? = null,
+    val maxViews: Int? = null,
+    val viewCount: Int,
+    val revoked: Boolean,
+)
+
+@Serializable
+data class WebPushSubscription(val endpoint: String, val keys: WebPushKeys)
+
+@Serializable
+data class WebPushKeys(val p256dh: String, val auth: String)
+
+@Serializable
+data class TotpEnrollStartResponse(val provisioningUri: String, val secret: String)
+
+@Serializable
+data class TotpEnrollConfirmBody(val code: String)
+
+@Serializable
+data class TotpEnrollConfirmResponse(val backupCodes: List<String>)
+
+@Serializable
+data class TotpDisableBody(val password: String, val code: String? = null)
+
+@Serializable
+data class CircleInfo(val circleId: Int, val name: String? = null, val role: String)
+
+@Serializable
+data class CirclesResponse(val circles: List<CircleInfo>)
+
+@Serializable
+data class ActiveCircleBody(val circleId: Int)
+
+@Serializable
+data class WebhookBody(val url: String, val events: String, val active: Boolean = true)
+
+@Serializable
+data class WebhookItem(
+    val id: Int,
+    val circleId: Int,
+    val url: String,
+    val events: String,
+    val active: Boolean,
+    val createdAt: Long,
+    val lastDispatchedAt: Long? = null,
+    val lastError: String? = null,
+)
+
+@Serializable
+data class WebhooksResponse(val webhooks: List<WebhookItem>)

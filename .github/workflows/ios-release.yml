@@ -1,0 +1,52 @@
+name: iOS Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Expo deps
+        working-directory: ios-app
+        run: npm ci
+
+      - name: Install code signing certs
+        if: secrets.APPLE_CERTS_BASE64 != ''
+        uses: apple-actions/import-codesign-certs@v2
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTS_BASE64 }}
+          p12-password: ${{ secrets.APPLE_CERTS_PASSWORD }}
+
+      - name: Download provisioning profile
+        if: secrets.APPLE_PROVISION_PROFILE_BASE64 != ''
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "${{ secrets.APPLE_PROVISION_PROFILE_BASE64 }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+
+      - name: Build signed IPA
+        if: secrets.APPLE_CERTS_BASE64 != ''
+        working-directory: ios-app
+        run: npx expo run:ios --configuration Release
+
+      - name: Build unsigned IPA (fallback)
+        if: secrets.APPLE_CERTS_BASE64 == ''
+        working-directory: ios-app
+        run: npx expo export --platform ios
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: family-guardian.ipa
+          path: ios-app/build/**/*.ipa
+          if-no-files-found: ignore

@@ -863,4 +863,264 @@
     }
 
     initSnoozeUI();
+
+    // --- Sprint 9: Circle switcher ---
+    (async function initCircleSwitcher() {
+        try {
+            const res = await fetch('/api/users/me/circles', { headers: authHeaders() });
+            if (!res.ok) return;
+            const data = await res.json();
+            const circles = data.circles || [];
+            if (circles.length <= 1) return;
+            const wrap = document.createElement('div');
+            wrap.className = 'flex items-center gap-3 mb-4';
+            wrap.innerHTML = `<label class="text-sm font-semibold text-on-surface">Active circle:</label>
+                <select id="circle-switcher" class="border border-outline-variant/50 rounded-lg px-3 py-1.5 text-sm bg-surface-container text-on-surface"></select>`;
+            const main = document.querySelector('main') || document.body;
+            main.prepend(wrap);
+            const sel = wrap.querySelector('select');
+            sel.innerHTML = circles.map(c =>
+                `<option value="${c.id}" ${c.id === state.circleId ? 'selected' : ''}>${esc(c.name)}</option>`
+            ).join('');
+            sel.addEventListener('change', async () => {
+                try {
+                    await fetch('/api/users/me/active-circle', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                        body: JSON.stringify({ circleId: Number(sel.value) }),
+                    });
+                    window.location.reload();
+                } catch (err) { toast('Switch failed: ' + err.message, 'error'); }
+            });
+        } catch {}
+    })();
+
+    // --- Sprint 9: Web Push registration ---
+    (async function initWebPush() {
+        try {
+            const res = await fetch('/api/web-push/public-key', { headers: authHeaders() });
+            if (!res.ok) return;
+            const { publicKey } = await res.json();
+            if (!publicKey) return;
+
+            const container = $('web-push-section');
+            if (!container) return;
+
+            function renderPushUI(permission) {
+                container.innerHTML = '';
+                if (permission === 'granted') {
+                    const disableBtn = document.createElement('button');
+                    disableBtn.className = 'bg-error-container text-on-error-container rounded-full px-4 py-2 text-sm font-semibold';
+                    disableBtn.textContent = 'Disable browser notifications';
+                    disableBtn.addEventListener('click', async () => {
+                        try {
+                            await fetch('/api/web-push/subscriptions', { method: 'DELETE', headers: authHeaders() });
+                            toast('Push notifications disabled', 'success');
+                            renderPushUI(Notification.permission);
+                        } catch (err) { toast('Failed: ' + err.message, 'error'); }
+                    });
+                    container.appendChild(disableBtn);
+                } else if (permission === 'default') {
+                    const enableBtn = document.createElement('button');
+                    enableBtn.className = 'bg-primary text-on-primary rounded-full px-4 py-2 text-sm font-semibold';
+                    enableBtn.textContent = 'Enable browser notifications';
+                    enableBtn.addEventListener('click', async () => {
+                        try {
+                            const perm = await Notification.requestPermission();
+                            if (perm !== 'granted') { toast('Permission denied', 'error'); return; }
+                            const reg = await navigator.serviceWorker.ready;
+                            const sub = await reg.pushManager.subscribe({
+                                applicationServerKey: publicKey,
+                                userVisibleOnly: true,
+                            });
+                            await fetch('/api/web-push/subscriptions', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                                body: JSON.stringify(sub.toJSON()),
+                            });
+                            toast('Push notifications enabled', 'success');
+                            renderPushUI(perm);
+                        } catch (err) { toast('Push setup failed: ' + err.message, 'error'); }
+                    });
+                    container.appendChild(enableBtn);
+                } else {
+                    const note = document.createElement('p');
+                    note.className = 'text-sm text-on-surface-variant';
+                    note.textContent = 'Browser notifications are blocked. Update your browser settings to enable.';
+                    container.appendChild(note);
+                }
+            }
+            renderPushUI(Notification.permission);
+        } catch {}
+    })();
+
+    // --- Sprint 9: 2FA TOTP enrollment ---
+    (function initTOTP() {
+        const section = $('totp-section');
+        if (!section) return;
+
+        function renderIdle() {
+            section.innerHTML = `
+                <h3 class="font-headline-md text-on-surface text-base mb-2">Two-factor authentication</h3>
+                <p class="text-sm text-on-surface-variant mb-3">Add an extra layer of security to your account.</p>
+                <button id="totp-enable-btn" class="bg-primary text-on-primary rounded-full px-4 py-2 text-sm font-semibold">Enable 2FA</button>`;
+            $('totp-enable-btn').addEventListener('click', startEnrollment);
+        }
+
+        async function startEnrollment() {
+            try {
+                const res = await fetch('/api/users/me/totp/enroll-start', {
+                    method: 'POST', headers: authHeaders(),
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                renderEnrolling(data.provisioningUri);
+            } catch (err) { toast('Enrollment failed: ' + err.message, 'error'); }
+        }
+
+        function renderEnrolling(uri) {
+            section.innerHTML = `
+                <h3 class="font-headline-md text-on-surface text-base mb-2">Set up authenticator</h3>
+                <p class="text-sm text-on-surface-variant mb-2">Scan this URI in your authenticator app:</p>
+                <a href="${esc(uri)}" target="_blank" rel="noopener" class="text-primary text-sm break-all underline block mb-3">${esc(uri)}</a>
+                <div class="flex gap-2 items-end">
+                    <div class="flex-1">
+                        <label class="text-sm text-on-surface-variant block mb-1">Verification code</label>
+                        <input id="totp-code" type="text" inputmode="numeric" maxlength="6" class="border border-outline-variant/50 rounded-lg px-3 py-1.5 text-sm w-full" placeholder="000000">
+                    </div>
+                    <button id="totp-confirm-btn" class="bg-primary text-on-primary rounded-full px-4 py-2 text-sm font-semibold">Confirm</button>
+                </div>
+                <button id="totp-cancel-btn" class="text-on-surface-variant text-xs mt-2 hover:underline">Cancel</button>`;
+            $('totp-confirm-btn').addEventListener('click', confirmEnrollment);
+            $('totp-cancel-btn').addEventListener('click', renderIdle);
+        }
+
+        async function confirmEnrollment() {
+            const code = $('totp-code')?.value?.trim();
+            if (!code || code.length !== 6) { toast('Enter a 6-digit code', 'error'); return; }
+            try {
+                const res = await fetch('/api/users/me/totp/enroll-confirm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                    body: JSON.stringify({ code }),
+                });
+                if (!res.ok) {
+                    const e = await res.json().catch(() => ({}));
+                    throw new Error(e.error || 'HTTP ' + res.status);
+                }
+                const data = await res.json();
+                renderEnabled(data.backupCodes || []);
+            } catch (err) { toast('Confirmation failed: ' + err.message, 'error'); }
+        }
+
+        function renderEnabled(backupCodes) {
+            const codesHtml = backupCodes.length
+                ? `<div class="bg-surface-container-high rounded-lg p-3 mb-3"><p class="text-sm font-semibold mb-1">Backup codes (save these!)</p>
+                    <ul class="font-mono text-sm text-on-surface-variant list-disc pl-4">${backupCodes.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>`
+                : '';
+            section.innerHTML = `
+                <h3 class="font-headline-md text-on-surface text-base mb-2">Two-factor authentication <span class="text-xs bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded-full ml-1">Enabled</span></h3>
+                ${codesHtml}
+                <button id="totp-disable-btn" class="bg-error-container text-on-error-container rounded-full px-4 py-2 text-sm font-semibold">Disable 2FA</button>`;
+            $('totp-disable-btn').addEventListener('click', disableTOTP);
+        }
+
+        async function disableTOTP() {
+            const password = prompt('Enter your password to disable 2FA:');
+            if (!password) return;
+            try {
+                const res = await fetch('/api/users/me/totp/disable', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                    body: JSON.stringify({ password }),
+                });
+                if (!res.ok) {
+                    const e = await res.json().catch(() => ({}));
+                    throw new Error(e.error || 'HTTP ' + res.status);
+                }
+                toast('2FA disabled', 'success');
+                renderIdle();
+            } catch (err) { toast('Disable failed: ' + err.message, 'error'); }
+        }
+
+        renderIdle();
+    })();
+
+    // --- Sprint 9: Webhook management (admin only) ---
+    (function initWebhooks() {
+        if (!state.isAdmin) return;
+        const section = $('webhook-section');
+        if (!section) return;
+
+        async function loadWebhooks() {
+            try {
+                const res = await fetch(`/api/circles/${state.circleId}/webhooks`, { headers: authHeaders() });
+                if (!res.ok) return;
+                const data = await res.json();
+                renderWebhooks(data.webhooks || []);
+            } catch {}
+        }
+
+        function renderWebhooks(webhooks) {
+            const list = $('webhook-list');
+            if (!list) return;
+            if (!webhooks.length) {
+                list.innerHTML = '<p class="text-sm text-on-surface-variant">No webhooks configured.</p>';
+                return;
+            }
+            list.innerHTML = webhooks.map(w => `
+                <div class="flex items-center gap-3 py-3 border-b border-outline-variant/20" data-wid="${w.id}">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-semibold text-on-surface truncate">${esc(w.url)}</div>
+                        <div class="text-xs text-on-surface-variant">Events: ${esc((w.events || []).join(', '))} &middot; ${w.active ? 'Active' : 'Inactive'}</div>
+                    </div>
+                    <button class="wh-test bg-surface-container-high text-on-surface rounded-full px-3 py-1 text-xs font-semibold" data-wid="${w.id}">Test</button>
+                    <button class="wh-del text-error text-xs hover:underline" data-wid="${w.id}">Delete</button>
+                </div>`).join('');
+            for (const btn of list.querySelectorAll('.wh-test')) {
+                btn.addEventListener('click', async () => {
+                    btn.disabled = true; btn.textContent = 'Testing...';
+                    try {
+                        const res = await fetch(`/api/webhooks/${btn.dataset.wid}/test`, { method: 'POST', headers: authHeaders() });
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
+                        toast('Test webhook sent', 'success');
+                    } catch (err) { toast('Test failed: ' + err.message, 'error'); }
+                    btn.disabled = false; btn.textContent = 'Test';
+                });
+            }
+            for (const btn of list.querySelectorAll('.wh-del')) {
+                btn.addEventListener('click', async () => {
+                    if (!confirm('Delete this webhook?')) return;
+                    try {
+                        await fetch(`/api/webhooks/${btn.dataset.wid}`, { method: 'DELETE', headers: authHeaders() });
+                        toast('Webhook deleted', 'success');
+                        loadWebhooks();
+                    } catch (err) { toast('Delete failed: ' + err.message, 'error'); }
+                });
+            }
+        }
+
+        $('webhook-add-btn')?.addEventListener('click', async () => {
+            const url = $('webhook-url')?.value?.trim();
+            const events = $('webhook-events')?.value?.split(',').map(s => s.trim()).filter(Boolean);
+            if (!url) { toast('Enter a URL', 'error'); return; }
+            try {
+                const res = await fetch(`/api/circles/${state.circleId}/webhooks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                    body: JSON.stringify({ url, events }),
+                });
+                if (!res.ok) {
+                    const e = await res.json().catch(() => ({}));
+                    throw new Error(e.error || 'HTTP ' + res.status);
+                }
+                $('webhook-url').value = '';
+                $('webhook-events').value = '';
+                toast('Webhook added', 'success');
+                loadWebhooks();
+            } catch (err) { toast('Add failed: ' + err.message, 'error'); }
+        });
+
+        loadWebhooks();
+    })();
 })();

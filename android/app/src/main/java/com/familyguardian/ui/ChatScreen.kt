@@ -262,6 +262,7 @@ fun ChatScreen(onBack: () -> Unit) {
                 Composer(
                     value = input,
                     onChange = { input = it },
+                    onError = { error = it },
                     onSend = {
                     val cid = circleId ?: return@Composer
                     val text = input.trim()
@@ -349,13 +350,43 @@ fun ChatScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun Composer(value: String, onChange: (String) -> Unit, onSend: () -> Unit, sending: Boolean) {
+private fun Composer(value: String, onChange: (String) -> Unit, onError: (String) -> Unit, onSend: () -> Unit, sending: Boolean) {
     val context = LocalContext.current
     val prefs = remember { Prefs(context.applicationContext) }
     val repo = remember { ChatRepo(prefs) }
     val scope = rememberCoroutineScope()
     var recording by remember { mutableStateOf(false) }
     var mediaRecorder by remember { mutableStateOf<android.media.MediaRecorder?>(null) }
+    var currentAudioFile by remember { mutableStateOf<File?>(null) }
+
+    val audioPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (!granted) onError("Microphone permission is required for voice notes")
+    }
+
+    fun stopAndSend() {
+        val mr = mediaRecorder
+        val audioFile = currentAudioFile
+        mediaRecorder = null
+        currentAudioFile = null
+        recording = false
+        mr?.apply {
+            try { stop() } catch (_: Throwable) {}
+            release()
+        }
+        if (audioFile != null && audioFile.exists() && audioFile.length() > 0) {
+            scope.launch {
+                val cid = prefs.snapshot().circleId ?: return@launch
+                try {
+                    repo.sendAttachment(cid, audioFile, "audio")
+                } catch (t: Throwable) {
+                    onError(t.message ?: "Failed to send voice note")
+                }
+                audioFile.delete()
+            }
+        }
+    }
 
     val imagePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.GetContent(),
@@ -364,12 +395,20 @@ private fun Composer(value: String, onChange: (String) -> Unit, onSend: () -> Un
         scope.launch {
             try {
                 val inputStream = context.contentResolver.openInputStream(uri) ?: return@launch
-                val tmpFile = File(context.cacheDir, "upload_img_${System.currentTimeMillis()}.jpg")
+                val actualMime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                val ext = when (actualMime) {
+                    "image/png" -> "png"
+                    "image/webp" -> "webp"
+                    else -> "jpg"
+                }
+                val tmpFile = File(context.cacheDir, "upload_img_${System.currentTimeMillis()}.$ext")
                 tmpFile.outputStream().use { out -> inputStream.copyTo(out) }
                 val cid = prefs.snapshot().circleId ?: return@launch
-                repo.sendAttachment(cid, tmpFile, "image")
+                repo.sendAttachment(cid, tmpFile, "image", mimeType = actualMime)
                 tmpFile.delete()
-            } catch (_: Throwable) {}
+            } catch (t: Throwable) {
+                onError(t.message ?: "Failed to send image")
+            }
         }
     }
 
@@ -391,36 +430,43 @@ private fun Composer(value: String, onChange: (String) -> Unit, onSend: () -> Un
             }
             IconButton(
                 onClick = {
-                    if (recording) return@IconButton
-                    try {
-                        val mr = android.media.MediaRecorder(context)
-                        val tmpFile = File(context.cacheDir, "voice_${System.currentTimeMillis()}.m4a")
-                        mr.setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
-                        mr.setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
-                        mr.setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
-                        mr.setOutputFile(tmpFile.absolutePath)
-                        mr.prepare()
-                        mr.start()
-                        mediaRecorder = mr
-                        recording = true
-                        scope.launch {
-                            kotlinx.coroutines.delay(60_000)
-                            if (recording) {
-                                mediaRecorder?.apply { stop(); release() }
-                                mediaRecorder = null
-                                recording = false
-                                val cid = prefs.snapshot().circleId ?: return@launch
-                                try { repo.sendAttachment(cid, tmpFile, "audio") } catch (_: Throwable) {}
-                                tmpFile.delete()
-                            }
+                    if (recording) {
+                        stopAndSend()
+                    } else {
+                        val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                            context, android.Manifest.permission.RECORD_AUDIO,
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                        if (!hasPermission) {
+                            audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                            return@IconButton
                         }
-                    } catch (_: Throwable) { recording = false }
+                        try {
+                            val tmpFile = File(context.cacheDir, "voice_${System.currentTimeMillis()}.m4a")
+                            val mr = android.media.MediaRecorder(context)
+                            mr.setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                            mr.setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
+                            mr.setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+                            mr.setOutputFile(tmpFile.absolutePath)
+                            mr.prepare()
+                            mr.start()
+                            mediaRecorder = mr
+                            currentAudioFile = tmpFile
+                            recording = true
+                            scope.launch {
+                                kotlinx.coroutines.delay(60_000)
+                                if (recording) stopAndSend()
+                            }
+                        } catch (t: Throwable) {
+                            recording = false
+                            onError(t.message ?: "Failed to start recording")
+                        }
+                    }
                 },
                 modifier = Modifier.size(40.dp),
             ) {
                 Icon(
                     Icons.Filled.Mic,
-                    contentDescription = if (recording) "Recording..." else "Voice note",
+                    contentDescription = if (recording) "Stop recording" else "Voice note",
                     tint = if (recording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

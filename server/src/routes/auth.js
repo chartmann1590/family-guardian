@@ -25,9 +25,6 @@ const COOKIE_OPTS = {
     path: '/',
     httpOnly: true,
     sameSite: 'lax',
-    // In production, require HTTPS for the session cookie. Local dev /
-    // first-run on plain http://localhost still works because NODE_ENV
-    // is unset there.
     secure: process.env.NODE_ENV === 'production',
 };
 
@@ -95,8 +92,13 @@ export default async function authRoutes(fastify, { db }) {
         const { token } = createSession(db, userId);
         const readReceiptsEnabled = !!db.prepare('SELECT read_receipts_enabled FROM users WHERE id = ?').get(userId)?.read_receipts_enabled;
         const crashDetectionEnabled = !!db.prepare('SELECT crash_detection_enabled FROM users WHERE id = ?').get(userId)?.crash_detection_enabled;
+
+        const circles = db.prepare(
+            'SELECT cm.circle_id AS circleId, cm.role FROM circle_members cm WHERE cm.user_id = ?'
+        ).all(userId);
+
         reply.setCookie('fg_session', token, COOKIE_OPTS);
-        return { token, userId, circleId, role, displayName, readReceiptsEnabled, crashDetectionEnabled };
+        return { token, userId, circleId, role, displayName, readReceiptsEnabled, crashDetectionEnabled, circles };
     });
 
     fastify.post('/api/auth/login', {
@@ -112,14 +114,27 @@ export default async function authRoutes(fastify, { db }) {
             req.log.warn({ ip: req.ip, email }, 'login_failed');
             return reply.code(401).send({ error: 'invalid_credentials' });
         }
+
+        const totpRow = db.prepare('SELECT enabled FROM user_totp WHERE user_id = ?').get(user.id);
+        if (totpRow && totpRow.enabled) {
+            const { token: challengeToken } = createSession(db, user.id);
+            reply.setCookie('fg_session', challengeToken, COOKIE_OPTS);
+            return { requiresTotp: true, challengeToken };
+        }
+
         const { token } = createSession(db, user.id);
         reply.setCookie('fg_session', token, COOKIE_OPTS);
         const circleId = db
-            .prepare('SELECT circle_id AS circleId FROM circle_members WHERE user_id = ? LIMIT 1')
+            .prepare('SELECT circle_id AS circleId FROM circle_members WHERE user_id = ? ORDER BY joined_at ASC LIMIT 1')
             .get(user.id)?.circleId;
         const readReceiptsEnabled = !!user.read_receipts_enabled;
         const crashDetectionEnabled = !!user.crash_detection_enabled;
-        return { token, userId: user.id, circleId, displayName: user.display_name, readReceiptsEnabled, crashDetectionEnabled };
+
+        const circles = db.prepare(
+            'SELECT cm.circle_id AS circleId, cm.role FROM circle_members cm WHERE cm.user_id = ?'
+        ).all(user.id);
+
+        return { token, userId: user.id, circleId, displayName: user.display_name, readReceiptsEnabled, crashDetectionEnabled, circles };
     });
 
     fastify.post('/api/auth/logout', async (req, reply) => {
@@ -132,10 +147,54 @@ export default async function authRoutes(fastify, { db }) {
     fastify.get('/api/auth/me', async (req, reply) => {
         const session = lookupSession(db, extractToken(req));
         if (!session) return reply.code(401).send({ error: 'unauthorized' });
+        const circleId = db
+            .prepare('SELECT circle_id AS circleId FROM circle_members WHERE user_id = ? ORDER BY joined_at ASC LIMIT 1')
+            .get(session.userId)?.circleId;
+        const circles = db.prepare(
+            'SELECT cm.circle_id AS circleId, cm.role FROM circle_members cm WHERE cm.user_id = ?'
+        ).all(session.userId);
         return {
             userId: session.userId,
             email: session.email,
             displayName: session.displayName,
+            circleId,
+            circles,
         };
+    });
+
+    fastify.get('/api/users/me/circles', { preHandler: async (req, reply) => {
+        const token = extractToken(req);
+        const session = lookupSession(db, token);
+        if (!session) { reply.code(401).send({ error: 'unauthorized' }); return; }
+        req.auth = { token, ...session };
+    } }, async (req) => {
+        const circles = db.prepare(`
+            SELECT cm.circle_id AS circleId, c.name, cm.role, cm.joined_at AS joinedAt
+            FROM circle_members cm
+            JOIN circles c ON c.id = cm.circle_id
+            WHERE cm.user_id = ?
+            ORDER BY cm.joined_at ASC
+        `).all(req.auth.userId);
+        return { circles };
+    });
+
+    fastify.post('/api/users/me/active-circle', { preHandler: async (req, reply) => {
+        const token = extractToken(req);
+        const session = lookupSession(db, token);
+        if (!session) { reply.code(401).send({ error: 'unauthorized' }); return; }
+        req.auth = { token, ...session };
+    } }, async (req, reply) => {
+        const body = z.object({ circleId: z.number().int().positive() }).safeParse(req.body);
+        if (!body.success) return reply.code(400).send({ error: 'invalid_body' });
+
+        const membership = db.prepare(
+            'SELECT 1 FROM circle_members WHERE circle_id = ? AND user_id = ?'
+        ).get(body.data.circleId, req.auth.userId);
+        if (!membership) return reply.code(403).send({ error: 'not_a_member' });
+
+        db.prepare('UPDATE users SET last_circle_id = ? WHERE id = ?')
+            .run(body.data.circleId, req.auth.userId);
+
+        return { ok: true };
     });
 }

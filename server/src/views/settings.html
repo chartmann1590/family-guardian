@@ -356,6 +356,51 @@
             <div id="active-snoozes-list"></div>
         </section>
 
+        <!-- Browser notifications -->
+        <section id="web-push-section" class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="font-headline-md text-headline-md text-on-surface">Browser notifications</h2>
+                    <p class="text-sm text-on-surface-variant mt-1">Receive push notifications in your browser for alerts and messages.</p>
+                </div>
+                <button id="web-push-enable" class="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-primary/90">Enable</button>
+            </div>
+        </section>
+
+        <!-- Two-factor authentication -->
+        <section id="totp-section" class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="font-headline-md text-headline-md text-on-surface">Two-factor authentication</h2>
+                    <p class="text-sm text-on-surface-variant mt-1">Add an extra layer of security to your account with TOTP.</p>
+                </div>
+                <button id="totp-enable-btn" class="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-primary/90">Set up 2FA</button>
+            </div>
+            <div id="totp-setup" class="hidden mt-4 flex flex-col gap-3">
+                <div id="totp-qr" class="flex justify-center"></div>
+                <p class="text-sm text-on-surface-variant text-center">Enter the 6-digit code from your authenticator app.</p>
+                <input id="totp-code" type="text" maxlength="6" placeholder="000000" class="block w-full max-w-xs mx-auto px-3 py-2 border border-outline-variant rounded-lg bg-surface text-on-surface text-sm text-center tracking-widest">
+                <button id="totp-confirm-btn" class="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-primary/90 self-center">Confirm</button>
+            </div>
+            <div id="totp-backup-codes" class="hidden mt-4 bg-surface-container rounded-lg p-4">
+                <h3 class="font-bold text-sm mb-2">Backup codes</h3>
+                <p class="text-xs text-on-surface-variant mb-2">Save these codes in a safe place. Each can only be used once.</p>
+                <div id="totp-backup-codes-list" class="grid grid-cols-2 gap-1 font-mono text-sm"></div>
+            </div>
+        </section>
+
+        <!-- Webhooks (admin only) -->
+        <section id="webhooks-section" class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">
+            <h2 class="font-headline-md text-headline-md text-on-surface mb-4">Webhooks</h2>
+            <p class="text-sm text-on-surface-variant mb-4">Receive HTTP callbacks when circle events occur. Admin only.</p>
+            <div id="webhooks-list" class="flex flex-col divide-y divide-outline-variant/20 mb-4"></div>
+            <div class="flex flex-col gap-3">
+                <input id="webhook-url" type="url" placeholder="https://example.com/webhook" class="block w-full px-3 py-2 border border-outline-variant rounded-lg bg-surface text-on-surface text-sm">
+                <input id="webhook-events" type="text" placeholder="geofence_enter,geofence_exit,sos_active" class="block w-full px-3 py-2 border border-outline-variant rounded-lg bg-surface text-on-surface text-sm">
+                <button id="add-webhook-btn" class="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-primary/90 self-start">Add webhook</button>
+            </div>
+        </section>
+
         <!-- Emergency contacts -->
         <section class="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 shadow-sm">
             <h2 class="font-headline-md text-headline-md text-on-surface mb-4">Emergency contacts</h2>

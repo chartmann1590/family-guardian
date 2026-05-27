@@ -1,7 +1,11 @@
 // Geofence enter/exit detection. Called from POST /api/locations.
 import { publish } from './hub.js';
 import { fanOutToUsers } from './fcm.js';
+import { fanOutToUsers as webPushFanOut } from './webPush.js';
 import { isSnoozed } from './lib/snooze.js';
+import { estimateLocalMinute } from './routines.js';
+import { evaluateArrivedSafely } from './eta.js';
+import { dispatchWebhook } from './webhooks.js';
 
 const EARTH_RADIUS_M = 6_371_000;
 
@@ -99,7 +103,7 @@ export function reconcileGeofences(db, { userId, circleId, displayName, lat, lng
     reconcile();
 
     const findSubs = db.prepare(`
-        SELECT ps.user_id, ps.quiet_start, ps.quiet_end
+        SELECT ps.user_id, ps.quiet_start, ps.quiet_end, ps.days_of_week, ps.window_start, ps.window_end
         FROM place_subscriptions ps
         WHERE ps.place_id = ?
           AND (ps.member_id IS NULL OR ps.member_id = ?)
@@ -108,13 +112,49 @@ export function reconcileGeofences(db, { userId, circleId, displayName, lat, lng
     `);
     for (const ev of events) {
         const subs = findSubs.all(ev.placeId, ev.userId, ev.type, ev.type);
+
+        const subjectLoc = db.prepare('SELECT lng FROM locations WHERE user_id = ?').get(ev.userId);
+        const subjectLng = subjectLoc?.lng;
+        const localTime = estimateLocalMinute(subjectLng, ev.recordedAt);
+
         ev.notifyUserIds = subs
-            .filter(s => !inQuietHours(s.quiet_start, s.quiet_end, recordedAt) && !isSnoozed(db, s.user_id, ev.type))
+            .filter(s => {
+                if (inQuietHours(s.quiet_start, s.quiet_end, ev.recordedAt)) return false;
+                if (isSnoozed(db, s.user_id, ev.type)) return false;
+
+                const dow = s.days_of_week ?? 127;
+                if (dow !== 127) {
+                    const bit = 1 << localTime.dayOfWeek;
+                    if (!(dow & bit)) return false;
+                }
+                const ws = s.window_start;
+                const we = s.window_end;
+                if (ws != null && we != null) {
+                    const min = localTime.minute;
+                    const inWindow = ws <= we
+                        ? (min >= ws && min < we)
+                        : (min >= ws || min < we);
+                    if (!inWindow) return false;
+                }
+
+                return true;
+            })
             .map(s => s.user_id);
     }
 
-    for (const ev of events) publish(circleId, ev);
-    for (const ev of events) fanOutToUsers(ev.notifyUserIds, ev, db);
+    for (const ev of events) {
+        publish(circleId, ev);
+        fanOutToUsers(ev.notifyUserIds, ev, db);
+        webPushFanOut(ev.notifyUserIds, ev, db);
+        dispatchWebhook(circleId, ev);
+    }
+
+    for (const t of transitions) {
+        if (t.type === 'geofence_enter') {
+            evaluateArrivedSafely(db, t.userId, circleId, t.placeId);
+        }
+    }
+
     if (typeof onTransition === 'function') {
         for (const t of transitions) onTransition(t);
     }

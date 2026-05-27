@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { requireAuth } from '../auth.js';
 import { publish } from '../hub.js';
 import { fanOut } from '../fcm.js';
+import { fanOut as webPushFanOut } from '../webPush.js';
 import { isAllowedImageMime, isAllowedAudioMime, stripImageMetadata } from '../exifStrip.js';
 import { streamToTemp, commitAttachment } from '../uploads.js';
 
@@ -12,7 +13,7 @@ const PostBody = z.object({
 });
 
 const ALLOWED_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
-const ATTACHMENT_BYTES = 2 * 1024 * 1024;
+const ATTACHMENT_BYTES = 8 * 1024 * 1024;
 
 function rowToMsg(r) {
     const msg = {
@@ -65,11 +66,13 @@ export default async function messageRoutes(fastify, { db, uploadsDir }) {
         const msg = rowToMsg(row);
         publish(circleId, { type: 'chat_message', ...msg });
         fanOut(circleId, { type: 'chat_message', ...msg }, db, req.auth.userId);
+        webPushFanOut(circleId, { type: 'chat_message', ...msg }, db, req.auth.userId);
         return msg;
     });
 
     fastify.post('/api/circles/:id/messages/attachment', {
         preHandler: requireAuth(db),
+        bodyLimit: ATTACHMENT_BYTES + 4096,
         config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
     }, async (req, reply) => {
         const circleId = Number(req.params.id);
@@ -88,10 +91,14 @@ export default async function messageRoutes(fastify, { db, uploadsDir }) {
         const validMime = kind === 'image' ? isAllowedImageMime(mime) : isAllowedAudioMime(mime);
         if (!validMime) return reply.code(415).send({ error: 'unsupported_type' });
 
-        if (file.file.truncated) return reply.code(413).send({ error: 'too_large' });
-
-        const body = file.fields.body?.value?.trim()?.slice(0, 2000) || null;
+        const body = file.fields.body?.value?.trim()?.slice(0, 2000) || '';
         const durationMs = file.fields.durationMs?.value ? Number(file.fields.durationMs.value) : null;
+
+        const { tmpPath } = await streamToTemp(file, join(uploadsDir, 'tmp'));
+        if (file.file.truncated) {
+            await import('node:fs/promises').then(m => m.unlink(tmpPath)).catch(() => {});
+            return reply.code(413).send({ error: 'too_large' });
+        }
 
         const now = Date.now();
         const result = db.prepare(
@@ -107,7 +114,6 @@ export default async function messageRoutes(fastify, { db, uploadsDir }) {
         const finalPath = join(msgDir, `${msgId}${ext}`);
 
         try {
-            const { tmpPath } = await streamToTemp(file, join(uploadsDir, 'tmp'));
             const transform = kind === 'image'
                 ? (buf) => stripImageMetadata({ buffer: buf, mime })
                 : null;
@@ -117,6 +123,7 @@ export default async function messageRoutes(fastify, { db, uploadsDir }) {
                 .run(`messages/${circleId}/${msgId}${ext}`, stat.size, msgId);
         } catch (err) {
             db.prepare('DELETE FROM messages WHERE id = ?').run(msgId);
+            await import('node:fs/promises').then(m => m.unlink(tmpPath)).catch(() => {});
             req.log.error({ err: err.message }, 'attachment_write_failed');
             return reply.code(500).send({ error: 'upload_failed' });
         }
@@ -129,6 +136,7 @@ export default async function messageRoutes(fastify, { db, uploadsDir }) {
         const msg = rowToMsg(row);
         publish(circleId, { type: 'chat_message', ...msg });
         fanOut(circleId, { type: 'chat_message', ...msg }, db, req.auth.userId);
+        webPushFanOut(circleId, { type: 'chat_message', ...msg }, db, req.auth.userId);
         return msg;
     });
 

@@ -8,6 +8,9 @@ const SubBody = z.object({
     onExit: z.boolean().optional().default(true),
     quietStart: z.number().int().min(0).max(1439).nullable().optional(),
     quietEnd: z.number().int().min(0).max(1439).nullable().optional(),
+    daysOfWeek: z.number().int().min(0).max(127).optional().default(127),
+    windowStart: z.number().int().min(0).max(1439).nullable().optional(),
+    windowEnd: z.number().int().min(0).max(1439).nullable().optional(),
 });
 
 const SubPatch = z.object({
@@ -15,6 +18,9 @@ const SubPatch = z.object({
     onExit: z.boolean().optional(),
     quietStart: z.number().int().min(0).max(1439).nullable().optional(),
     quietEnd: z.number().int().min(0).max(1439).nullable().optional(),
+    daysOfWeek: z.number().int().min(0).max(127).optional(),
+    windowStart: z.number().int().min(0).max(1439).nullable().optional(),
+    windowEnd: z.number().int().min(0).max(1439).nullable().optional(),
 });
 
 function assertMember(db, circleId, userId, reply) {
@@ -40,6 +46,9 @@ function rowToSub(r) {
         onExit: !!r.on_exit,
         quietStart: r.quiet_start,
         quietEnd: r.quiet_end,
+        daysOfWeek: r.days_of_week ?? 127,
+        windowStart: r.window_start,
+        windowEnd: r.window_end,
         createdAt: r.created_at,
     };
 }
@@ -74,7 +83,7 @@ export default async function placeSubRoutes(fastify, { db }) {
         const parsed = SubBody.safeParse(req.body);
         if (!parsed.success) return reply.code(400).send({ error: 'invalid_body' });
 
-        const { placeId, memberId, onEnter, onExit, quietStart, quietEnd } = parsed.data;
+        const { placeId, memberId, onEnter, onExit, quietStart, quietEnd, daysOfWeek, windowStart, windowEnd } = parsed.data;
 
         const place = db.prepare('SELECT id FROM places WHERE id = ? AND circle_id = ?').get(placeId, circleId);
         if (!place) return reply.code(400).send({ error: 'place_not_in_circle' });
@@ -88,14 +97,17 @@ export default async function placeSubRoutes(fastify, { db }) {
 
         const now = Date.now();
         db.prepare(
-            `INSERT INTO place_subscriptions (user_id, place_id, member_id, on_enter, on_exit, quiet_start, quiet_end, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `INSERT INTO place_subscriptions (user_id, place_id, member_id, on_enter, on_exit, quiet_start, quiet_end, days_of_week, window_start, window_end, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT(user_id, place_id, member_id) DO UPDATE SET
                on_enter = excluded.on_enter,
                on_exit  = excluded.on_exit,
                quiet_start = excluded.quiet_start,
-               quiet_end   = excluded.quiet_end`
-        ).run(req.auth.userId, placeId, memberId ?? null, onEnter ? 1 : 0, onExit ? 1 : 0, quietStart ?? null, quietEnd ?? null, now);
+               quiet_end   = excluded.quiet_end,
+               days_of_week = excluded.days_of_week,
+               window_start = excluded.window_start,
+               window_end   = excluded.window_end`
+        ).run(req.auth.userId, placeId, memberId ?? null, onEnter ? 1 : 0, onExit ? 1 : 0, quietStart ?? null, quietEnd ?? null, daysOfWeek ?? 127, windowStart ?? null, windowEnd ?? null, now);
 
         const row = db.prepare(
             `SELECT ps.*, p.name AS place_name, u.display_name AS member_name
@@ -127,11 +139,14 @@ export default async function placeSubRoutes(fastify, { db }) {
             on_exit: parsed.data.onExit !== undefined ? (parsed.data.onExit ? 1 : 0) : existing.on_exit,
             quiet_start: parsed.data.quietStart !== undefined ? parsed.data.quietStart : existing.quiet_start,
             quiet_end: parsed.data.quietEnd !== undefined ? parsed.data.quietEnd : existing.quiet_end,
+            days_of_week: parsed.data.daysOfWeek !== undefined ? parsed.data.daysOfWeek : (existing.days_of_week ?? 127),
+            window_start: parsed.data.windowStart !== undefined ? parsed.data.windowStart : existing.window_start,
+            window_end: parsed.data.windowEnd !== undefined ? parsed.data.windowEnd : existing.window_end,
         };
 
         db.prepare(
-            `UPDATE place_subscriptions SET on_enter = ?, on_exit = ?, quiet_start = ?, quiet_end = ? WHERE id = ?`
-        ).run(merged.on_enter, merged.on_exit, merged.quiet_start, merged.quiet_end, subId);
+            `UPDATE place_subscriptions SET on_enter = ?, on_exit = ?, quiet_start = ?, quiet_end = ?, days_of_week = ?, window_start = ?, window_end = ? WHERE id = ?`
+        ).run(merged.on_enter, merged.on_exit, merged.quiet_start, merged.quiet_end, merged.days_of_week, merged.window_start, merged.window_end, subId);
 
         const row = db.prepare(
             `SELECT ps.*, p.name AS place_name, u.display_name AS member_name

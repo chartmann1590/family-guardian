@@ -47,13 +47,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.familyguardian.data.AccountRepo
+import com.familyguardian.data.ActiveCircleBody
 import com.familyguardian.data.AlertPrefs
 import com.familyguardian.data.ApiClient
 import com.familyguardian.data.AuthRepo
+import com.familyguardian.data.CircleInfo
 import com.familyguardian.data.CircleMember
 import com.familyguardian.data.DigestRepo
 import com.familyguardian.data.MembersResponse
 import com.familyguardian.data.Prefs
+import com.familyguardian.data.TotpDisableBody
+import com.familyguardian.data.TotpEnrollConfirmBody
 import com.familyguardian.location.LocationService
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.booleanOrNull
@@ -89,6 +93,14 @@ fun AccountScreen(
     var curfewEnabled by remember { mutableStateOf(false) }
     var lowBatteryAlerts by remember { mutableStateOf(false) }
     var lowBatteryThreshold by remember { mutableStateOf(15f) }
+    var totpEnabled by remember { mutableStateOf(false) }
+    var showTotpEnrollDialog by remember { mutableStateOf(false) }
+    var totpProvisioningUri by remember { mutableStateOf<String?>(null) }
+    var totpCode by remember { mutableStateOf("") }
+    var totpBackupCodes by remember { mutableStateOf<List<String>?>(null) }
+    var showTotpDisableDialog by remember { mutableStateOf(false) }
+    var totpDisablePassword by remember { mutableStateOf("") }
+    var circles by remember { mutableStateOf<List<CircleInfo>>(emptyList()) }
 
     LaunchedEffect(Unit) {
         signedInAs = prefs.snapshot().email
@@ -124,11 +136,32 @@ fun AccountScreen(
     LaunchedEffect(Unit) {
         try {
             val s = prefs.snapshot()
-            val server = s.serverUrl ?: return@LaunchedEffect
-            val token = s.token ?: return@LaunchedEffect
-            val url = ApiClient.endpoint(server, "/api/circles/$circleId/members")
-            members = ApiClient.api.listMembers(url, "Bearer $token").members
-        } catch (_: Exception) { }
+            val server = s.serverUrl; val token = s.token
+            if (server != null && token != null) {
+                val url = ApiClient.endpoint(server, "/api/users/me/alert-prefs")
+                val ap = ApiClient.api.getAlertPrefs(url, "Bearer $token")
+                curfewEnabled = ap.curfewEnabled
+                lowBatteryAlerts = ap.lowBatteryAlerts
+                lowBatteryThreshold = (ap.lowBatteryThresholdPct ?: 15).toFloat()
+            }
+        } catch (_: Exception) {}
+        try {
+            val s = prefs.snapshot()
+            val server = s.serverUrl; val token = s.token
+            if (server != null && token != null) {
+                val url = ApiClient.endpoint(server, "/api/users/me")
+                val me = ApiClient.api.me(url, "Bearer $token")
+                totpEnabled = me["totpEnabled"]?.jsonPrimitive?.booleanOrNull == true
+            }
+        } catch (_: Exception) {}
+        try {
+            val s = prefs.snapshot()
+            val server = s.serverUrl; val token = s.token
+            if (server != null && token != null) {
+                val url = ApiClient.endpoint(server, "/api/users/me/circles")
+                circles = ApiClient.api.getCircles(url, "Bearer $token").circles
+            }
+        } catch (_: Exception) {}
     }
 
     Scaffold(
@@ -386,7 +419,73 @@ fun AccountScreen(
             }
 
             item {
-                Text("Export your data", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Two-factor authentication", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (totpEnabled) "Your account is protected with an authenticator app." else "Add a second factor using an authenticator app (TOTP).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        if (totpEnabled) {
+                            showTotpDisableDialog = true
+                        } else {
+                            scope.launch {
+                                try {
+                                    val s = prefs.snapshot()
+                                    val url = ApiClient.endpoint(s.serverUrl!!, "/api/users/me/totp/enroll-start")
+                                    val resp = ApiClient.api.totpEnrollStart(url, "Bearer ${s.token!!}")
+                                    totpProvisioningUri = resp.provisioningUri
+                                    showTotpEnrollDialog = true
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text(if (totpEnabled) "Disable 2FA" else "Enable 2FA")
+                }
+            }
+
+            if (circles.size > 1) {
+                item {
+                    Text("Switch circle", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "You belong to ${circles.size} circles. Switch to change which one is active.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    for (c in circles) {
+                        val isCurrent = c.circleId.toLong() == circleId
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    try {
+                                        val s = prefs.snapshot()
+                                        val url = ApiClient.endpoint(s.serverUrl!!, "/api/users/me/active-circle")
+                                        ApiClient.api.setActiveCircle(url, "Bearer ${s.token!!}", ActiveCircleBody(circleId = c.circleId))
+                                        Toast.makeText(context, "Switched to ${c.name ?: "Circle"}", Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            enabled = !isCurrent,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            shape = RoundedCornerShape(12.dp),
+                        ) {
+                            Text("${c.name ?: "Circle"} (${c.role})${if (isCurrent) " — active" else ""}")
+                        }
+                    }
+                }
+            }
+
+            item {
                 Text(
                     "Download a JSON file containing all your location history, messages, check-ins, and other data.",
                     style = MaterialTheme.typography.bodySmall,
@@ -445,6 +544,107 @@ fun AccountScreen(
                 }
             }
         }
+    }
+
+    if (showTotpEnrollDialog) {
+        AlertDialog(
+            onDismissRequest = { showTotpEnrollDialog = false; totpCode = ""; totpProvisioningUri = null },
+            title = { Text("Set up 2FA") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    totpProvisioningUri?.let { uri ->
+                        Text("Scan this URI in your authenticator app:", style = MaterialTheme.typography.bodyMedium)
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                        ) {
+                            Text(uri, modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    OutlinedTextField(
+                        value = totpCode,
+                        onValueChange = { totpCode = it },
+                        label = { Text("6-digit code") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    totpBackupCodes?.let { codes ->
+                        Text("Backup codes (save these!):", fontWeight = FontWeight.SemiBold)
+                        Text(codes.joinToString(", "), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val s = prefs.snapshot()
+                                val url = ApiClient.endpoint(s.serverUrl!!, "/api/users/me/totp/enroll-confirm")
+                                val resp = ApiClient.api.totpEnrollConfirm(url, "Bearer ${s.token!!}", TotpEnrollConfirmBody(code = totpCode))
+                                totpBackupCodes = resp.backupCodes
+                                totpEnabled = true
+                                if (totpBackupCodes != null) {
+                                    Toast.makeText(context, "2FA enabled! Save your backup codes.", Toast.LENGTH_LONG).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Invalid code: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    enabled = totpCode.length == 6,
+                ) { Text("Confirm") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTotpEnrollDialog = false; totpCode = ""; totpProvisioningUri = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    if (showTotpDisableDialog) {
+        AlertDialog(
+            onDismissRequest = { showTotpDisableDialog = false; totpDisablePassword = "" },
+            title = { Text("Disable 2FA") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Enter your password to disable two-factor authentication.")
+                    OutlinedTextField(
+                        value = totpDisablePassword,
+                        onValueChange = { totpDisablePassword = it },
+                        label = { Text("Password") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val s = prefs.snapshot()
+                                val url = ApiClient.endpoint(s.serverUrl!!, "/api/users/me/totp/disable")
+                                ApiClient.api.totpDisable(url, "Bearer ${s.token!!}", TotpDisableBody(password = totpDisablePassword))
+                                totpEnabled = false
+                                showTotpDisableDialog = false
+                                Toast.makeText(context, "2FA disabled", Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    enabled = totpDisablePassword.isNotBlank(),
+                ) { Text("Disable", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTotpDisableDialog = false; totpDisablePassword = "" }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 
     if (showDeleteDialog) {

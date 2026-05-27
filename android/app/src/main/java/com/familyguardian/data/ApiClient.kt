@@ -11,7 +11,7 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
-import retrofit2.http.Multipart
+
 import retrofit2.http.POST
 import retrofit2.http.PATCH
 import retrofit2.http.Streaming
@@ -108,7 +108,6 @@ interface GuardianApi {
         @Body body: SendMessageBody,
     ): ChatMessage
 
-    @Multipart
     @POST
     suspend fun sendAttachment(
         @Url url: String,
@@ -129,7 +128,6 @@ interface GuardianApi {
         @Body body: CheckinBody,
     ): CheckinResponse
 
-    @Multipart
     @POST
     suspend fun sendCheckinWithPhoto(
         @Url url: String,
@@ -409,6 +407,60 @@ interface GuardianApi {
         @Url url: String,
         @Header("Authorization") auth: String,
     ): PendingInvitesResponse
+
+    @POST
+    suspend fun createTripShare(@Url url: String, @Header("Authorization") auth: String, @Body body: TripShareCreateBody): TripShareResponse
+
+    @GET
+    suspend fun getTripShares(@Url url: String, @Header("Authorization") auth: String): TripSharesResponse
+
+    @DELETE
+    suspend fun revokeTripShare(@Url url: String, @Header("Authorization") auth: String): OkResponse
+
+    @GET
+    suspend fun getPlaceSuggestions(@Url url: String, @Header("Authorization") auth: String): PlaceSuggestionsResponse
+
+    @POST
+    suspend fun acceptPlaceSuggestion(@Url url: String, @Header("Authorization") auth: String, @Body body: AcceptSuggestionBody): OkResponse
+
+    @POST
+    suspend fun dismissPlaceSuggestion(@Url url: String, @Header("Authorization") auth: String): OkResponse
+
+    @GET
+    suspend fun getWebPushPublicKey(@Url url: String): Map<String, String>
+
+    @POST
+    suspend fun registerWebPush(@Url url: String, @Header("Authorization") auth: String, @Body body: WebPushSubscription): OkResponse
+
+    @DELETE
+    suspend fun unregisterWebPush(@Url url: String, @Header("Authorization") auth: String, @Body body: WebPushSubscription): OkResponse
+
+    @POST
+    suspend fun totpEnrollStart(@Url url: String, @Header("Authorization") auth: String): TotpEnrollStartResponse
+
+    @POST
+    suspend fun totpEnrollConfirm(@Url url: String, @Header("Authorization") auth: String, @Body body: TotpEnrollConfirmBody): TotpEnrollConfirmResponse
+
+    @POST
+    suspend fun totpDisable(@Url url: String, @Header("Authorization") auth: String, @Body body: TotpDisableBody): OkResponse
+
+    @POST
+    suspend fun totpLogin(@Url url: String, @Body body: Map<String, String>): LoginResponse
+
+    @GET
+    suspend fun getCircles(@Url url: String, @Header("Authorization") auth: String): CirclesResponse
+
+    @POST
+    suspend fun setActiveCircle(@Url url: String, @Header("Authorization") auth: String, @Body body: ActiveCircleBody): OkResponse
+
+    @GET
+    suspend fun getWebhooks(@Url url: String, @Header("Authorization") auth: String): WebhooksResponse
+
+    @POST
+    suspend fun createWebhook(@Url url: String, @Header("Authorization") auth: String, @Body body: WebhookBody): WebhookItem
+
+    @DELETE
+    suspend fun deleteWebhook(@Url url: String, @Header("Authorization") auth: String): OkResponse
 }
 
 object ApiClient {

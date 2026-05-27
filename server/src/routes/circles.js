@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { z } from 'zod';
 import QRCode from 'qrcode';
 import { requireAuth } from '../auth.js';
 
@@ -111,6 +112,37 @@ export default async function circleRoutes(fastify, { db }) {
         if (!invite) return reply.code(404).send({ error: 'not_found' });
         if (!assertAdmin(db, invite.circle_id, req.auth.userId, reply)) return;
         db.prepare('DELETE FROM invites WHERE code = ?').run(code);
+        return { ok: true };
+    });
+
+    fastify.patch('/api/circles/:id/profile', {
+        preHandler: requireAuth(db),
+        config: { rateLimit: { max: 30, timeWindow: '1 hour' } },
+    }, async (req, reply) => {
+        const circleId = Number(req.params.id);
+        if (!Number.isInteger(circleId)) return reply.code(400).send({ error: 'invalid_circle' });
+
+        const membership = db.prepare(
+            'SELECT 1 FROM circle_members WHERE circle_id = ? AND user_id = ?'
+        ).get(circleId, req.auth.userId);
+        if (!membership) return reply.code(403).send({ error: 'not_a_member' });
+
+        const body = z.object({
+            nickname: z.string().max(64).optional(),
+            photoPath: z.string().max(512).optional(),
+            visibility: z.enum(['full', 'approximate', 'hidden']).optional(),
+        }).safeParse(req.body);
+        if (!body.success) return reply.code(400).send({ error: 'invalid_body' });
+
+        const sets = [];
+        const vals = [];
+        if (body.data.nickname !== undefined) { sets.push('nickname = ?'); vals.push(body.data.nickname); }
+        if (body.data.photoPath !== undefined) { sets.push('photo_path = ?'); vals.push(body.data.photoPath); }
+        if (body.data.visibility !== undefined) { sets.push('visibility = ?'); vals.push(body.data.visibility); }
+        if (sets.length === 0) return reply.code(400).send({ error: 'empty_patch' });
+
+        vals.push(circleId, req.auth.userId);
+        db.prepare(`UPDATE circle_members SET ${sets.join(', ')} WHERE circle_id = ? AND user_id = ?`).run(...vals);
         return { ok: true };
     });
 }
