@@ -48,7 +48,7 @@ export default async function tripShareRoutes(fastify, { db }) {
         const activeCount = db.prepare(
             `SELECT COUNT(*) AS c FROM trip_share_tokens WHERE user_id = ? AND revoked = 0 AND expires_at > ?`
         ).get(userId, Date.now())?.c ?? 0;
-        if (activeCount >= 3) return reply.code(429).send({ error: 'too_many_active_shares' });
+        if (activeCount >= 10) return reply.code(429).send({ error: 'too_many_active_shares' });
 
         const now = Date.now();
         const token = randomBytes(16).toString('base64url');
