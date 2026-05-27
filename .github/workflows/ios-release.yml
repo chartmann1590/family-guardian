@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    env:
+      HAS_CERTS: ${{ secrets.APPLE_CERTS_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -22,25 +24,25 @@ jobs:
         run: npm ci
 
       - name: Install code signing certs
-        if: ${{ secrets.APPLE_CERTS_BASE64 != '' }}
+        if: env.HAS_CERTS == 'true'
         uses: apple-actions/import-codesign-certs@v2
         with:
           p12-file-base64: ${{ secrets.APPLE_CERTS_BASE64 }}
           p12-password: ${{ secrets.APPLE_CERTS_PASSWORD }}
 
       - name: Download provisioning profile
-        if: ${{ secrets.APPLE_PROVISION_PROFILE_BASE64 != '' }}
+        if: env.HAS_CERTS == 'true'
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "${{ secrets.APPLE_PROVISION_PROFILE_BASE64 }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
 
       - name: Build signed IPA
-        if: ${{ secrets.APPLE_CERTS_BASE64 != '' }}
+        if: env.HAS_CERTS == 'true'
         working-directory: ios-app
         run: npx expo run:ios --configuration Release
 
       - name: Build unsigned IPA (fallback)
-        if: ${{ secrets.APPLE_CERTS_BASE64 == '' }}
+        if: env.HAS_CERTS != 'true'
         working-directory: ios-app
         run: npx expo export --platform ios
 
