@@ -478,5 +478,6 @@
         await api.json('/api/web-push/subscriptions', { method: 'POST', body: JSON.stringify(subscription.toJSON()) });
       } catch {}
     }).catch(() => {});
+  }
 })();
 

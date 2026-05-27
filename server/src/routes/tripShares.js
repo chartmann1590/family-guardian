@@ -73,7 +73,7 @@ export default async function tripShareRoutes(fastify, { db }) {
     fastify.get('/api/users/me/trip-shares', { preHandler: requireAuth(db) }, async (req) => {
         const rows = db.prepare(`
             SELECT * FROM trip_share_tokens
-            WHERE user_id = ? AND (revoked = 0 OR revoked_at > ?)
+            WHERE user_id = ? AND (revoked = 0 OR expires_at > ?)
             ORDER BY created_at DESC LIMIT 20
         `).all(req.auth.userId, Date.now() - 24 * 60 * 60 * 1000);
         return { shares: rows.map(rowToJson) };

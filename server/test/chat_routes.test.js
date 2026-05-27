@@ -4,7 +4,7 @@ import cookie from '@fastify/cookie';
 import formbody from '@fastify/formbody';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
-import { mkdirSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import messageRoutes from '../src/routes/messages.js';

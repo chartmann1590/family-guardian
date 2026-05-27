@@ -803,7 +803,7 @@ function MoreTab({ session, onLogout, onRefresh, onOpenRoutines, onOpenDigest }:
   const [totpEnrolled, setTotpEnrolled] = useState(false);
   const [totpEnrolling, setTotpEnrolling] = useState(false);
   const [totpSecret, setTotpSecret] = useState('');
-  const [totpUri, setTotpUri] = useState('');
+  const [_totpUri, setTotpUri] = useState('');
   const [totpConfirmCode, setTotpConfirmCode] = useState('');
   const [circles, setCircles] = useState<CircleInfo[]>([]);
   const [digestDow, setDigestDow] = useState(1);
