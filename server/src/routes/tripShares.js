@@ -2,6 +2,14 @@ import { z } from 'zod';
 import { requireAuth } from '../auth.js';
 import { randomBytes } from 'node:crypto';
 
+function publicBaseUrl(req) {
+    const fwdProto = req.headers['x-forwarded-proto'];
+    const fwdHost = req.headers['x-forwarded-host'];
+    const proto = (typeof fwdProto === 'string' ? fwdProto.split(',')[0].trim() : null) || req.protocol || 'http';
+    const host = (typeof fwdHost === 'string' ? fwdHost.split(',')[0].trim() : null) || req.headers.host;
+    return `${proto}://${host}`;
+}
+
 function rowToJson(r) {
     return {
         token: r.token,
@@ -57,8 +65,7 @@ export default async function tripShareRoutes(fastify, { db }) {
             body.data.maxViews ?? null,
         );
 
-        const baseUrl = process.env.PUBLIC_BASE_URL || `http://${process.env.HOST || '0.0.0.0'}:${process.env.PORT || 8080}`;
-        const url = `${baseUrl}/share/${token}`;
+        const url = `${publicBaseUrl(req)}/share/${token}`;
 
         return { token, url, expiresAt };
     });
