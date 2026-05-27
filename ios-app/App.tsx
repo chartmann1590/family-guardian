@@ -504,12 +504,25 @@ function HealthStrip({ health }: { health: MemberHealth[] }) {
 function MapTab({ members, places, mapRef, onMember, onShare, sharing, onSos, onCheckIn, health, digest, onOpenDigest, session }: any) {
   const first = members.find((m: Member) => m.lat && m.lng);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
-  async function shareLive() {
+  async function createShare(minutes: number, label: string) {
     try {
-      const res = await api<TripShareResponse>(session, '/api/users/me/trip-shares', { method: 'POST', body: '{}' });
+      const res = await api<TripShareResponse>(session, '/api/users/me/trip-shares', {
+        method: 'POST',
+        body: JSON.stringify({ durationMinutes: minutes }),
+      });
       setShareUrl(res.url);
-      Alert.alert('Link copied', `Share link: ${res.url}`);
+      Alert.alert(`Link active — ${label}`, res.url);
     } catch (e: any) { Alert.alert('Share failed', e.message); }
+  }
+  function shareLive() {
+    Alert.alert('Share live location', 'How long should the link stay active?', [
+      { text: '15 minutes', onPress: () => createShare(15, '15 min') },
+      { text: '30 minutes', onPress: () => createShare(30, '30 min') },
+      { text: '1 hour', onPress: () => createShare(60, '1 hour') },
+      { text: '2 hours', onPress: () => createShare(120, '2 hours') },
+      { text: '4 hours', onPress: () => createShare(240, '4 hours') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }
   return <View style={styles.flex}><HealthStrip health={health} />
     {digest && digest.summary && <Pressable style={styles.digestCard} onPress={onOpenDigest}><Text style={styles.digestCardTitle}>This week</Text>{digest.summary.members.slice(0, 4).map((m: any) => <Text key={m.userId} style={styles.digestCardLine}>{m.displayName}: {m.tripCount} trips, {fmtDist(m.totalDistanceM)}</Text>)}</Pressable>}

@@ -239,6 +239,7 @@ fun MapScreen(
     var healthRefresh by remember { mutableStateOf(0) }
     var placeOverlays by remember { mutableStateOf<List<com.familyguardian.data.Place>>(emptyList()) }
     var shareLiveInFlight by remember { mutableStateOf(false) }
+    var showShareDurationPicker by remember { mutableStateOf(false) }
     val healthRepo = remember { HealthRepo(prefs) }
     val digestRepo = remember { DigestRepo(prefs) }
     var digestSummary by remember { mutableStateOf<DigestData?>(null) }
@@ -516,6 +517,46 @@ fun MapScreen(
             }
         }
         onDispose { job.cancel() }
+    }
+
+    if (showShareDurationPicker) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showShareDurationPicker = false },
+            title = { Text("Share live location", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("How long should the link stay active?", style = MaterialTheme.typography.bodyMedium)
+                    for ((minutes, label) in listOf(15 to "15 minutes", 30 to "30 minutes", 60 to "1 hour", 120 to "2 hours", 240 to "4 hours")) {
+                        Button(
+                            onClick = {
+                                showShareDurationPicker = false
+                                shareLiveInFlight = true
+                                scope.launch {
+                                    try {
+                                        val snap = prefs.snapshot()
+                                        val url = ApiClient.endpoint(snap.serverUrl!!, "/api/users/me/trip-shares")
+                                        val resp = ApiClient.api.createTripShare(url, "Bearer ${snap.token!!}", com.familyguardian.data.TripShareCreateBody(durationMinutes = minutes))
+                                        val clipboard = appCtx.getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                                        clipboard.setPrimaryClip(ClipData.newPlainText("Trip share", resp.url))
+                                        Toast.makeText(appCtx, "Link copied — expires in $label", Toast.LENGTH_SHORT).show()
+                                    } catch (t: Throwable) {
+                                        Toast.makeText(appCtx, "Failed: ${t.message}", Toast.LENGTH_SHORT).show()
+                                    } finally {
+                                        shareLiveInFlight = false
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                        ) { Text(label) }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showShareDurationPicker = false }) { Text("Cancel") }
+            },
+        )
     }
 
     if (checkinDialogOpen) {
@@ -844,21 +885,7 @@ fun MapScreen(
                                         leadingIcon = { Icon(Icons.Filled.Visibility, contentDescription = null) },
                                         onClick = {
                                             overflowMenuOpen = false
-                                            shareLiveInFlight = true
-                                            scope.launch {
-                                                try {
-                                                    val snap = prefs.snapshot()
-                                                    val url = ApiClient.endpoint(snap.serverUrl!!, "/api/users/me/trip-shares")
-                                                    val resp = ApiClient.api.createTripShare(url, "Bearer ${snap.token!!}", com.familyguardian.data.TripShareCreateBody())
-                                                    val clipboard = appCtx.getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                                                    clipboard.setPrimaryClip(ClipData.newPlainText("Trip share", resp.url))
-                                                    Toast.makeText(appCtx, "Link copied to clipboard", Toast.LENGTH_SHORT).show()
-                                                } catch (t: Throwable) {
-                                                    Toast.makeText(appCtx, "Failed: ${t.message}", Toast.LENGTH_SHORT).show()
-                                                } finally {
-                                                    shareLiveInFlight = false
-                                                }
-                                            }
+                                            showShareDurationPicker = true
                                         },
                                     )
                                     DropdownMenuItem(
