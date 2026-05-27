@@ -259,9 +259,18 @@ fun ChatScreen(onBack: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                var typingLastSent by remember { mutableStateOf(0L) }
                 Composer(
                     value = input,
-                    onChange = { input = it },
+                    onChange = {
+                        input = it
+                        val now = System.currentTimeMillis()
+                        if (now - typingLastSent > 3000) {
+                            typingLastSent = now
+                            val cid = circleId ?: return@Composer
+                            scope.launch { try { repo.sendTyping(cid) } catch (_: Throwable) {} }
+                        }
+                    },
                     onError = { error = it },
                     onSend = {
                     val cid = circleId ?: return@Composer
