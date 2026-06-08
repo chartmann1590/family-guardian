@@ -3,6 +3,8 @@ name: Release
 on:
   push:
     branches: [master, main]
+    paths-ignore:
+      - 'feedback-assets/**'
   workflow_dispatch:
 
 permissions:

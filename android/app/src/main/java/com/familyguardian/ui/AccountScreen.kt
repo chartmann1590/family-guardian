@@ -955,28 +955,6 @@ fun AccountScreen(
                     }
 
                     item {
-                        OutlinedTextField(
-                            value = name,
-                            onValueChange = { name = it },
-                            label = { Text("Your Name (Optional)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !submitting
-                        )
-                    }
-
-                    item {
-                        OutlinedTextField(
-                            value = email,
-                            onValueChange = { email = it },
-                            label = { Text("Your Email (Optional)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !submitting
-                        )
-                    }
-
-                    item {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.clickable(enabled = !submitting) { includeDiagnostics = !includeDiagnostics }
@@ -987,7 +965,7 @@ fun AccountScreen(
                                 enabled = !submitting
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text("Include system info & models", style = MaterialTheme.typography.bodyMedium)
+                            Text("Include phone system info and models", style = MaterialTheme.typography.bodyMedium)
                         }
                     }
 
@@ -1041,6 +1019,28 @@ fun AccountScreen(
                                 }
                             }
                         }
+                    }
+
+                    item {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text("Your Name (Optional)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !submitting
+                        )
+                    }
+
+                    item {
+                        OutlinedTextField(
+                            value = email,
+                            onValueChange = { email = it },
+                            label = { Text("Your Email (Optional)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !submitting
+                        )
                     }
                 }
             },
