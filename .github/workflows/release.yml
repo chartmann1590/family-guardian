@@ -57,6 +57,13 @@ jobs:
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
 
+      - name: Inject GitHub Issue Reporter Properties
+        run: |
+          echo "github.api.token=${{ secrets.GH_API_TOKEN }}" >> local.properties
+          echo "github.repo.owner=${{ secrets.GH_REPO_OWNER }}" >> local.properties
+          echo "github.repo.name=${{ secrets.GH_REPO_NAME }}" >> local.properties
+        working-directory: android
+
       - name: Assemble debug APK
         run: |
           ./gradlew assembleDebug --no-daemon --stacktrace \

@@ -38,6 +38,13 @@ jobs:
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
 
+      - name: Inject Stub GitHub Properties for CI
+        run: |
+          echo "github.api.token=stub_token" >> local.properties
+          echo "github.repo.owner=stub_owner" >> local.properties
+          echo "github.repo.name=stub_name" >> local.properties
+        working-directory: android
+
       - name: Assemble debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
