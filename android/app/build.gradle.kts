@@ -9,12 +9,12 @@ plugins {
 
 android {
     namespace = "com.familyguardian"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.familyguardian"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = (providers.gradleProperty("FG_VERSION_CODE").orNull ?: "1").toInt()
         versionName = providers.gradleProperty("FG_VERSION_NAME").orNull ?: "0.1.0"
 
