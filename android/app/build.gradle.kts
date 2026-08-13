@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -17,19 +15,6 @@ android {
         targetSdk = 36
         versionCode = (providers.gradleProperty("FG_VERSION_CODE").orNull ?: "1").toInt()
         versionName = providers.gradleProperty("FG_VERSION_NAME").orNull ?: "0.1.0"
-
-        val localProperties = Properties()
-        val localPropertiesFile = rootProject.file("local.properties")
-        if (localPropertiesFile.exists()) {
-            localPropertiesFile.inputStream().use { localProperties.load(it) }
-        }
-        val githubToken = localProperties.getProperty("github.api.token") ?: "stub_token"
-        val githubOwner = localProperties.getProperty("github.repo.owner") ?: "chartmann1590"
-        val githubName = localProperties.getProperty("github.repo.name") ?: "family-guardian"
-
-        buildConfigField("String", "GITHUB_API_TOKEN", "\"$githubToken\"")
-        buildConfigField("String", "GITHUB_REPO_OWNER", "\"$githubOwner\"")
-        buildConfigField("String", "GITHUB_REPO_NAME", "\"$githubName\"")
     }
 
     // Reads keystore details from ~/.gradle/gradle.properties so the keystore

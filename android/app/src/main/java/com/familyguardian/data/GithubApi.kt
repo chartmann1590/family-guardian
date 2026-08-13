@@ -8,55 +8,44 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.http.Body
 import retrofit2.http.GET
-import retrofit2.http.Header
 import retrofit2.http.POST
-import retrofit2.http.PUT
 import retrofit2.http.Path
 
 interface GithubApi {
-    @POST("repos/{owner}/{repo}/issues")
+    @POST("issue")
     suspend fun createIssue(
-        @Header("Authorization") auth: String,
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
         @Body body: CreateIssueRequest
     ): GithubIssue
 
-    @GET("repos/{owner}/{repo}/issues/{number}")
+    @GET("issue/{number}")
     suspend fun getIssue(
-        @Header("Authorization") auth: String,
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
         @Path("number") number: Int
     ): GithubIssue
 
-    @GET("repos/{owner}/{repo}/issues/{number}/comments")
+    @GET("issue/{number}/comments")
     suspend fun getComments(
-        @Header("Authorization") auth: String,
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
         @Path("number") number: Int
     ): List<GithubComment>
 
-    @POST("repos/{owner}/{repo}/issues/{number}/comments")
+    @POST("issue/{number}/comments")
     suspend fun postComment(
-        @Header("Authorization") auth: String,
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
         @Path("number") number: Int,
         @Body body: PostCommentRequest
     ): GithubComment
 
-    @PUT("repos/{owner}/{repo}/contents/feedback-assets/{filename}")
+    @POST("upload-image")
     suspend fun uploadAsset(
-        @Header("Authorization") auth: String,
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-        @Path("filename") filename: String,
         @Body body: UploadAssetRequest
     ): UploadAssetResponse
 }
 
+/**
+ * Talks to the cloudflare-worker/ feedback relay, not api.github.com directly. See
+ * cloudflare-worker/src/index.ts, which holds the GitHub token server-side as a Worker
+ * secret. Previously this embedded BuildConfig.GITHUB_API_TOKEN client-side as a Bearer
+ * header, which shipped a real repo-write PAT in every release build (extractable from
+ * the APK).
+ */
 object GithubClient {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -65,19 +54,11 @@ object GithubClient {
 
     private val okHttp = OkHttpClient.Builder()
         .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
-        .addInterceptor { chain ->
-            val req = chain.request().newBuilder()
-                .header("Accept", "application/vnd.github+json")
-                .header("X-GitHub-Api-Version", "2022-11-28")
-                .header("User-Agent", "FamilyGuardian-Android/0.1")
-                .build()
-            chain.proceed(req)
-        }
         .build()
 
     val api: GithubApi by lazy {
         Retrofit.Builder()
-            .baseUrl("https://api.github.com/")
+            .baseUrl("https://family-guardian-github-feedback.charles-h-hartmann1.workers.dev/")
             .client(okHttp)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()

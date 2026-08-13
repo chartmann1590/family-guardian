@@ -47,9 +47,8 @@ data class PostCommentRequest(
 
 @Serializable
 data class UploadAssetRequest(
-    val message: String,
-    val content: String, // Base64-encoded file
-    val branch: String? = null
+    val filename: String,
+    val contentBase64: String
 )
 
 @Serializable

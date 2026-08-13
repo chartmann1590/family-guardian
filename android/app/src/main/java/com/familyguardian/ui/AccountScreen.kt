@@ -87,7 +87,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.familyguardian.BuildConfig
 import com.familyguardian.data.BugReport
 import com.familyguardian.data.BugReportRepo
 import com.familyguardian.data.CreateIssueRequest
@@ -179,13 +178,7 @@ fun AccountScreen(
             if (currentList.isNotEmpty()) {
                 val updatedList = currentList.map { report ->
                     try {
-                        val authHeader = "Bearer ${BuildConfig.GITHUB_API_TOKEN}"
-                        val latest = GithubClient.api.getIssue(
-                            auth = authHeader,
-                            owner = BuildConfig.GITHUB_REPO_OWNER,
-                            repo = BuildConfig.GITHUB_REPO_NAME,
-                            number = report.number
-                        )
+                        val latest = GithubClient.api.getIssue(number = report.number)
                         report.copy(status = latest.state)
                     } catch (e: Exception) {
                         report
@@ -1050,10 +1043,6 @@ fun AccountScreen(
                         scope.launch {
                             submitting = true
                             try {
-                                val authHeader = "Bearer ${BuildConfig.GITHUB_API_TOKEN}"
-                                val owner = BuildConfig.GITHUB_REPO_OWNER
-                                val repoName = BuildConfig.GITHUB_REPO_NAME
-
                                 var finalDescription = description
                                 if (name.isNotBlank() || email.isNotBlank()) {
                                     finalDescription += "\n\n---\n**Reporter Info:**"
@@ -1067,13 +1056,9 @@ fun AccountScreen(
                                     if (base64Content != null) {
                                         val filename = "screenshot_${System.currentTimeMillis()}.png"
                                         val uploadResp = GithubClient.api.uploadAsset(
-                                            auth = authHeader,
-                                            owner = owner,
-                                            repo = repoName,
-                                            filename = filename,
                                             body = UploadAssetRequest(
-                                                message = "Upload screenshot feedback asset",
-                                                content = base64Content
+                                                filename = filename,
+                                                contentBase64 = base64Content
                                             )
                                         )
                                         finalDescription += "\n\n![Screenshot](${uploadResp.content.download_url})"
@@ -1098,9 +1083,6 @@ fun AccountScreen(
                                 }
 
                                 val issueResp = GithubClient.api.createIssue(
-                                    auth = authHeader,
-                                    owner = owner,
-                                    repo = repoName,
                                     body = CreateIssueRequest(
                                         title = title,
                                         body = finalDescription
@@ -1160,18 +1142,14 @@ fun AccountScreen(
         LaunchedEffect(currentIssue) {
             loadingDetail = true
             try {
-                val authHeader = "Bearer ${BuildConfig.GITHUB_API_TOKEN}"
-                val owner = BuildConfig.GITHUB_REPO_OWNER
-                val repoName = BuildConfig.GITHUB_REPO_NAME
-
-                val fullIssue = GithubClient.api.getIssue(authHeader, owner, repoName, currentIssue.number)
+                val fullIssue = GithubClient.api.getIssue(currentIssue.number)
                 issueDetailBody = fullIssue.body ?: ""
 
                 if (fullIssue.state != currentIssue.status) {
                     bugReportRepo.saveBugReport(currentIssue.copy(status = fullIssue.state))
                 }
 
-                comments = GithubClient.api.getComments(authHeader, owner, repoName, currentIssue.number)
+                comments = GithubClient.api.getComments(currentIssue.number)
             } catch (e: Exception) {
                 Toast.makeText(context, "Failed to load thread: ${e.message}", Toast.LENGTH_SHORT).show()
             } finally {
@@ -1347,10 +1325,6 @@ fun AccountScreen(
                                     scope.launch {
                                         postingReply = true
                                         try {
-                                            val authHeader = "Bearer ${BuildConfig.GITHUB_API_TOKEN}"
-                                            val owner = BuildConfig.GITHUB_REPO_OWNER
-                                            val repoName = BuildConfig.GITHUB_REPO_NAME
-
                                             var finalCommentBody = "**[User Reply from App]**\n\n$replyText"
 
                                             replyScreenshotUri?.let { uri ->
@@ -1358,13 +1332,9 @@ fun AccountScreen(
                                                 if (base64Content != null) {
                                                     val filename = "screenshot_${System.currentTimeMillis()}.png"
                                                     val uploadResp = GithubClient.api.uploadAsset(
-                                                        auth = authHeader,
-                                                        owner = owner,
-                                                        repo = repoName,
-                                                        filename = filename,
                                                         body = UploadAssetRequest(
-                                                            message = "Upload screenshot comment asset",
-                                                            content = base64Content
+                                                            filename = filename,
+                                                            contentBase64 = base64Content
                                                         )
                                                     )
                                                     finalCommentBody += "\n\n![Screenshot](${uploadResp.content.download_url})"
@@ -1372,9 +1342,6 @@ fun AccountScreen(
                                             }
 
                                             GithubClient.api.postComment(
-                                                auth = authHeader,
-                                                owner = owner,
-                                                repo = repoName,
                                                 number = currentIssue.number,
                                                 body = PostCommentRequest(body = finalCommentBody)
                                             )
@@ -1382,7 +1349,7 @@ fun AccountScreen(
                                             replyText = ""
                                             replyScreenshotUri = null
 
-                                            comments = GithubClient.api.getComments(authHeader, owner, repoName, currentIssue.number)
+                                            comments = GithubClient.api.getComments(currentIssue.number)
                                             Toast.makeText(context, "Reply posted", Toast.LENGTH_SHORT).show()
                                         } catch (e: Exception) {
                                             Toast.makeText(context, "Failed to post reply: ${e.message}", Toast.LENGTH_LONG).show()
