@@ -193,7 +193,7 @@ export default async function messageRoutes(fastify, { db, uploadsDir }) {
             `SELECT m.*, u.display_name FROM messages m
              JOIN users u ON u.id = m.user_id
              WHERE m.circle_id = ? AND m.created_at < ?
-             ORDER BY m.created_at DESC LIMIT ?`
+             ORDER BY m.created_at DESC, m.id DESC LIMIT ?`
         ).all(circleId, before, limit);
 
         const messages = rows.map(rowToMsg).reverse();
