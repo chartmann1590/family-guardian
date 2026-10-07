@@ -30,7 +30,7 @@ export default async function accountRoutes(fastify, { db }) {
         {
             key: 'messages',
             sql: `SELECT id, circle_id, body, created_at
-                  FROM messages WHERE user_id = ? ORDER BY created_at ASC`,
+                  FROM messages WHERE user_id = ? ORDER BY created_at ASC, id ASC`,
         },
         {
             key: 'checkins',
